@@ -1,0 +1,22 @@
+# Everything below is made on YOUR computer from YOUR copy of the game (or is personal) - never commit it.
+# Game-derived data
+catalog/
+items.json
+icons/
+icons-missing.txt
+Mappings.usmap
+*.usmap
+Output/
+# Personal / generated
+config.json
+Backups/
+error.log
+spoiler.json
+theme.json
+backpacks.json
+recipe-tweaks.json
+*.bak
+*.bak-*
+# Game artwork (this repository ships none)
+assets/logo.png
+assets/art_*.jpg
