@@ -142,7 +142,7 @@ If you see *"The game data has not been made yet"*, go back to step 5.
 4. **Preview** shows exactly what will change; **Apply to save** writes it. A copy of the save is stored in `Backups\` first, and **Restore** puts it back.
 5. Start the game and load your save.
 
-**Player tools** (button at the top): vitals, skills, skill points, recipes, teleport, quest progress (read-only). Change values, then apply with the game closed.
+**Player tools** (button at the top): vitals, skills, skill points, recipes, teleport, quest progress (read-only). Change values, then apply with the game closed. Hover a recipe in the Recipes tab to see its picture, cost or ingredients (pictures are built by `Build-RecipeIcons.ps1`, part of the full rebuild).
 
 **Game data** (button at the top): every table the tool built. Quest and dialogue text is hidden behind a **spoiler guard** that is on by default.
 

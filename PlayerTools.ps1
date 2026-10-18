@@ -110,6 +110,69 @@ function PT-Commit([hashtable]$changes, [string]$summary, [string]$warnText = ''
   }
 }
 
+# ---------- recipe hover pictures (catalog\recipe-icons.csv from Build-RecipeIcons.ps1; text-only when a recipe has no picture) ----------
+$script:RcTip = @{ Map = $null; Img = @{}; Data = $null; Key = $null; Tt = $null }
+function PT-RcImage([string]$rel) {
+  if (-not $rel) { return $null }
+  if ($script:RcTip.Img.ContainsKey($rel)) { return $script:RcTip.Img[$rel] }
+  $img = $null; $f = Join-Path $PSScriptRoot $rel
+  if (Test-Path -LiteralPath $f) { try { $ms = New-Object IO.MemoryStream (, [IO.File]::ReadAllBytes($f)); $img = [System.Drawing.Image]::FromStream($ms) } catch { $img = $null } }
+  $script:RcTip.Img[$rel] = $img; return $img
+}
+function PT-RcInfo($r) {
+  if (-not $script:RcTip.Map) {
+    $m = @{}; $f = Join-Path $PSScriptRoot 'catalog\recipe-icons.csv'
+    if (Test-Path -LiteralPath $f) { foreach ($x in (Import-Csv $f)) { $m[$x.Asset] = $x } }
+    $script:RcTip.Map = $m
+  }
+  return $script:RcTip.Map[$r.Asset]
+}
+function PT-RcWrap([string]$text, [int]$max) {
+  $out = New-Object System.Collections.Generic.List[string]; $line = ''
+  foreach ($w in ($text -split '\s+' | Where-Object { $_ })) { if ($line.Length + $w.Length + 1 -gt $max -and $line) { $out.Add($line); $line = $w } else { $line = $(if ($line) { "$line $w" } else { $w }) } }
+  if ($line) { $out.Add($line) }; return , $out.ToArray()
+}
+function PT-RcTipData($r, [string]$status, [string]$group = "") {
+  $info = PT-RcInfo $r; $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add("$($r.Kind)  /  $(if ($group) { $group } elseif ($r.Group) { $r.Group } else { 'General' })  -  $status")
+  if ($info -and $info.Detail) { foreach ($seg in ($info.Detail -split ' \| ')) { foreach ($w in (PT-RcWrap $seg 70)) { $lines.Add($w) } } }
+  $img = $null; if ($info) { $img = PT-RcImage $info.IconFile }
+  return @{ Id = $r.Name; Lines = $lines.ToArray(); Icon = $img }
+}
+function PT-RcMeasure($d) {
+  $fb = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold); $f = New-Object System.Drawing.Font('Segoe UI', 9)
+  $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$d.Id, $fb).Width; $th = 24
+  foreach ($ln in $d.Lines) { $s = [System.Windows.Forms.TextRenderer]::MeasureText([string]$ln, $f); $tw = [math]::Max($tw, $s.Width); $th += 18 }
+  $iw = if ($d.Icon) { 112 } else { 0 }
+  $w = [math]::Min([int]($iw + $tw + 28), 640); $h = [math]::Max([int]($th + 14), $(if ($d.Icon) { 120 } else { 44 })); $fb.Dispose(); $f.Dispose()
+  return New-Object System.Drawing.Size($w, $h)
+}
+function PT-RcDraw($g, $r, $d) {
+  $g.SmoothingMode = 'AntiAlias'; $g.InterpolationMode = 'HighQualityBicubic'
+  $bg = New-Object System.Drawing.SolidBrush ($script:Th.Panel); $g.FillRectangle($bg, $r); $bg.Dispose()
+  $pen = New-Object System.Drawing.Pen ($script:Th.Accent); $g.DrawRectangle($pen, $r.X, $r.Y, $r.Width - 1, $r.Height - 1); $pen.Dispose()
+  $x = $r.X + 8
+  if ($d.Icon) { $box = 96; $sc = [math]::Min($box / $d.Icon.Width, $box / $d.Icon.Height); $w = [int]($d.Icon.Width * $sc); $h = [int]($d.Icon.Height * $sc)
+    $g.DrawImage($d.Icon, $x + [int](($box - $w) / 2), $r.Y + [int](($r.Height - $h) / 2), $w, $h); $x += 104 }
+  $fb = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold); $f = New-Object System.Drawing.Font('Segoe UI', 9); $y = $r.Y + 8
+  [System.Windows.Forms.TextRenderer]::DrawText($g, [string]$d.Id, $fb, (New-Object System.Drawing.Point($x, $y)), $script:Th.Text); $y += 24
+  foreach ($ln in $d.Lines) { [System.Windows.Forms.TextRenderer]::DrawText($g, [string]$ln, $f, (New-Object System.Drawing.Point($x, $y)), $script:Th.Muted); $y += 18 }
+  $fb.Dispose(); $f.Dispose()
+}
+function PT-RcHover($lv, $e) {
+  $it = $lv.GetItemAt($e.X, $e.Y)
+  if (-not $it -or -not $it.Tag) { $script:RcTip.Key = $null; $script:RcTip.Tt.Hide($lv); return }
+  if ($script:RcTip.Key -eq $it.Tag.Asset) { return }
+  $script:RcTip.Key = $it.Tag.Asset; $script:RcTip.Data = PT-RcTipData $it.Tag $it.SubItems[3].Text $it.SubItems[2].Text
+  $script:RcTip.Tt.Show(' ', $lv, ($e.X + 18), ($e.Y + 22))
+}
+function PT-RcInitTip($lv) {
+  $tt = New-Object System.Windows.Forms.ToolTip; $tt.OwnerDraw = $true; $tt.ShowAlways = $true; $tt.AutoPopDelay = 30000; $script:RcTip.Tt = $tt
+  $tt.Add_Popup({ param($s, $e) if ($script:RcTip.Data) { $e.ToolTipSize = PT-RcMeasure $script:RcTip.Data } })
+  $tt.Add_Draw({ param($s, $e) if ($script:RcTip.Data) { PT-RcDraw $e.Graphics $e.Bounds $script:RcTip.Data } else { $e.DrawBackground(); $e.DrawBorder(); $e.DrawText() } })
+  $lv.Add_MouseMove({ param($s, $e) PT-RcHover $s $e })
+  $lv.Add_MouseLeave({ $script:RcTip.Key = $null; $script:RcTip.Tt.Hide($script:PT.LvRecipes) })
+}
 # ---------- recipes ----------
 function PT-FillRecipes {
   $ui = $script:PT; $d = $ui.Data; if (-not $d) { return }
@@ -247,7 +310,7 @@ function New-PlayerForm {
   $bAllRc = New-Btn $top 'Tick all shown' 650 5 120; $bNoRc = New-Btn $top 'Untick all' 776 5 100; $bUn = New-Btn $top 'Learn ticked recipes' 884 5 160; $bUn.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   $ui.RcCount = New-Object System.Windows.Forms.Label; $ui.RcCount.Dock = 'Bottom'; $ui.RcCount.Height = 24; $ui.RcCount.TextAlign = 'MiddleLeft'; $t2.Controls.Add($ui.RcCount)
   $ui.LvRecipes = New-LV $t2 @('Recipe', 'Kind', 'Group', 'Status') @(300, 120, 360, 110); $ui.LvRecipes.Dock = 'Fill'; $ui.LvRecipes.CheckBoxes = $true; $ui.LvRecipes.BringToFront()
-  $ui.RcMode.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcKind.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcFilter.Add_TextChanged({ PT-FillRecipes })
+  PT-RcInitTip $ui.LvRecipes; $ui.RcMode.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcKind.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcFilter.Add_TextChanged({ PT-FillRecipes })
   $bAllRc.Add_Click({ foreach ($i in $script:PT.LvRecipes.Items) { $i.Checked = ($i.SubItems[3].Text -eq 'not learned') } }); $bNoRc.Add_Click({ foreach ($i in $script:PT.LvRecipes.Items) { $i.Checked = $false } }); $bUn.Add_Click({ PT-UnlockRecipes })
 
   # --- tab 3: teleport
