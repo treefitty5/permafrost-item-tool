@@ -20,3 +20,5 @@ recipe-tweaks.json
 # Game artwork (this repository ships none)
 assets/logo.png
 assets/art_*.jpg
+# Private drafts
+ForumPost.txt
