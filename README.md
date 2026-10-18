@@ -13,6 +13,8 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
 | **Player tools** | Vitals, skills (with the game's level caps), skill points, known recipes, teleport, and a read-only quest view. |
 | **Game data browser** | Search everything: reward pools, quests (with a spoiler guard), recipes, loot tables, building parts, recordings and notes, game rules (effects, difficulty, animals, NPCs, skills, ...). |
 | **Recipe tweaks** | Change ingredient amounts, amount crafted and crafting time through a small in-game mod. Changes apply while the game is running; your save file is never touched. |
+| **World reset** | Put chopped trees, mined boulders and ores, picked-up items and looted containers back, per world, so you can harvest them again (the game never respawns them). Backup first; optional radius around you. |
+| **Build move** | Pick up a placed building (furniture, storage, workbench, lamp...) from the Q wheel and put it down somewhere else, through a small in-game mod. Storage can be stacked and put on walls. |
 
 > **Unofficial fan tool, not affiliated with the developers or publisher of Permafrost.** Single-player only. Editing saves can corrupt them: the tool makes a backup first, but keep your own copy too.
 
@@ -41,10 +43,12 @@ That is all. If Windows says *"Windows protected your PC"* the first time, click
 6. [Start the tool](#6-start-the-tool)
 7. [Using it](#7-using-it)
 8. [Recipe tweaks (in-game mod)](#8-recipe-tweaks-in-game-mod)
-9. [After a game update](#9-after-a-game-update)
-10. [Troubleshooting](#10-troubleshooting)
-11. [How it works / repository layout](#11-how-it-works--repository-layout)
-12. [Legal](#12-legal)
+9. [World reset](#9-world-reset)
+10. [Build move (in-game mod)](#10-build-move-in-game-mod)
+11. [After a game update](#11-after-a-game-update)
+12. [Troubleshooting](#12-troubleshooting)
+13. [How it works / repository layout](#13-how-it-works--repository-layout)
+14. [Legal](#14-legal)
 
 ---
 
@@ -142,6 +146,8 @@ If you see *"The game data has not been made yet"*, go back to step 5.
 
 **Game data** (button at the top): every table the tool built. Quest and dialogue text is hidden behind a **spoiler guard** that is on by default.
 
+**World reset** and **Build move** (buttons at the top): see sections 9 and 10. The **Help / how it works** window has a Find bar (Ctrl+F) that highlights matches as you type.
+
 **Theme:** the combo box at the top right switches between three colour themes. It is remembered.
 
 ## 8. Recipe tweaks (in-game mod)
@@ -155,7 +161,30 @@ If you see *"The game data has not been made yet"*, go back to step 5.
 
 You can edit recipes you have not learned yet; the values are there when you learn them. Everything the mod does is written to `UE4SS.log` (search for `[RecipeTweaks]`) and to `status.txt` in the mod folder.
 
-## 9. After a game update
+## 9. World reset
+
+The game never respawns trees, boulders, picked-up items or container loot. **World reset...** puts them back by editing your save (**close the game first**; a backup is made before every change, and the result is checked before it replaces the save).
+
+1. Pick the **World**. The box lists every `.pfs` in your SaveGame folder; under it you see the hours played, when it was last saved and how many backups that world has.
+2. Tick what to put back: trees you chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food...); loot in containers (cars, cabinets, crates, corpses, trash cans...); and, if you want, other breakables (pallets, rubble, trash piles, furniture). *Leave containers alone that still hold items* keeps half-emptied containers.
+3. Optionally limit it to N metres around where you stand in the save (0 = the whole world). Try **150** first, load the game, check, then do the rest.
+4. **Preview** shows how many of each would be put back and what is left alone. **Reset the world now...** runs its own preview, asks you to confirm, makes the backup, writes the change and verifies it. You do not have to press Preview first.
+
+**How it works.** The save has a record for every object of every area you have visited; a destroyed or picked-up object simply has no record any more. Felled trees are removed from the record (they stand again); partly mined boulders go back to full health; destroyed boulders and picked-up items are put back from your **earlier backups** (so keep the `Backups` folder: a world without backups cannot get destroyed ores or picked-up items back); looted containers get their original loot back from a backup, or the loot of another container with the same loot table. Quest items and keys are never re-rolled.
+
+**Not covered:** bushes (no save shows how the game remembers a harvested bush) and containers without a loot sample (solar panels). Undo a reset with **Restore a backup...** in the main window.
+
+## 10. Build move (in-game mod)
+
+**Build move...** installs a small UE4SS mod that lets you pick up a building you placed and put it somewhere else, without rebuilding it. Click it once (needs UE4SS from step 3): it copies the mod into `...\ue4ss\Mods\BuildMove` and adds `BuildMove : 1` to `mods.txt` (a backup of `mods.txt` is made). **Restart the game** after installing or updating: UE4SS loads mods at start-up only.
+
+* In the game: look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press **Q** and choose **Move** (the mod puts it in the wheel's empty padlock slot). The part follows your crosshair. **Left click** puts it down; choosing Move again or pressing **F7** also puts it down, and F7 starts a move without opening the wheel.
+* The same object is moved: health, contents and variation stay, and no materials are used or refunded. The game saves the new position itself.
+* There is **no collision check, on purpose**: you can put a part on top of another one, stack storage (chests on chests, barrels on barrels) and put storage on walls. If a part ends up inside a wall, pick it up again.
+* Page Up / Page Down (turn 15 degrees), F6 (cancel) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs) are in the mod but have not been tested yet.
+* Everything the mod does is written to `UE4SS.log` and to `BuildMove.log` in the mod folder (search for `[BuildMove]`). Switch it off with `BuildMove : 0` in `mods.txt`.
+
+## 11. After a game update
 
 Permafrost is in active development, so updates will come. The tool does not guess: everything it shows is read from the game files, so after an update **its data is out of date until you rebuild it**. Out-of-date data is the main risk: new items are missing, and a stack size or condition that the developers changed would still be the old value.
 
@@ -169,6 +198,7 @@ Permafrost is in active development, so updates will come. The tool does not gue
 6. Run `Build-Everything.ps1` and read the output. Each builder prints a one-line summary (items, recipes, quests, ...). Numbers far below the previous run, or a line saying *problems:* with a number above 0, mean something in the data changed shape: open an issue and include that output.
 7. Start the tool and look at the items you care about. Then **try one small change on your save copy** (or apply, start the game, and check) before trusting a big queue.
 8. **Recipe tweaks:** restart the game once. The mod changes recipes only in memory, so after an update the worst case is that it logs an error (look for `[RecipeTweaks]` in `UE4SS.log`) and changes nothing; your save is never touched. Press *Install / update mod* again if this tool was updated.
+9. **Build move:** restart the game once. If Move disappears from the Q wheel or F7 stops working after an update, read `BuildMove.log` (in `...\ue4ss\Mods\BuildMove`) and open an issue with it; your save is never touched by the mod.
 
 **Also worth knowing**
 
@@ -176,8 +206,10 @@ Permafrost is in active development, so updates will come. The tool does not gue
 * **The save format:** the tool only edits inventory entries and checks its work, and it refuses to write when the checks fail. If an update changes how saves are stored, the tool will refuse rather than guess; wait for a tool update and do not edit around it.
 * **Saves made in a newer version** may not open in an older one. Keep your save copy from before the update if you might go back.
 * **Update the tool too:** download the new zip from this repository (or `git pull`), keep your `config.json`, and re-run `Build-Everything.ps1`.
+* **World reset uses your backups as its history.** Keep the `Backups` folder; after a game update an old backup may no longer match the new world layout.
 * **Do not share your extracted data.** Each player rebuilds it from their own copy of the game.
-## 10. Troubleshooting
+
+## 12. Troubleshooting
 
 | Problem | What to do |
 |---|---|
@@ -188,21 +220,23 @@ Permafrost is in active development, so updates will come. The tool does not gue
 | The game crashes when you use the full mappings dump (Ctrl+Numpad6) | Known on this game; use the F9 mod from step 3 instead. |
 | Items added but not in the game | The game was open, or Steam Cloud restored the old save. Close the game, keep Steam Cloud off, apply again. |
 | Recipe change does not show | The bench was already open (reopen it), or the mod was updated without restarting the game. Look for `[RecipeTweaks]` lines in `UE4SS.log`. |
+| Move is missing from the Q wheel, or F7 does nothing | The mod is not installed, or the game was not restarted after installing. Click **Build move...** again, restart the game, and read `BuildMove.log` in `...\ue4ss\Mods\BuildMove`. |
+| World reset says there is nothing to put back | Nothing qualifies with these tick boxes and radius, or the world has no backups (destroyed ores and picked-up items need earlier backups). Preview lists what is left alone and why. |
 | Some item has no picture | The texture was not in your `Assets\Items` export or it is not an `Assets\Items` texture. The tool shows text instead. The list is in `icons-missing.txt`. |
 | A window is blank or the tool closes at once | Start it from PowerShell 7 with `pwsh -NoProfile -STA -File .\PermafrostItemTool.ps1` to see the error; it is also written to `error.log`. |
 
-## 11. How it works / repository layout
+## 13. How it works / repository layout
 
-* `PermafrostItemTool.ps1` - the main window. `SaveCore.ps1` - reading and writing the `.pfs` save (the inventory exists in **three synced copies** inside it; all are patched together and verified). `PlayerCore.ps1` / `PlayerTools.ps1` - player data. `GameData.ps1` - the data browser. `RecipeTweaks.ps1` - the recipe editor. `Theme.ps1` - colours.
+* `PermafrostItemTool.ps1` - the main window. `SaveCore.ps1` - reading and writing the `.pfs` save (the inventory exists in **three synced copies** inside it; all are patched together and verified). `PlayerCore.ps1` / `PlayerTools.ps1` - player data. `GameData.ps1` - the data browser. `RecipeTweaks.ps1` - the recipe editor. `WorldCore.ps1` / `WorldReset.ps1` / `WorldResetUI.ps1` - the world reset (reading and rewriting the world block of the save, which is checked to round-trip byte for byte; planning; the window). `BuildMove.ps1` - installs the Build move mod. `Theme.ps1` - colours.
 * `Paths.ps1` - finds your game folder, save and FModel export; reads `config.json`.
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all; `Rebuild-All.ps1` runs the JSON-based ones.
-* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
+* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `TextureDecode.ps1` - decodes the exported item textures into PNGs.
 * Nothing under `catalog\`, `icons\`, `items.json` or `Backups\` is part of the repository: they are made on your computer (see `.gitignore`).
 
 To check what the tool will do to your save, read `SaveCore.ps1`: it only touches the inventory entries, and it refuses to write if its checks fail.
 
-## 12. Legal
+## 14. Legal
 
 * This is an **unofficial** project, **not affiliated with, endorsed by, or sponsored by** the developers or publisher of Permafrost. "Permafrost" and all game content belong to their owners.
 * The repository contains **only original code**. It ships no game files, text, textures or extracted data; you create those locally from a copy of the game you own, and you should not redistribute them.

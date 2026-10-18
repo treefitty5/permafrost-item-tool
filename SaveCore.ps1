@@ -230,7 +230,7 @@ function Test-EditedSave([string]$origPath, [byte[]]$newBytes, $plan, [bool]$chE
 }
 
 # ---------- backup / install / restore ----------
-function Get-BackupDir { $d = Join-Path $PSScriptRoot 'Backups'; if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }; return $d }
+function Get-BackupDir { if ($script:BackupDirOverride) { return $script:BackupDirOverride }; $d = Join-Path $PSScriptRoot 'Backups'; if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }; return $d }
 
 function Install-Items([string]$savePath, $requests, [switch]$SkipGameCheck) {
   if ((-not $SkipGameCheck) -and (Test-GameRunning)) { throw 'The game is running. Save and close it first.' }

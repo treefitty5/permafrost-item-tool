@@ -9,6 +9,8 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 * **Player tools:** vitals, skills and skill points, known recipes, teleport, read-only quest view.
 * **Game data browser:** reward pools, quests (with a spoiler guard, on by default), recipes, loot tables, building parts, recordings, effects, difficulty, animals, NPCs and more.
 * **Recipe tweaks:** change ingredient amounts, how many you craft and crafting time, live in game through a small UE4SS mod. Your save is never touched.
+* **World reset:** put chopped trees, mined boulders and ores, picked-up items and looted containers back (the game never respawns them), per world, with a backup first.
+* **Build move:** pick up a placed building from the Q wheel and put it down elsewhere, live in game. Storage can be stacked and put on walls.
 
 Everything it shows is read from the game's own files on your PC. The repository contains no game files, art or data: you build it from your own copy (steps below).
 
@@ -40,6 +42,14 @@ If Windows says "protected your PC", click **More info → Run anyway**: it's pl
 ## Recipe tweaks (in game)
 
 In the tool: **Recipe tweaks... → Install / update mod** (once, then restart the game). Edit ingredient amounts, amount crafted or time, and press **Save to game**. Changes apply by themselves within a few seconds while you play: close and reopen the bench to see them. **Reset ALL recipes** and Save puts everything back. Your save file is never changed, so this works with the game running.
+
+## World reset
+
+In the tool: **World reset...** (game closed). Pick the world, tick what to put back (trees, boulders and ores, items, container loot, optionally other breakables), optionally limit it to N metres around you (try 150 first), then **Reset the world now...**. It previews, asks you to confirm, backs up your save and verifies the result. Destroyed ores and picked-up items are restored from your earlier backups, so keep the `Backups` folder. Bushes are not covered.
+
+## Build move (in game)
+
+In the tool: **Build move... -> Install** (once, then restart the game). In the game look at a placed part, press **Q** and choose **Move**; it follows your crosshair and a **left click** puts it down. The same object is moved (health and contents stay, no materials used). There is no collision check on purpose: you can stack chests and barrels and put storage on walls.
 
 ## After a game update
 

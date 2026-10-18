@@ -10,6 +10,10 @@ try {
   . (Join-Path $PSScriptRoot 'PlayerTools.ps1')
   . (Join-Path $PSScriptRoot 'GameData.ps1')
 . (Join-Path $PSScriptRoot 'RecipeTweaks.ps1')
+  . (Join-Path $PSScriptRoot 'WorldCore.ps1')
+  . (Join-Path $PSScriptRoot 'WorldReset.ps1')
+  . (Join-Path $PSScriptRoot 'WorldResetUI.ps1')
+  . (Join-Path $PSScriptRoot 'BuildMove.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   if ($SelfTest) { [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException) }
@@ -40,7 +44,7 @@ try {
   $btnBrowse = New-Ctl System.Windows.Forms.Button 852 10 80 26 'Browse...'; $btnBrowse.Anchor = 'Top,Right'
   $btnReload = New-Ctl System.Windows.Forms.Button 938 10 80 26 'Reload'; $btnReload.Anchor = 'Top,Right'
   $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help / how it works'; $btnHelp.Anchor = 'Top,Right'
-  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'
+  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'
   $lblGame = New-Ctl System.Windows.Forms.Label 12 44 1140 22; $lblGame.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $lblGame.Anchor = 'Top,Left,Right'
   $lblInfo = New-Ctl System.Windows.Forms.Label 12 66 1140 20; $lblInfo.Anchor = 'Top,Left,Right'
   $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'
@@ -248,13 +252,86 @@ try {
   function Open-Player { Reload-Inventory; Show-PlayerTools $form; Reload-Inventory; Update-GameState }
   function Open-Data { $script:GD = @{}; Show-GameData $form; Update-GameState }
   function Open-Tweaks { Show-RecipeTweaks $form }
+  function Open-World { Show-WorldReset $form; Reload-Inventory; Update-GameState }
 
   function Show-TextDialog([string]$title, [string]$text) {
-    $d = New-Object System.Windows.Forms.Form; $d.Text = $title; $d.Size = New-Object System.Drawing.Size(780, 640); $d.StartPosition = 'CenterParent'; $d.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-    $tb = New-Object System.Windows.Forms.TextBox; $tb.Multiline = $true; $tb.ReadOnly = $true; $tb.ScrollBars = 'Vertical'; $tb.Dock = 'Fill'; $tb.Text = $text; $tb.BackColor = [System.Drawing.Color]::White; $tb.SelectionStart = 0; $tb.SelectionLength = 0
+    # read-only text window with a Find bar (like Acrobat): matches are highlighted while you type, the arrows / Enter / F3 jump to the next or previous one.
+    # Redrawing is switched off while highlights change (otherwise the whole box flickers on every key) and the search waits ~150 ms after the last key.
+    if (-not ('RtbRedraw' -as [type])) { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class RtbRedraw { [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int m, IntPtr w, IntPtr l); public static void Set(IntPtr h, bool on) { SendMessage(h, 0x000B, on ? new IntPtr(1) : IntPtr.Zero, IntPtr.Zero); } }' }
+    $d = New-Object System.Windows.Forms.Form; $d.Text = $title; $d.Size = New-Object System.Drawing.Size(960, 700); $d.StartPosition = 'CenterParent'; $d.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $d.KeyPreview = $true
+    $top = New-Object System.Windows.Forms.Panel; $top.Dock = 'Top'; $top.Height = 40
+    $lf = New-Object System.Windows.Forms.Label; $lf.Text = 'Find'; $lf.Location = New-Object System.Drawing.Point(10, 11); $lf.Size = New-Object System.Drawing.Size(36, 20); $top.Controls.Add($lf)
+    $tf = New-Object System.Windows.Forms.TextBox; $tf.Location = New-Object System.Drawing.Point(48, 8); $tf.Size = New-Object System.Drawing.Size(320, 24); $top.Controls.Add($tf)
+    $bPrev = New-Object System.Windows.Forms.Button; $bPrev.Text = [string][char]0x25B2; $bPrev.Location = New-Object System.Drawing.Point(376, 7); $bPrev.Size = New-Object System.Drawing.Size(34, 26); $top.Controls.Add($bPrev)
+    $bNext = New-Object System.Windows.Forms.Button; $bNext.Text = [string][char]0x25BC; $bNext.Location = New-Object System.Drawing.Point(414, 7); $bNext.Size = New-Object System.Drawing.Size(34, 26); $top.Controls.Add($bNext)
+    $lc = New-Object System.Windows.Forms.Label; $lc.Text = ''; $lc.Location = New-Object System.Drawing.Point(458, 11); $lc.Size = New-Object System.Drawing.Size(230, 20); $top.Controls.Add($lc)
+    $tb = New-Object System.Windows.Forms.RichTextBox; $tb.ReadOnly = $true; $tb.ScrollBars = 'Vertical'; $tb.Dock = 'Fill'; $tb.WordWrap = $true; $tb.DetectUrls = $false; $tb.HideSelection = $true; $tb.BorderStyle = 'FixedSingle'; $tb.Text = $text
     $bp = New-Object System.Windows.Forms.Panel; $bp.Dock = 'Bottom'; $bp.Height = 44
-    $ok = New-Object System.Windows.Forms.Button; $ok.Text = 'Close'; $ok.Size = New-Object System.Drawing.Size(100, 30); $ok.Location = New-Object System.Drawing.Point(660, 6); $ok.Anchor = 'Top,Right'; $ok.Add_Click({ $d.Close() }); $bp.Controls.Add($ok)
-    $d.Controls.Add($tb); $d.Controls.Add($bp); $d.AcceptButton = $ok; Apply-Theme $d; Set-AppIcon $d; [void]$d.ShowDialog($form)
+    $ok = New-Object System.Windows.Forms.Button; $ok.Text = 'Close'; $ok.Size = New-Object System.Drawing.Size(100, 30); $ok.Location = New-Object System.Drawing.Point(($d.ClientSize.Width - 116), 6); $ok.Anchor = 'Top,Right'; $ok.Add_Click({ $d.Close() }); $bp.Controls.Add($ok)
+    $d.Controls.Add($tb); $d.Controls.Add($top); $d.Controls.Add($bp); $d.AcceptButton = $null; $d.CancelButton = $ok
+    Apply-Theme $d; Set-AppIcon $d
+    $th = $script:Th; $tb.BackColor = $th.Field; $tb.ForeColor = $th.Text   # a RichTextBox is not themed by Apply-Theme
+    $st = @{ Hits = (New-Object System.Collections.Generic.List[int]); Len = 0; Cur = -1; Painted = (New-Object System.Collections.Generic.List[int]); PaintedLen = 0 }
+    $paint = {
+      param([int]$pos, [int]$len, [bool]$current)
+      $tb.Select($pos, $len)
+      if ($current) { $tb.SelectionBackColor = $th.Accent; $tb.SelectionColor = $th.AccentText } else { $tb.SelectionBackColor = $th.Warn; $tb.SelectionColor = [System.Drawing.Color]::Black }
+    }
+    $unpaint = {
+      param([int]$pos, [int]$len)
+      $tb.Select($pos, $len); $tb.SelectionBackColor = $th.Field; $tb.SelectionColor = $th.Text
+    }
+    $show = {
+      # make match number $st.Cur stand out, scroll to it, update the counter (caller has redraw switched off)
+      if ($st.Hits.Count -eq 0) { return }
+      & $paint $st.Hits[$st.Cur] $st.Len $true
+      $tb.Select($st.Hits[$st.Cur], 0); $tb.ScrollToCaret()
+      $lc.Text = ('{0} of {1}' -f ($st.Cur + 1), $st.Hits.Count)
+    }
+    $search = {
+      # take the old highlights away (only those ranges, no select-all), find every match (case-insensitive), highlight them, go to the first
+      [RtbRedraw]::Set($tb.Handle, $false)
+      try {
+        if ($st.Cur -ge 0 -and $st.Cur -lt $st.Hits.Count) { & $unpaint $st.Hits[$st.Cur] $st.Len }   # the current match may lie beyond the painted ones
+        foreach ($p in $st.Painted) { & $unpaint $p $st.PaintedLen }
+        $st.Painted.Clear(); $st.Hits.Clear(); $st.Cur = -1; $term = $tf.Text; $st.Len = $term.Length; $content = $tb.Text
+        if ($term.Length -gt 0) {
+          $i = 0; while ($st.Hits.Count -lt 5000) { $i = $content.IndexOf($term, $i, [StringComparison]::OrdinalIgnoreCase); if ($i -lt 0) { break }; $st.Hits.Add($i); $i += [Math]::Max(1, $term.Length) }
+          $n = 0; foreach ($h in $st.Hits) { if ($n -ge 1500) { break }; & $paint $h $st.Len $false; $st.Painted.Add($h); $n++ }
+          $st.PaintedLen = $term.Length
+        }
+        $tb.Select(0, 0)
+        if ($term.Length -eq 0) { $lc.Text = ''; $tb.ScrollToCaret() }
+        elseif ($st.Hits.Count -eq 0) { $lc.Text = 'No results'; $lc.ForeColor = $th.Bad }
+        else { $st.Cur = 0; & $show }
+        if ($st.Hits.Count -gt 0 -or $term.Length -eq 0) { $lc.ForeColor = $th.Muted }
+      } finally { [RtbRedraw]::Set($tb.Handle, $true); $tb.Invalidate() }
+    }
+    $step = {
+      param([int]$dir)
+      if ($st.Hits.Count -eq 0) { return }
+      [RtbRedraw]::Set($tb.Handle, $false)
+      try {
+        # the match we leave goes back to the normal highlight (or none, if it was beyond the painted ones)
+        if ($st.Painted.Contains($st.Hits[$st.Cur])) { & $paint $st.Hits[$st.Cur] $st.Len $false } else { & $unpaint $st.Hits[$st.Cur] $st.Len }
+        $st.Cur = ($st.Cur + $dir + $st.Hits.Count) % $st.Hits.Count
+        & $show
+      } finally { [RtbRedraw]::Set($tb.Handle, $true); $tb.Invalidate() }
+    }
+    # wait a moment after the last key before searching, so fast typing does not repaint on every letter
+    $timer = New-Object System.Windows.Forms.Timer; $timer.Interval = 150
+    $timer.Add_Tick({ $timer.Stop(); & $search })
+    $tf.Add_TextChanged({ $timer.Stop(); $timer.Start() })
+    $d.Add_FormClosed({ $timer.Stop(); $timer.Dispose() })
+    $flush = { if ($timer.Enabled) { $timer.Stop(); & $search } }   # a key or click right after typing must see the finished search
+    $bNext.Add_Click({ & $flush; & $step 1; $tf.Focus() }); $bPrev.Add_Click({ & $flush; & $step -1; $tf.Focus() })
+    $d.Add_KeyDown({ param($s, $e)
+      if ($e.KeyCode -eq 'Enter' -and $tf.Focused) { & $flush; & $step $(if ($e.Shift) { -1 } else { 1 }); $e.Handled = $true; $e.SuppressKeyPress = $true }
+      elseif ($e.KeyCode -eq 'F3') { & $flush; & $step $(if ($e.Shift) { -1 } else { 1 }); $e.Handled = $true }
+      elseif ($e.Control -and $e.KeyCode -eq 'F') { $tf.Focus(); $tf.SelectAll(); $e.Handled = $true; $e.SuppressKeyPress = $true } })
+    $d.Add_Shown({ $tf.Focus() })
+    if ($script:DialogTestHook) { & $script:DialogTestHook $d $tf $tb $lc $bNext $bPrev $timer; return }
+    [void]$d.ShowDialog($form)
   }
 
   function Get-WarningText($pv, [bool]$all) {
@@ -305,160 +382,155 @@ try {
 PERMAFROST ITEM TOOL - HOW IT WORKS
 ===================================
 What it is
-  A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar. Two extra windows
-  (top right) cover the rest:  'Player tools...' (vitals, skills, recipes, teleport, quest progress) and 'Game data...'
-  (search everything found in the game files, reward pools, quests, recipes, bundles). See THE EXTRA WINDOWS below.
+A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar. Extra windows (top right) cover the rest: 'Player tools...' (vitals, skills, recipes, teleport, quest progress), 'Game data...' (search everything found in the game files, reward pools, quests, recipes, bundles), 'Recipe tweaks...' (change crafting inside the game), 'World reset...' (put used-up trees, ores, items and loot back) and 'Build move...' (move placed buildings inside the game). See THE EXTRA WINDOWS below. Press Ctrl+F in this window to search it.
 
 Before you start (every time)
-  1. In the game: save, then quit completely. The tool refuses to apply while the game is running.
-  2. Keep Steam Cloud OFF for Permafrost while editing (see "Steam Cloud" below).
+1. In the game: save, then quit completely. The tool refuses to apply while the game is running.
+2. Keep Steam Cloud OFF for Permafrost while editing (see "Steam Cloud" below).
 
 THE WINDOW
-  The window opens maximized and resizes with you. Press F11 for true full screen (Esc or F11 again to leave it).
-  Save file / Browse / Reload (top)
-      Shows which .pfs save is edited (World#2 by default). Browse picks another. Reload re-reads the save.
-  Game status line (top, green/red)
-      Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-  Backpack slots (top right)
-      How many slots your worn backpack has. The tool now takes this from the game's own item data, so it is exact for every backpack
-      (the label says 'game data'). The box only matters for a backpack the data does not cover; type the real number there and press Remember.
-  The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
-  Hover pictures      hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details.
-                          Pictures come from the 'icons' folder next to the tool (built by Build-Icons.ps1). An item without a picture shows text only.
-  Item catalog (left)
-      All 380 items found in the game's files. Type in the search box or pick a category. Click a column header to sort.
-      Columns (everything comes from the game's own data unless it says otherwise):
-        Name        the in-game name (the Item column is the id the save uses). You can search by either.
-        Stack       how many fit in one slot, from the game data. Items whose data has no stack setting stack as 1.
-        Cond.       the item's top condition/durability, from the game data (building parts use their max health). A few quest items
-                    have no value in the data; those show the highest value seen in your saves, marked "~". Blank = none exists.
-        Dmg         weapon damage per hit (shots for guns); Frost = cold protection of clothing; Value = trade value. Click the header to sort, ("melee" = none). Ammo: how many weapons use it ("no gun" = none found).
-        Where to find (shown under the item when it applies) lists the best sources with the chance per opening, worked out from the loot weights:
-                    e.g. '2.9% Military_Car_01 +5 [Container]' = about a 3% chance each time one of those is opened. 'sold by' = traders.
-        Found via   which game files link the item: Loot (loot tables/containers), Pickup (a world pickup exists), Craft (a crafting recipe
-                    makes it; the ingredients are shown in the Selected item panel), Trader, Quest (reward pool or quest; the exact group and amount are shown as 'Quest reward'), Animal. It says WHERE it is linked, not how likely
-                    it is - drop chances are not readable. "-" = no link found at all (likely unreleased).
-        Status      In your saves = this exact name already exists in your own saves (known to work).
-                    Game data = name read from the game's data files (worked every time so far, but it is not in your saves).
-                    Name unsure (red) = several names were possible; the game may ignore it.
-  Selected item (right)
-      Hint text           for weapons it says which ammo they use (or that they use none); for ammo it lists the weapons that use it.
-      Total quantity      how many items to add IN TOTAL (all stacks together).
-      Stacks (dropdown)        pick 1 to 10 stacks and the total fills in (stacks x items per slot); typing a total updates the dropdown too.
-      ...or number of stacks   (under Advanced) the same for more than 10 stacks.
-      Free slots               under the quantity the tool shows how many backpack (or hotbar) slots are free, counting what is already in the queue.
-                               If the item will not fit it says NOT ENOUGH SPACE in red, and adding it writes a warning to the Log. Nothing is lost:
-                               Preview and Apply refuse to run until it fits (free space in the game, add less, or use the Hotbar).
-                          (stacks x items per slot). If you change the items-per-slot afterwards, the total stays and the stacks update.
-      Items per slot      the stack size = how many fit in ONE slot. Default = the game's own stack limit when it could be read
-                          from the game data (most resources, consumables, valuables); otherwise the biggest stack seen in your saves.
-                          Slots used = total quantity / items per slot, rounded up. Example: 150 total at 50 per slot = 3 slots.
-                          The blue line under the box always shows what your numbers will do.
-      Condition           wear value for weapons/clothing/tools (greyed out for items that have none).
-      Rounds loaded       only for firearms: ammo already in the gun.
-      Put it in           Backpack or Hotbar. The tool uses the first free slots.
-      Add to queue        (or double-click an item) puts it on the list below. Nothing is written yet.
-  Queue
-      Items waiting to be added. Remove selected / Clear queue edit the list.
-      Preview (no changes)   shows exactly which slots would be used, plus any warnings. Writes nothing.
-      Apply to save          does the real edit (see below).
-  Current inventory (bottom left)
-      What the save currently holds in the hotbar and backpack, slot by slot.
-  Log (bottom right)
-      A running record of everything the tool did.
-  Restore a backup...   puts one of the automatic backups back (your current save is kept too).
-  Open backups folder   opens the folder where backups live.
+The window opens maximized and resizes with you. Press F11 for true full screen (Esc or F11 again to leave it).
+
+- Save file / Browse / Reload (top): Shows which .pfs save is edited (World#2 by default). Browse picks another. Reload re-reads the save.
+- Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
+- Backpack slots (top right): How many slots your worn backpack has. The tool now takes this from the game's own item data, so it is exact for every backpack (the label says 'game data'). The box only matters for a backpack the data does not cover; type the real number there and press Remember.
+
+The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
+
+- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool (built by Build-Icons.ps1). An item without a picture shows text only.
+
+Item catalog (left)
+All 380 items found in the game's files. Type in the search box or pick a category. Click a column header to sort. Columns (everything comes from the game's own data unless it says otherwise):
+- Name - the in-game name (the Item column is the id the save uses). You can search by either.
+- Stack - how many fit in one slot, from the game data. Items whose data has no stack setting stack as 1.
+- Cond. - the item's top condition/durability, from the game data (building parts use their max health). A few quest items have no value in the data; those show the highest value seen in your saves, marked "~". Blank = none exists.
+- Dmg - weapon damage per hit (shots for guns); Frost = cold protection of clothing; Value = trade value. Click the header to sort, ("melee" = none). Ammo: how many weapons use it ("no gun" = none found).
+- Where to find (shown under the item when it applies) lists the best sources with the chance per opening, worked out from the loot weights: e.g. '2.9% Military_Car_01 +5 [Container]' = about a 3% chance each time one of those is opened. 'sold by' = traders.
+- Found via - which game files link the item: Loot (loot tables/containers), Pickup (a world pickup exists), Craft (a crafting recipe makes it; the ingredients are shown in the Selected item panel), Trader, Quest (reward pool or quest; the exact group and amount are shown as 'Quest reward'), Animal. It says WHERE it is linked, not how likely it is - drop chances are not readable. "-" = no link found at all (likely unreleased).
+- Status - In your saves = this exact name already exists in your own saves (known to work). Game data = name read from the game's data files (worked every time so far, but it is not in your saves). Name unsure (red) = several names were possible; the game may ignore it.
+
+Selected item (right)
+- Hint text - for weapons it says which ammo they use (or that they use none); for ammo it lists the weapons that use it.
+- Total quantity - how many items to add IN TOTAL (all stacks together).
+- Stacks (dropdown) - pick 1 to 10 stacks and the total fills in (stacks x items per slot); typing a total updates the dropdown too.
+- ...or number of stacks - (under Advanced) the same for more than 10 stacks. (stacks x items per slot). If you change the items-per-slot afterwards, the total stays and the stacks update.
+- Free slots - under the quantity the tool shows how many backpack (or hotbar) slots are free, counting what is already in the queue. If the item will not fit it says NOT ENOUGH SPACE in red, and adding it writes a warning to the Log. Nothing is lost: Preview and Apply refuse to run until it fits (free space in the game, add less, or use the Hotbar).
+- Items per slot - the stack size = how many fit in ONE slot. Default = the game's own stack limit when it could be read from the game data (most resources, consumables, valuables); otherwise the biggest stack seen in your saves. Slots used = total quantity / items per slot, rounded up. Example: 150 total at 50 per slot = 3 slots. The blue line under the box always shows what your numbers will do.
+- Condition - wear value for weapons/clothing/tools (greyed out for items that have none).
+- Rounds loaded - only for firearms: ammo already in the gun.
+- Put it in - Backpack or Hotbar. The tool uses the first free slots.
+- Add to queue - (or double-click an item) puts it on the list below. Nothing is written yet.
+
+Queue
+Items waiting to be added. Remove selected / Clear queue edit the list.
+- Preview (no changes) - shows exactly which slots would be used, plus any warnings. Writes nothing.
+- Apply to save - does the real edit (see below).
+
+Current inventory (bottom left)
+What the save currently holds in the hotbar and backpack, slot by slot.
+
+Log (bottom right)
+A running record of everything the tool did.
+
+- Restore a backup... - puts one of the automatic backups back (your current save is kept too).
+- Open backups folder - opens the folder where backups live.
 
 WHAT "APPLY TO SAVE" DOES, STEP BY STEP
-  1. Checks the game is closed.
-  2. Dry run: works out the exact free slots. If there is not enough room it stops and says so.
-  3. Shows CAUTION warnings (see below) - you must answer Yes to continue (default answer is No).
-  4. Shows a final confirmation listing the exact slots.
-  5. Makes a backup of your save (in the Backups folder).
-  6. Edits all three copies of your inventory inside the save and checks they agree.
-  7. Re-reads the finished file; if anything is off it puts your original back.
-  8. Refreshes the file's modified time so Steam sees it as the newest copy.
+1. Checks the game is closed.
+2. Dry run: works out the exact free slots. If there is not enough room it stops and says so.
+3. Shows CAUTION warnings (see below) - you must answer Yes to continue (default answer is No).
+4. Shows a final confirmation listing the exact slots.
+5. Makes a backup of your save (in the Backups folder).
+6. Edits all three copies of your inventory inside the save and checks they agree.
+7. Re-reads the finished file; if anything is off it puts your original back.
+8. Refreshes the file's modified time so Steam sees it as the newest copy.
 
 WARNINGS YOU MAY SEE
-  Best guess name      the item name was ambiguous; the game may simply ignore it.
-  Raised stack size    bigger than anything seen in your saves; the game may cap or mishandle it.
-  Condition too high   above the usual value; may exceed the item's real maximum.
-  Quest item           adding it does NOT complete or advance any quest step.
-  Not enough room      free some backpack/hotbar space in the game first.
-  Game is running      save and close the game, then try again.
-  If a step FAILS, the message says whether your save was left untouched or the original was put back.
+- Best guess name - the item name was ambiguous; the game may simply ignore it.
+- Raised stack size - bigger than anything seen in your saves; the game may cap or mishandle it.
+- Condition too high - above the usual value; may exceed the item's real maximum.
+- Quest item - adding it does NOT complete or advance any quest step.
+- Not enough room - free some backpack/hotbar space in the game first.
+- Game is running - save and close the game, then try again.
+
+If a step FAILS, the message says whether your save was left untouched or the original was put back.
 
 THE EXTRA WINDOWS
-  Both windows use the same save file as the main window, and every change goes through the same safety steps:
-  game must be closed, confirmation first, automatic backup, all three copies of the data edited, result re-checked.
+These windows use the same save file as the main window (World reset has its own World box). The ones that change your save (Player tools, World reset) go through the same safety steps: game must be closed, confirmation first, automatic backup, result re-checked. Recipe tweaks and Build move change the game while it runs and never touch your save.
 
-  PLAYER TOOLS...
-    Vitals & skills   Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the
-                      level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to
-                      save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save).
-                      Levels above anything in your save (highest 29) are flagged as untested.
-    Recipes           All recipes found in the game files (item recipes and building recipes), marked learned / not learned.
-                      Tick the ones you want and press 'Learn ticked recipes'.
-    Teleport          Moves you to your bed, the crash site, or any workbench/campfire/etc. you built. You load in 1.5 m above it.
-                      The game's own named locations have no coordinates in the exported data, so they cannot be listed.
-    Quest progress    READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the
-                      next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters,
-                      rewards already claimed, journal. Quests are not edited.
-    Save info         Summary of the save: world, play time, position, skills, vitals, everything you built.
+PLAYER TOOLS...
+- Vitals & skills - Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save). Levels above anything in your save (highest 29) are flagged as untested.
+- Recipes - All recipes found in the game files (item recipes and building recipes), marked learned / not learned. Tick the ones you want and press 'Learn ticked recipes'.
+- Teleport - Moves you to your bed, the crash site, or any workbench/campfire/etc. you built. You load in 1.5 m above it. The game's own named locations have no coordinates in the exported data, so they cannot be listed.
+- Quest progress - READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters, rewards already claimed, journal. Quests are not edited.
+- Save info - Summary of the save: world, play time, position, skills, vitals, everything you built.
 
-  RECIPE TWEAKS...
-    Change crafting inside the game: ingredient amounts, how many a craft makes, crafting time. Pick a recipe and edit its numbers, or use the
-    boxes on the right and 'Multiply the recipes shown' (filter with Search / Station first, e.g. 'ammo' and 'Amount made x 5'). That button only changes the numbers in this window.
-    'Save to game' writes the values for the in-game mod. 'Install / update mod' puts the mod into your UE4SS Mods folder (mods.txt is backed up first).
-    With the game running, saved values apply by themselves within a few seconds (reopen the bench to see them; F8 re-applies by hand). Nothing in your save file changes; to undo, press 'Reset ALL recipes' and Save,
-    or switch the mod off ('RecipeTweaks : 0' in Mods\mods.txt). Every change the mod makes is listed in ue4ss\UE4SS.log under [RecipeTweaks].
+RECIPE TWEAKS...
+Change crafting inside the game: ingredient amounts, how many a craft makes, crafting time. Pick a recipe and edit its numbers, or use the boxes on the right and 'Multiply the recipes shown' (filter with Search / Station first, e.g. 'ammo' and 'Amount made x 5'). That button only changes the numbers in this window.
 
-  GAME DATA...
-    Find anything     Type a name (KeyAnnas, Anna, Whiskey, heater, bunker...) and see every quest, reward pool, loot config,
-                      NPC, recipe or world item that mentions it. Select a row for details; the button queues its items.
-    Reward pools      What each quest reward group pays out, with exact amounts, and which recipes it teaches. Queue a group's items.
-    Quests            All 125 quests: description, every state, the tasks that lead from one state to the next (talk to, find, build,
-                      craft...), events, and a '>>' marker where YOUR save is. Use it to see what a stuck quest is waiting for.
-                      QUEST HELPER: the box 'Items this step needs' lists what your current step asks for (an item to find or hand over,
-                      ingredients for a craft task, a reward group to collect). The button below queues exactly those items.
-    Recipes           Crafting recipes (ingredients, amounts, what they make, crafting time, station) and learning recipes (what they
-                      teach, how they are learned, cost, which rewards hand them out), with 'learned' status from your save.
-                      CRAFT LIST: pick a crafting recipe, set the number in the box to the number of crafts, press the button: all the
-                      ingredients are queued.
-    Loot tables       Every loot list: items with spawn weight and amount range, guaranteed loot, which containers/NPCs use it.
-    Building parts    Cost, health, refund, repair cost and requirements of everything you can build.
-    Recordings/notes  The text of recordings, radio messages and notes.
-    Game rules        Pick a table: gameplay effects (what food, medicine, wounds and cold do), status effects, difficulty presets, animals (health, damage,
-                      loot), NPCs, skills, attributes, plants, destructibles, random encounters, fast travel, achievements, world locations,
-                      and ALL in-game text (search any phrase, e.g. a line of dialogue). Pick a row to see every field.
-    All tables        Every table built from the game files (loot, containers, NPCs, animals, locations, building parts...).
-    Bundles           One-click groups: all quest items, a full stack of every ammo, ammo for the weapons you carry now,
-                      or everything one reward pool can give. They go into the Queue; you still Preview / Apply as usual.
-  The box at the top, 'Hide story text', hides quest descriptions, recordings, dialogue and NPC journals until you untick it
-  (it is on by default; the same box is in Player tools > Quest progress). Task lists, items and numbers stay visible.
-  Game rules > 'Difficulty compare': '(default)' means the preset does not store that setting, so the game's default applies.
-  Everything here is read from the game's own files (exported with a mappings file so every field has its real name).
-  Not stored in the files: how often a container is found in the world, and anything the game decides at run time.
+'Save to game' writes the values for the in-game mod. 'Install / update mod' puts the mod into your UE4SS Mods folder (mods.txt is backed up first).
+
+With the game running, saved values apply by themselves within a few seconds (reopen the bench to see them; F8 re-applies by hand). Nothing in your save file changes; to undo, press 'Reset ALL recipes' and Save, or switch the mod off ('RecipeTweaks : 0' in Mods\mods.txt). Every change the mod makes is listed in ue4ss\UE4SS.log under [RecipeTweaks].
+
+WORLD RESET...
+Puts back things you have used up in the world so you can harvest them again; the game never respawns them by itself. Close the game first.
+- World - pick which world (.pfs save) to work on. The box lists every save in your SaveGame folder and starts on the one chosen in the main window. Under it you see the hours played, when it was last saved and how many backups of that world exist.
+- What to put back - trees you have chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food...) that you picked up; loot in containers (cars, cabinets, crates, corpses, trash cans...); and, if you tick it, other breakables (pallets, rubble, trash piles, furniture). 'Leave containers alone that still hold items' keeps containers you only half emptied.
+- Only within N metres - limits the reset to the area around where you stand in the save (your position at the last save). 0 = the whole world. Tip: try 150 first, load the game, check, then do the rest.
+- Preview - shows how many of each would be put back and what is left alone. Nothing is changed.
+- Reset the world now... - does its own preview, shows you the summary, asks you to confirm, makes a backup, writes the change and checks the result before it replaces your save. You do not have to press Preview first.
+How it works: felled trees are removed from the save's record, so they stand again. Partly mined boulders go back to full health. Boulders you broke and items you picked up are put back from your OLD BACKUPS (the tool makes a backup before every change, so keep them: a world with no backups cannot get destroyed ores or picked-up items back). Looted containers get their original loot back from a backup, or the loot of another container with the same loot table when no backup saw theirs unopened. Quest items and keys are never re-rolled.
+Not covered: bushes (no save shows how the game remembers a harvested bush), and containers without a loot sample (for example solar panels) are left alone. To undo a reset use 'Restore a backup...' in the main window.
+
+BUILD MOVE...
+Lets you pick up a building you placed and put it somewhere else, inside the game, without rebuilding it. The button installs a small in-game mod (a UE4SS mod; Mods\mods.txt is backed up first). A mod only loads when the game starts, so restart the game after installing or updating it. The tool does not edit your save for this: the game saves the new position itself (checked: the moved positions were in the save file).
+- Move from the wheel - look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press Q and choose Move. Move is the slot that used to show a padlock, between Deconstruction and Call dog. The part then follows your crosshair.
+- Left click - puts it down where it is. Choosing Move again, or pressing F7, also puts it down. F7 does the same as the wheel's Move without opening the wheel.
+- Same object - health, contents and variation stay; no materials are used or refunded.
+- No collision check - you can put a part on top of another one, stack storage (chests on chests, barrels on barrels) and put storage on walls. This is on purpose. It also means a part can end up inside a wall or the ground; pick it up again with Move to fix it.
+- Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
+- Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
+
+FINDING TEXT IN THIS WINDOW
+This window (and the Preview window) has a Find bar on top. Type a word and every match lights up, with a counter such as '3 of 44'. The up and down arrows, Enter / Shift+Enter and F3 / Shift+F3 jump to the next / previous match. Ctrl+F jumps to the box, Esc closes the window.
+
+GAME DATA...
+- Find anything - Type a name (KeyAnnas, Anna, Whiskey, heater, bunker...) and see every quest, reward pool, loot config, NPC, recipe or world item that mentions it. Select a row for details; the button queues its items.
+- Reward pools - What each quest reward group pays out, with exact amounts, and which recipes it teaches. Queue a group's items.
+- Quests - All 125 quests: description, every state, the tasks that lead from one state to the next (talk to, find, build, craft...), events, and a '>>' marker where YOUR save is. Use it to see what a stuck quest is waiting for. QUEST HELPER: the box 'Items this step needs' lists what your current step asks for (an item to find or hand over, ingredients for a craft task, a reward group to collect). The button below queues exactly those items.
+- Recipes - Crafting recipes (ingredients, amounts, what they make, crafting time, station) and learning recipes (what they teach, how they are learned, cost, which rewards hand them out), with 'learned' status from your save. CRAFT LIST: pick a crafting recipe, set the number in the box to the number of crafts, press the button: all the ingredients are queued.
+- Loot tables - Every loot list: items with spawn weight and amount range, guaranteed loot, which containers/NPCs use it.
+- Building parts - Cost, health, refund, repair cost and requirements of everything you can build.
+- Recordings/notes - The text of recordings, radio messages and notes.
+- Game rules - Pick a table: gameplay effects (what food, medicine, wounds and cold do), status effects, difficulty presets, animals (health, damage, loot), NPCs, skills, attributes, plants, destructibles, random encounters, fast travel, achievements, world locations, and ALL in-game text (search any phrase, e.g. a line of dialogue). Pick a row to see every field.
+- All tables - Every table built from the game files (loot, containers, NPCs, animals, locations, building parts...).
+- Bundles - One-click groups: all quest items, a full stack of every ammo, ammo for the weapons you carry now, or everything one reward pool can give. They go into the Queue; you still Preview / Apply as usual.
+
+The box at the top, 'Hide story text', hides quest descriptions, recordings, dialogue and NPC journals until you untick it (it is on by default; the same box is in Player tools > Quest progress). Task lists, items and numbers stay visible.
+Game rules > 'Difficulty compare': '(default)' means the preset does not store that setting, so the game's default applies.
+Everything here is read from the game's own files (exported with a mappings file so every field has its real name).
+Not stored in the files: how often a container is found in the world, and anything the game decides at run time.
 
 STEAM CLOUD
-  Steam syncs the game's save folder. If it syncs an OLD copy over your edited save, the edit is lost.
-  Safest: leave Steam Cloud OFF for Permafrost while you use this tool:
-     Steam Library > right-click Permafrost > Properties > General > turn off "Keep game saves in the Steam Cloud".
-  To turn it back on later: do it AFTER your edits. At the next launch Steam may show a conflict - always choose to
-  KEEP/UPLOAD the LOCAL (newer) files, never "download from cloud".
-  The tool refreshes the save's modified time after every apply and restore so it counts as newest.
+Steam syncs the game's save folder. If it syncs an OLD copy over your edited save, the edit is lost.
+Safest: leave Steam Cloud OFF for Permafrost while you use this tool:
+- Steam Library > right-click Permafrost > Properties > General > turn off "Keep game saves in the Steam Cloud".
+To turn it back on later: do it AFTER your edits. At the next launch Steam may show a conflict - always choose to KEEP/UPLOAD the LOCAL (newer) files, never "download from cloud".
+The tool refreshes the save's modified time after every apply and restore so it counts as newest.
 
 LIMITS
-  * Single-player worlds only - do not use on online/multiplayer worlds.
-  * Maximum condition values and skill-level caps cannot be read from the game files.
-  * An unknown item name is silently ignored by the game (the item just does not appear).
-  * Quest items are added but do not mark quest progress.
+- Single-player worlds only - do not use on online/multiplayer worlds.
+- Maximum condition values and skill-level caps cannot be read from the game files.
+- An unknown item name is silently ignored by the game (the item just does not appear).
+- Quest items are added but do not mark quest progress.
+- World reset cannot bring back bushes, and it cannot restore destroyed ores or picked-up items in a world that has no backups.
+- Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
 
 WHERE THINGS ARE
-  This tool:  <tool folder>
-  Backups:    the Backups folder inside it (one backup per change, from any window)
-  Data:       the catalog folder (CSV files you can open in Excel) and items.json
-  Your save:  <your save file>
+- This tool: <tool folder>
+- Backups: the Backups folder inside it (one backup per change, from any window)
+- Data: the catalog folder (CSV files you can open in Excel) and items.json
+- Your save: <your save file>
 '@
     $h = $h.Replace('<tool folder>', $PSScriptRoot).Replace('<your save file>', $script:SavePath)
     Show-TextDialog 'Help - how the Permafrost Item Tool works' $h
@@ -482,7 +554,7 @@ WHERE THINGS ARE
     $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20)
     $btnHelp.SetBounds($W - $m - 132, 10 + $off, 132, 26)
     $btnData.SetBounds($btnHelp.Left - 6 - 110, 10 + $off, 110, 26); $btnPlayer.SetBounds($btnData.Left - 6 - 110, 10 + $off, 110, 26)
-    $btnTweaks.SetBounds($btnPlayer.Left - 6 - 120, 10 + $off, 120, 26); $btnReload.SetBounds($btnTweaks.Left - 6 - 80, 10 + $off, 80, 26)
+    $btnTweaks.SetBounds($btnPlayer.Left - 6 - 120, 10 + $off, 120, 26); $btnWorld.SetBounds($btnTweaks.Left - 6 - 110, 10 + $off, 110, 26); $btnMove.SetBounds($btnWorld.Left - 6 - 110, 10 + $off, 110, 26); $btnReload.SetBounds($btnMove.Left - 6 - 80, 10 + $off, 80, 26)
     $btnBrowse.SetBounds($btnReload.Left - 6 - 80, 10 + $off, 80, 26)
     $txtSave.SetBounds(84, 11 + $off, $btnBrowse.Left - 8 - 84, 24)
     $lblSave.Top = 14 + $off
@@ -680,7 +752,7 @@ WHERE THINGS ARE
   $btnApply.Add_Click({ Apply-Queue })
   $btnPreview.Add_Click({ Show-Preview })
   $btnHelp.Add_Click({ Show-Help })
-  $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Remember-BackpackSlots })
   $btnReload.Add_Click({ Reload-Inventory })
   $btnBrowse.Add_Click({ $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'Permafrost saves (*.pfs)|*.pfs'; if ($d.ShowDialog() -eq 'OK') { $txtSave.Text = $d.FileName; PF-SetConfig 'SavePath' $d.FileName; Reload-Inventory } })
@@ -770,6 +842,39 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $ui.ResetAll.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $ui.Save.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $out += "after Reset ALL + save: recipe lines = " + @((Get-Content "$rtTmp\RecipeTweaks\tweaks.lua") | Where-Object { $_ -match '^\s+\["DA_' }).Count + "; summary: $($ui.Summary.Text)"
       $ui.Dirty = $false; $rf.Close() } catch { $out += "recipe tweaks TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)" }
     $script:RtModsDirOverride = $null; $script:RtStateOverride = $null; $script:TestMode = $false; Remove-Item -LiteralPath $rtTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # World reset window on a COPY of the save (temp folder; the real save and Backups are never touched)
+    $wrTmp = Join-Path $env:TEMP ('wr-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force "$wrTmp\Backups" | Out-Null
+    if (Test-Path (Join-Path $PSScriptRoot 'Backups')) { Copy-Item (Join-Path $PSScriptRoot 'Backups\*') "$wrTmp\Backups" -Force }; Copy-Item $script:SavePath "$wrTmp\World#2.pfs" -Force
+    $script:WRSavePathOverride = "$wrTmp\World#2.pfs"; $script:BackupDirOverride = "$wrTmp\Backups"; $script:TestMode = $true
+    try { $wf = New-WorldResetForm; $wf.Opacity = 0; $wf.ShowInTaskbar = $false; $wf.StartPosition = 'Manual'; $wf.Location = New-Object System.Drawing.Point(-4000, -4000); $wf.Show(); [System.Windows.Forms.Application]::DoEvents(); $wu = $script:WR
+      $h0 = (Get-FileHash "$wrTmp\World#2.pfs").Hash; $nb0 = @(Get-ChildItem "$wrTmp\Backups").Count
+      $out += "world picker: worlds listed = $($wu.World.Items.Count) [$(($wu.World.Items | ForEach-Object { $_ }) -join ', ')], selected = $($wu.World.SelectedItem); info = $($wu.WorldInfo.Text); reset button enabled before any preview = $($wu.Reset.Enabled)"
+      $wu.Preview.PerformClick(); [System.Windows.Forms.Application]::DoEvents()
+      $out += "world reset preview: reset button enabled = $($wu.Reset.Enabled); " + (($wu.Out.Text -split "`r?`n" | Where-Object { $_ } | Select-Object -First 6) -join ' | ')
+      $wu.Reset.PerformClick(); [System.Windows.Forms.Application]::DoEvents()
+      $out += "world reset applied: file changed = $((Get-FileHash "$wrTmp\World#2.pfs").Hash -ne $h0); new backups = $(@(Get-ChildItem "$wrTmp\Backups").Count - $nb0); message: $($wu.Msg.Text)"
+      $wu.Preview.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $out += "world reset preview again: " + (($wu.Out.Text -split "`r?`n" | Where-Object { $_ } | Select-Object -First 2) -join ' | ')
+      $wf.Close() } catch { $out += "world reset TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)" }
+    $script:WRSavePathOverride = $null; $script:BackupDirOverride = $null; $script:TestMode = $false; Remove-Item -LiteralPath $wrTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # Build move installer against a temporary mods folder
+    $bmTmp = Join-Path $env:TEMP ('bm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bmTmp | Out-Null
+    [IO.File]::WriteAllText("$bmTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bmTmp
+    try { $s0 = (BM-Status).Text; BM-Install; $s1 = (BM-Status).Text; $mt2 = Get-Content "$bmTmp\mods.txt" -Raw
+      $out += "build move: before = [$s0]; after install = [$s1]; mods.txt order ok = " + ($mt2 -match '(?s)BPModLoaderMod : 1.*BuildMove : 1.*Built-in keybinds') + "; main.lua copied = " + (Test-Path "$bmTmp\BuildMove\Scripts\main.lua") + "; backup = " + (Test-Path "$bmTmp\mods.txt.bak-before-buildmove") } catch { $out += "build move TEST ERROR: $($_.Exception.Message)" }
+    $script:RtModsDirOverride = $null; Remove-Item -LiteralPath $bmTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # Find bar of the text dialogs (Help / Preview): runs against an invisible copy of the dialog
+    $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
+      $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents()
+      $wait = { $e0 = (Get-Date).AddMilliseconds(450); while ((Get-Date) -lt $e0) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 } }; $r = @(); $tfx.Text = 'alpha'; & $wait; $r += "type 'alpha' -> [$($lcx.Text)]"
+      $bN.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $r += "next -> [$($lcx.Text)]"
+      $bP.PerformClick(); $bP.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $r += "previous x2 (wraps) -> [$($lcx.Text)]"
+      $tfx.Text = 'ALPHA'; & $wait; $r += "case-insensitive 'ALPHA' -> [$($lcx.Text)]"
+      $tfx.Text = 'gamma'; $bN.PerformClick(); & $wait; $r += "typed 'gamma' and pressed next at once -> [$($lcx.Text)]"
+      $tfx.Text = 'zzzz'; & $wait; $r += "'zzzz' -> [$($lcx.Text)]"
+      $tfx.Text = ''; & $wait; $r += "cleared -> [$($lcx.Text)]"
+      $script:DialogTestResult = $r; $dlg.Close() }
+    try { Show-TextDialog 'find test' ((1..40 | ForEach-Object { "line $_ alpha beta gamma" + $(if ($_ % 10 -eq 0) { ' Alpha end' } else { '' }) }) -join "`r`n"); $out += ('find bar: ' + ($script:DialogTestResult -join ' | ')) } catch { $out += "find bar TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)" }
+    $script:DialogTestHook = $null
     $script:GD.Tabs.SelectedIndex = 1; [System.Windows.Forms.Application]::DoEvents(); $script:GD.Pools.LV.Items[0].Selected = $true; GD-QueueRow $script:GD.Pools; $out += "pool queue -> queue has $($script:Queue.Count)"
     $dataWin.Close()
     $pf = New-PlayerForm; $pf.Opacity = 0; $pf.ShowInTaskbar = $false; $pf.StartPosition = 'Manual'; $pf.Location = New-Object System.Drawing.Point(-4000, -4000); $pf.Show(); [System.Windows.Forms.Application]::DoEvents()
@@ -781,7 +886,7 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
     return @{ Layout = $out; Errors = $errs.ToArray(); LogText = $txtLog.Text }
   }
 
-  if ($Headless) { return @{ Form = $form; Search = $txtSearch; ListCat = $lvCat; Qty = $numQty; Stack = $numStack; Cond = $numCond; Loaded = $numLoaded; Target = $cmbTarget; Inv = $lvInv; Queue = $lbQ; Log = $txtLog; GameLabel = $lblGame; Info = $lblInfo; Apply = $btnApply; BtnPlayer = $btnPlayer; BtnData = $btnData; Fn = @{ AddSel = ${function:Add-Selected}; Select = ${function:On-SelectItem}; Refresh = ${function:Refresh-Catalog} } } }
+  if ($Headless) { return @{ Form = $form; Search = $txtSearch; ListCat = $lvCat; Qty = $numQty; Stack = $numStack; Cond = $numCond; Loaded = $numLoaded; Target = $cmbTarget; Inv = $lvInv; Queue = $lbQ; Log = $txtLog; GameLabel = $lblGame; Info = $lblInfo; Apply = $btnApply; BtnPlayer = $btnPlayer; BtnData = $btnData; BtnWorld = $btnWorld; Fn = @{ AddSel = ${function:Add-Selected}; Select = ${function:On-SelectItem}; Refresh = ${function:Refresh-Catalog} } } }
   $form.WindowState = 'Maximized'
   [void]$form.ShowDialog()
 }
