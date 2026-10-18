@@ -206,6 +206,7 @@ To check what the tool will do to your save, read `SaveCore.ps1`: it only touche
 
 * This is an **unofficial** project, **not affiliated with, endorsed by, or sponsored by** the developers or publisher of Permafrost. "Permafrost" and all game content belong to their owners.
 * The repository contains **only original code**. It ships no game files, text, textures or extracted data; you create those locally from a copy of the game you own, and you should not redistribute them.
+* **Modding is not officially supported.** The developers and publisher have said they do not support modding during Early Access and do not support problems caused by mods (see the notice in the "unofficial modding hub" of the official Permafrost Discord). **Please do not report problems with this tool to them.** Open an issue in this repository instead.
 * For use with **single-player** saves only. Do not use it to gain an advantage in multiplayer.
 * Provided as is, without warranty (see `LICENSE`). Back up your saves.
 * Third-party tools used (not included): [FModel](https://github.com/4sval/FModel) and [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) - follow their licences.
