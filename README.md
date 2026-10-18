@@ -209,5 +209,6 @@ To check what the tool will do to your save, read `SaveCore.ps1`: it only touche
 * **Modding is not officially supported.** The developers and publisher have said they do not support modding during Early Access and do not support problems caused by mods (see the notice in the "unofficial modding hub" of the official Permafrost Discord). **Please do not report problems with this tool to them.** Open an issue in this repository instead.
 * For use with **single-player** saves only. Do not use it to gain an advantage in multiplayer.
 * Provided as is, without warranty (see `LICENSE`). Back up your saves.
+* **How it was made:** built by [treefitty5](https://github.com/treefitty5) together with Claude, Anthropic's AI assistant. The goals and all in-game testing are the author's; the AI wrote the code and decoded the data files. All the source is here to read.
 * Third-party tools used (not included): [FModel](https://github.com/4sval/FModel) and [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) - follow their licences.
 * If you are a rights holder and want something changed or removed, please open an issue.
