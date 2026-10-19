@@ -212,8 +212,17 @@ function PT-FillTele {
 function PT-Teleport {
   $ui = $script:PT; if ($ui.LvTele.SelectedItems.Count -eq 0) { Msg 'Pick a place in the list first.' 'Teleport' 'OK' 'Information' | Out-Null; return }
   $t = $ui.LvTele.SelectedItems[0].Tag; $d = $ui.Data
-  $new = "{0},{1},{2}|{3}" -f (Format-Num $t.X), (Format-Num $t.Y), (Format-Num ($t.Z + 150)), $d.Position.Rest
-  [void](PT-Commit @{ PawnLocation = $new } ("Move you to: $($t.Name)  ($(Get-DistanceM $d $t) m away)`nYou will appear 1.5 m above that spot and drop onto it when the game loads.`nIf you ever want to come back, your old position is in the backup.") '')
+  $drop = [double]$ui.TeleDrop.Value
+  $new = "{0},{1},{2}|{3}" -f (Format-Num $t.X), (Format-Num $t.Y), (Format-Num ($t.Z + $drop)), $d.Position.Rest
+  [void](PT-Commit @{ PawnLocation = $new } ("Move you to: $($t.Name)  ($(Get-DistanceM $d $t) m away)`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that spot and drop onto it when the game loads.`nIf you ever want to come back, your old position is in the backup.") '')
+}
+# teleport to coordinates read off the in-game map (the X/Y/Z shown at the lower left of the map screen is YOUR position)
+function PT-TeleportXYZ {
+  $ui = $script:PT; $d = $ui.Data
+  $t = [pscustomobject]@{ Name = 'the coordinates you typed'; X = [double]$ui.TeleX.Value; Y = [double]$ui.TeleY.Value; Z = [double]$ui.TeleZ.Value }
+  $drop = [double]$ui.TeleDrop.Value
+  $new = "{0},{1},{2}|{3}" -f (Format-Num $t.X), (Format-Num $t.Y), (Format-Num ($t.Z + $drop)), $d.Position.Rest
+  [void](PT-Commit @{ PawnLocation = $new } ("Move you to X=$([int]$t.X)  Y=$([int]$t.Y)  Z=$([int]$t.Z)  ($(Get-DistanceM $d $t) m away)`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that height and drop onto the ground when the game loads.`nIf you ever want to come back, your old position is in the backup.") '')
 }
 
 # ---------- quest progress (read only) ----------
@@ -318,8 +327,13 @@ function New-PlayerForm {
   $ui.TeleNow = New-Lbl $t3 '' 8 8 900 22; $ui.TeleNow.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   New-Lbl $t3 'Search' 8 40 50 | Out-Null; $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Location = '60,37'; $ui.TeleFilter.Size = '240,24'; $t3.Controls.Add($ui.TeleFilter)
   $bTp = New-Btn $t3 'Teleport to selected place' 320 33 220 32; $bTp.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)') @(380, 140, 110); $ui.LvTele.Location = '8,76'; $ui.LvTele.Size = '640,520'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
-  $nt3 = New-Lbl $t3 "How it works: it writes a new position into the save (game closed, backup first). You load in 1.5 m above that spot and drop onto it.`r`n`r`nPlaces come from your own save: your bed, the crash site, and everything you built that isn't a plain wall/floor. Distances are straight-line.`r`n`r`nThe game's own named locations (Hunters Glade, Solar Fields, ...) have no coordinates in the exported data, so they can't be listed here. If you need one, stand there once and build/place something (e.g. a campfire) - it will show up in this list." 666 76 380 300; $nt3.ForeColor = $script:Th.Muted; $nt3.Anchor = 'Top,Left,Right'
+  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)') @(380, 140, 110); $ui.LvTele.Location = '8,76'; $ui.LvTele.Size = '640,500'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
+  $nt3 = New-Lbl $t3 "How it works: it writes a new position into the save (game closed, backup first). You load above that spot (150 cm by default, change it with 'Drop height') and drop onto it. If a spot sits inside rock or a hillside, raise the drop height to about 500 (map heights from the game's data run low).`r`n`r`nCoordinates box: open the in-game map and read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them under the list and press 'Teleport to coordinates'.`r`n`r`nPlaces come from your own save: your bed, the crash site, and everything you built that isn't a plain wall/floor. Distances are straight-line.`r`n`r`nThe game's own named locations (Hunters Glade, Solar Fields, ...) have no coordinates in the exported data, so they can't be listed here. If you need one, stand there once and build/place something (e.g. a campfire) - it will show up in this list." 666 76 380 300; $nt3.ForeColor = $script:Th.Muted; $nt3.Anchor = 'Top,Left,Right'
+  # drop height and teleport-to-coordinates row (below the list)
+  New-Lbl $t3 'Drop height (cm above the spot)' 8 606 200 | Out-Null; $ui.TeleDrop = New-Num $t3 212 603 70 50 2000 0; $ui.TeleDrop.Value = 150
+  New-Lbl $t3 'Coordinates (map X / Y / Z)' 300 606 170 | Out-Null; $ui.TeleX = New-Num $t3 474 603 80 -400000 400000 0; $ui.TeleY = New-Num $t3 560 603 80 -400000 400000 0; $ui.TeleZ = New-Num $t3 646 603 70 -20000 40000 0
+  $bXyz = New-Btn $t3 'Teleport to coordinates' 724 600 170 28; $bXyz.Add_Click({ PT-TeleportXYZ })
+  foreach ($c in @($ui.TeleDrop, $ui.TeleX, $ui.TeleY, $ui.TeleZ, $bXyz)) { $c.Anchor = 'Bottom,Left' }; foreach ($c in $t3.Controls) { if ($c -is [System.Windows.Forms.Label] -and $c.Top -ge 600) { $c.Anchor = 'Bottom,Left' } }
   $ui.TeleFilter.Add_TextChanged({ PT-FillTele }); $bTp.Add_Click({ PT-Teleport }); $ui.LvTele.Add_DoubleClick({ PT-Teleport })
 
   # --- tab 4: quest progress

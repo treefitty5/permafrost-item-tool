@@ -24,7 +24,8 @@ function Get-ResetKind([string]$cls, [string]$path) {
   if ($cls -match '^BP_D_.*Boulder') { return 'ore' }
   if ($cls -match '^BP_D_') { return 'breakable' }
   if ($cls -match '_WI_C$') { return 'item' }
-  if ($cls -match '^BP_BushScavengable') { return 'bush' }
+  # rock shards and scavengable bushes are plain pick-up records: a destroyed one has no record, so it is restored like a world item
+  if ($cls -match '^BP_(RockShard|BushScavengable)') { return 'item' }
   if (($cls -match '^BP_S_' -and $path -match '/Interactions/Containers/') -or ($cls -match '^BP_SolarPanel' -and $path -match '/Scavengable/')) { return 'container' }
   return ''
 }
@@ -235,6 +236,12 @@ function Build-ResetPlan([string]$savePath, $opt) {
           $cand = $pool[$pk]; $free = @($cand | Where-Object { -not $usedPool.ContainsKey($pk + '|' + $_) })
           if ($free.Count -eq 0) { $free = $cand.ToArray() }
           $inv = $free[$rng.Next($free.Count)]; $usedPool[$pk + '|' + $inv] = 1; $src = 'a real roll from the same loot table' }
+        elseif ($r.Cls -match '^BP_SolarPanel_\d+_C$') {
+          # solar panels are never recorded unopened in any save, so roll their loot from the game's own table
+          # (DA_RandomList_Preset_Remnants_SolarPanel: one pick, weights Wire 7 / Components 5 / ElectricalJunk 2 / MetalJunk 0.1, amount 1)
+          $tbl = @(@('Wire', 7.0), @('Components', 5.0), @('ElectricalParts', 2.0), @('MetalJunk', 0.1)); $tot = 0.0; foreach ($t in $tbl) { $tot += $t[1] }
+          $pick = $rng.NextDouble() * $tot; $item = $tbl[0][0]; foreach ($t in $tbl) { if ($pick -lt $t[1]) { $item = $t[0]; break }; $pick -= $t[1] }
+          $inv = "@0=$item&1"; $src = 'a roll from the game''s solar panel loot table' }
         else { Skip "no loot sample for $($r.Cls)"; continue } }
       $plan.Items.Add([pscustomobject]@{ Kind = 'container'; Action = 'Refill'; Cls = $r.Cls; Cell = $c.Name; Rec = $r; Pos = $r.Pos; Inv = $inv; Note = $src })
     } }

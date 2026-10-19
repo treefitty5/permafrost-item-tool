@@ -142,7 +142,7 @@ If you see *"The game data has not been made yet"*, go back to step 5.
 4. **Preview** shows exactly what will change; **Apply to save** writes it. A copy of the save is stored in `Backups\` first, and **Restore** puts it back.
 5. Start the game and load your save.
 
-**Player tools** (button at the top): vitals, skills, skill points, recipes, teleport, quest progress (read-only). Change values, then apply with the game closed. Hover a recipe in the Recipes tab to see its picture, cost or ingredients (pictures are built by `Build-RecipeIcons.ps1`, part of the full rebuild).
+**Player tools** (button at the top): vitals, skills, skill points, recipes, teleport, quest progress (read-only). Change values, then apply with the game closed. Hover a recipe in the Recipes tab to see its picture, cost or ingredients (pictures are built by `Build-RecipeIcons.ps1`, part of the full rebuild). **Teleport** goes to your bed, the crash site or anything you built, or to coordinates: open the in-game map, read X / Y / Z at its lower left (your own position), type them under the list and press *Teleport to coordinates*. *Drop height* (default 150 cm) is how far above the spot you appear; use about 500 if a spot is inside rock.
 
 **Game data** (button at the top): every table the tool built. Quest and dialogue text is hidden behind a **spoiler guard** that is on by default.
 
@@ -166,7 +166,7 @@ You can edit recipes you have not learned yet; the values are there when you lea
 The game never respawns trees, boulders, picked-up items or container loot. **World reset...** puts them back by editing your save (**close the game first**; a backup is made before every change, and the result is checked before it replaces the save).
 
 1. Pick the **World**. The box lists every `.pfs` in your SaveGame folder; under it you see the hours played, when it was last saved and how many backups that world has.
-2. Tick what to put back: trees you chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food...); loot in containers (cars, cabinets, crates, corpses, trash cans...); bushes and other generated plants / rocks you harvested; and, if you want, other breakables (pallets, rubble, trash piles, furniture). *Leave containers alone that still hold items* keeps half-emptied containers.
+2. Tick what to put back: trees you chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food, rock shards, scavengable bushes...); loot in containers (cars, cabinets, crates, corpses, trash cans...); bushes and other generated plants / rocks you harvested; and, if you want, other breakables (pallets, rubble, trash piles, furniture). *Leave containers alone that still hold items* keeps half-emptied containers.
 3. Optionally limit it to N metres around where you stand in the save (0 = the whole world). Try **150** first, load the game, check, then do the rest.
 4. **Preview** shows how many of each would be put back and what is left alone. **Reset the world now...** runs its own preview, asks you to confirm, makes the backup, writes the change and verifies it. You do not have to press Preview first.
 
@@ -174,7 +174,7 @@ The game never respawns trees, boulders, picked-up items or container loot. **Wo
 
 Two more things the game keeps in the save are handled too. (1) One **list of used-up objects** (`[rGUID>...` entries) that grows with everything you destroy or collect: the game drops a restored object again while it is still on that list, so the reset takes every object it puts back off the list (without this, restored ores simply vanished when the area loaded). (2) **Bushes and other generated plants / rocks** are not records: each harvested one is a single entry (its position) in a list on the game's PCG actors, and the reset removes the entries inside your radius so they grow back. Checked in the game with one bush; the other kinds in those lists were not identified one by one, so try a small radius first.
 
-**Not covered:** containers without a loot sample (solar panels). Undo a reset with **Restore a backup...** in the main window.
+**Solar panels:** no save ever records an unopened panel, so their loot is rolled from the game's own table (one pick: wire, components, electrical parts, rarely metal junk). Known game issue (version 0.44.3, reproduced with every mod off and in a brand-new world): panels show no "Press F" prompt, so restored panel loot cannot be opened for now; everything else works. **Not covered:** containers with no loot sample at all. Undo a reset with **Restore a backup...** in the main window.
 
 ## 10. Build move (in-game mod)
 
