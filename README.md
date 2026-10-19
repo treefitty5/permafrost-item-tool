@@ -166,13 +166,15 @@ You can edit recipes you have not learned yet; the values are there when you lea
 The game never respawns trees, boulders, picked-up items or container loot. **World reset...** puts them back by editing your save (**close the game first**; a backup is made before every change, and the result is checked before it replaces the save).
 
 1. Pick the **World**. The box lists every `.pfs` in your SaveGame folder; under it you see the hours played, when it was last saved and how many backups that world has.
-2. Tick what to put back: trees you chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food...); loot in containers (cars, cabinets, crates, corpses, trash cans...); and, if you want, other breakables (pallets, rubble, trash piles, furniture). *Leave containers alone that still hold items* keeps half-emptied containers.
+2. Tick what to put back: trees you chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food...); loot in containers (cars, cabinets, crates, corpses, trash cans...); bushes and other generated plants / rocks you harvested; and, if you want, other breakables (pallets, rubble, trash piles, furniture). *Leave containers alone that still hold items* keeps half-emptied containers.
 3. Optionally limit it to N metres around where you stand in the save (0 = the whole world). Try **150** first, load the game, check, then do the rest.
 4. **Preview** shows how many of each would be put back and what is left alone. **Reset the world now...** runs its own preview, asks you to confirm, makes the backup, writes the change and verifies it. You do not have to press Preview first.
 
 **How it works.** The save has a record for every object of every area you have visited; a destroyed or picked-up object simply has no record any more. Felled trees are removed from the record (they stand again); partly mined boulders go back to full health; destroyed boulders and picked-up items are put back from your **earlier backups** (so keep the `Backups` folder: a world without backups cannot get destroyed ores or picked-up items back); looted containers get their original loot back from a backup, or the loot of another container with the same loot table. Quest items and keys are never re-rolled.
 
-**Not covered:** bushes (no save shows how the game remembers a harvested bush) and containers without a loot sample (solar panels). Undo a reset with **Restore a backup...** in the main window.
+Two more things the game keeps in the save are handled too. (1) One **list of used-up objects** (`[rGUID>...` entries) that grows with everything you destroy or collect: the game drops a restored object again while it is still on that list, so the reset takes every object it puts back off the list (without this, restored ores simply vanished when the area loaded). (2) **Bushes and other generated plants / rocks** are not records: each harvested one is a single entry (its position) in a list on the game's PCG actors, and the reset removes the entries inside your radius so they grow back. Checked in the game with one bush; the other kinds in those lists were not identified one by one, so try a small radius first.
+
+**Not covered:** containers without a loot sample (solar panels). Undo a reset with **Restore a backup...** in the main window.
 
 ## 10. Build move (in-game mod)
 

@@ -60,6 +60,40 @@ function Get-CopyGuids([string]$s) {
   foreach ($m in [regex]::Matches($s, '\[BEGIN_RUNTIME_DATA_SAVE\?RuntimeDataPayload###>([0-9A-F]{32})\?')) { $set[$m.Groups[1].Value] = 'runtime' }
   return $set
 }
+# The save keeps ONE list of "[rGUID>HEX?" entries (HEX = the actor's text-form guid, 3756 entries in a 100 h world, one more for every thing
+# you destroy / collect). The game treats a listed actor as used up and drops its world record again on load, so a restored actor has to
+# be taken off this list too (checked 2026-10-19: all 40 ores restored by a reset and then lost were on the list).
+function Remove-RGuids([string]$s, $guids) {
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'; foreach ($g in $guids) { [void]$set.Add([string]$g) }
+  if ($set.Count -eq 0) { return $s }
+  $ev = [Text.RegularExpressions.MatchEvaluator] { param($m) if ($set.Contains($m.Groups[1].Value)) { '' } else { $m.Value } }
+  return [regex]::Replace($s, '\[rGUID>([0-9A-F]{32})\?', $ev)
+}
+# Harvested bushes and other generated plants / rocks are NOT world records: each one is an 80-byte entry (translation 3 doubles, rotation quat 4,
+# scale 3) in a base64 list "PCGReActor_ExcludedInteractionTransforms>" stored on a PCG actor in the plain-text part (12 lists in World#2).
+# Harvesting one bush added exactly one entry at its position; removing that entry brought the bush back in the game (verified 2026-10-19).
+$script:ExclRx = '(PrimaryObjectName>([^?]*)\?PCGReActor_ExcludedInteractionTransforms>)([^?]*)(\?)'
+function Get-ExclusionLists([string]$s) {
+  $res = New-Object System.Collections.Generic.List[object]
+  foreach ($m in [regex]::Matches($s, $script:ExclRx)) {
+    try { $raw = [Convert]::FromBase64String($m.Groups[3].Value) } catch { continue }
+    if ($raw.Length -eq 0 -or ($raw.Length % 80) -ne 0) { continue }
+    $res.Add([pscustomobject]@{ Name = $m.Groups[2].Value; Raw = $raw; Count = [int]($raw.Length / 80) }) }
+  return $res
+}
+function Get-ExclEntryPos($list, [int]$k) { return @([BitConverter]::ToDouble($list.Raw, $k * 80), [BitConverter]::ToDouble($list.Raw, $k * 80 + 8), [BitConverter]::ToDouble($list.Raw, $k * 80 + 16)) }
+# $drop: hashtable list name -> HashSet[int] of entry indexes to remove
+function Remove-ExclusionEntries([string]$s, $drop) {
+  if ($drop.Count -eq 0) { return $s }
+  $ev = [Text.RegularExpressions.MatchEvaluator] {
+    param($m)
+    $name = $m.Groups[2].Value
+    if (-not $drop.ContainsKey($name)) { return $m.Value }
+    $raw = [Convert]::FromBase64String($m.Groups[3].Value); $n = [int]($raw.Length / 80); $keep = New-Object System.Collections.Generic.List[byte]
+    for ($k = 0; $k -lt $n; $k++) { if (-not $drop[$name].Contains($k)) { $keep.AddRange([byte[]]$raw[($k * 80)..($k * 80 + 79)]) } }
+    return $m.Groups[1].Value + [Convert]::ToBase64String($keep.ToArray()) + $m.Groups[4].Value }
+  return [regex]::Replace($s, $script:ExclRx, $ev)
+}
 function Remove-Copies([string]$s, $guids) {
   $set = New-Object 'System.Collections.Generic.HashSet[string]'; foreach ($g in $guids) { [void]$set.Add([string]$g) }
   if ($set.Count -eq 0) { return $s }
@@ -96,7 +130,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
     $h = $r.Get('Scavengeable_CurrentHealth'); if (-not $h) { continue }
     if (-not $seen.ContainsKey($r.Cls)) { $seen[$r.Cls] = @{} }; $seen[$r.Cls][$h] = 1 + [int]$seen[$r.Cls][$h] } } }
   foreach ($k in $seen.Keys) { if ($seen[$k].Count -eq 1) { $nodes[$k] = [double]::Parse(@($seen[$k].Keys)[0], $script:ResetInv) } }
-  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = $hist.Count; Radius = $opt.RadiusM }
+  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Plants = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = $hist.Count; Radius = $opt.RadiusM }
   function Skip($why) { if ($plan.Skipped.Contains($why)) { $plan.Skipped[$why]++ } else { $plan.Skipped[$why] = 1 } }
 
   $cellByName = @{}; $byGuid = @{}; $byKey = @{}; $itemsByCls = @{}
@@ -117,6 +151,24 @@ function Build-ResetPlan([string]$savePath, $opt) {
       if ($null -ne $h -and ($h -lt $max -or $r.State -ne 'EIS_Active')) { if (Test-NearPos $r.Pos $center $radius) { $plan.Items.Add([pscustomobject]@{ Kind = $kind; Action = 'Heal'; Cls = $r.Cls; Cell = $c.Name; Rec = $r; Pos = $r.Pos; Note = "health $h -> $max" }) } else { Skip 'outside the chosen radius' } }
     }
   } }
+
+  # 1b) records that exist but are also on the save's used-up list (left behind by an earlier reset): the game drops them on load, so take them off the list
+  if ($opt.Ores -or $opt.Breakables -or $opt.Items) {
+    $rl = New-Object 'System.Collections.Generic.HashSet[string]'; foreach ($m in [regex]::Matches($s, '\[rGUID>([0-9A-F]{32})\?')) { [void]$rl.Add($m.Groups[1].Value) }
+    $planned = @{}; foreach ($it in $plan.Items) { $planned[$it.Rec.GuidHex] = 1 }
+    foreach ($c in $cells) { foreach ($r in $c.Recs) {
+      $kind = Get-ResetKind $r.Cls $r.ClsPath; if (-not $kind) { continue }
+      if (-not (($kind -eq 'ore' -and $opt.Ores) -or ($kind -eq 'breakable' -and $opt.Breakables) -or ($kind -eq 'item' -and $opt.Items))) { continue }
+      if ($planned.ContainsKey($r.GuidHex) -or -not $rl.Contains($r.TextGuid)) { continue }
+      if (-not (Test-NearPos $r.Pos $center $radius)) { Skip 'outside the chosen radius'; continue }
+      $plan.Items.Add([pscustomobject]@{ Kind = $kind; Action = 'Unlist'; Cls = $r.Cls; Cell = $c.Name; Rec = $r; Pos = $r.Pos; Note = 'record exists but was on the used-up list' }) } }
+  }
+
+  # 1c) harvested bushes and other generated plants / rocks: entries of the PCG exclusion lists (position known, so the radius works)
+  if ($opt.Plants) {
+    foreach ($L in (Get-ExclusionLists $s)) { for ($k = 0; $k -lt $L.Count; $k++) { $p = Get-ExclEntryPos $L $k
+      if (Test-NearPos $p $center $radius) { $plan.Plants.Add([pscustomobject]@{ List = $L.Name; Index = $k; Pos = $p }) } else { Skip 'outside the chosen radius' } } }
+  }
 
   # 2) destroyed ores / breakables and picked-up items: newest backup that still has the record
   $wantRestore = $opt.Ores -or $opt.Breakables -or $opt.Items
@@ -184,10 +236,11 @@ function Get-ResetSummary($plan) {
   $lines = New-Object System.Collections.Generic.List[string]
   $groups = $plan.Items | Group-Object Kind, Action
   $label = @{ 'tree' = 'Trees'; 'ore' = 'Boulders and ores'; 'breakable' = 'Other breakables (pallets, rubble...)'; 'item' = 'World items'; 'container' = 'Containers' }
-  $verb = @{ 'Remove' = 'felled trees put back'; 'Heal' = 'partly mined, back to full'; 'Restore' = 'destroyed / picked up, put back'; 'Refill' = 'looted, refilled' }
-  foreach ($k in 'tree', 'ore', 'breakable', 'item', 'container') { foreach ($a in 'Remove', 'Heal', 'Restore', 'Refill') {
+  $verb = @{ 'Remove' = 'felled trees put back'; 'Heal' = 'partly mined, back to full'; 'Restore' = 'destroyed / picked up, put back'; 'Refill' = 'looted, refilled'; 'Unlist' = 'in the save but marked used up, cleared' }
+  foreach ($k in 'tree', 'ore', 'breakable', 'item', 'container') { foreach ($a in 'Remove', 'Heal', 'Restore', 'Refill', 'Unlist') {
     $n = @($plan.Items | Where-Object { $_.Kind -eq $k -and $_.Action -eq $a }).Count
     if ($n) { $lines.Add(("{0,5}  {1}: {2}" -f $n, $label[$k], $verb[$a])) } } }
+  if ($plan.Plants -and $plan.Plants.Count) { $lines.Add(("{0,5}  Bushes and other generated plants / rocks: harvested, put back" -f $plan.Plants.Count)) }
   if ($lines.Count -eq 0) { $lines.Add('Nothing to reset with these settings.') }
   if ($plan.Skipped.Count) { $lines.Add(''); $lines.Add('Left alone:'); foreach ($k in $plan.Skipped.Keys) { $lines.Add(("{0,5}  {1}" -f $plan.Skipped[$k], $k)) } }
   $lines.Add(''); $lines.Add("Backups used as history: $($plan.History)")
@@ -199,15 +252,16 @@ function Build-ResetSave($plan, $opt) {
   $s = $plan.Text; $w = $plan.World; $cells = $w.Cells; $nodes = $plan.Nodes
   $cellByName = @{}; foreach ($c in $cells) { $cellByName[$c.Name] = $c }
   $removeGuids = New-Object System.Collections.Generic.List[string]; $removeRecs = New-Object System.Collections.Generic.HashSet[object]
-  $inserts = New-Object System.Collections.Generic.List[object]
+  $inserts = New-Object System.Collections.Generic.List[object]; $clearR = New-Object System.Collections.Generic.List[string]
   foreach ($it in $plan.Items) {
     switch ($it.Action) {
       'Remove' { [void]$removeRecs.Add($it.Rec); $removeGuids.Add($it.Rec.TextGuid) }
-      'Heal' { $it.Rec.Set('Scavengeable_CurrentHealth', (Format-Health $nodes[$it.Cls])); $it.Rec.Set('InteractionBase_InteractionState', 'EIS_Active') }
+      'Heal' { $it.Rec.Set('Scavengeable_CurrentHealth', (Format-Health $nodes[$it.Cls])); $it.Rec.Set('InteractionBase_InteractionState', 'EIS_Active'); $clearR.Add($it.Rec.TextGuid) }
       'Restore' { $n = $it.Rec.Clone()
         if ($it.Kind -ne 'item') { $n.Set('Scavengeable_CurrentHealth', (Format-Health $nodes[$it.Cls])); $n.Set('InteractionBase_InteractionState', 'EIS_Active') }
-        $inserts.Add(@{ Cell = $it.Cell; Rec = $n }) }
-      'Refill' { $it.Rec.Set('InteractionBase_InteractionState', 'EIS_Active'); $it.Rec.Set('bEverOpened', 'false'); $it.Rec.Set('Inventory', $it.Inv); $removeGuids.Add($it.Rec.TextGuid) }
+        $inserts.Add(@{ Cell = $it.Cell; Rec = $n }); $clearR.Add($it.Rec.TextGuid) }
+      'Refill' { $it.Rec.Set('InteractionBase_InteractionState', 'EIS_Active'); $it.Rec.Set('bEverOpened', 'false'); $it.Rec.Set('Inventory', $it.Inv); $removeGuids.Add($it.Rec.TextGuid); $clearR.Add($it.Rec.TextGuid) }
+      'Unlist' { $clearR.Add($it.Rec.TextGuid) }
     } }
   foreach ($c in $cells) { if ($removeRecs.Count) { [void]$c.Recs.RemoveAll([Predicate[WRec]] { param($x) $removeRecs.Contains($x) }) } }
   foreach ($i in $inserts) { $cellByName[$i.Cell].Recs.Add($i.Rec) }
@@ -215,7 +269,10 @@ function Build-ResetSave($plan, $opt) {
   $sec = $w.Sec
   $out = $s.Substring(0, $sec.Start) + (Encode-B64U $blob) + $s.Substring($sec.End)
   $out = Remove-Copies $out ($removeGuids.ToArray() | Select-Object -Unique)
-  return @{ Text = $out; Bytes = $script:L1.GetBytes($out); RemovedGuids = ($removeGuids.ToArray() | Select-Object -Unique) }
+  $out = Remove-RGuids $out ($clearR.ToArray() | Select-Object -Unique)
+  $drop = @{}; foreach ($pl in $plan.Plants) { if (-not $drop.ContainsKey($pl.List)) { $drop[$pl.List] = New-Object 'System.Collections.Generic.HashSet[int]' }; [void]$drop[$pl.List].Add([int]$pl.Index) }
+  $out = Remove-ExclusionEntries $out $drop
+  return @{ Text = $out; Bytes = $script:L1.GetBytes($out); RemovedGuids = ($removeGuids.ToArray() | Select-Object -Unique); ClearedGuids = ($clearR.ToArray() | Select-Object -Unique); PlantDrop = $drop }
 }
 
 # independent re-read of the candidate: world block must parse, every planned change must be visible, everything else must be unchanged
@@ -244,6 +301,13 @@ function Test-ResetSave([string]$origText, $plan, $built) {
   # nothing outside the world block and the removed plain-text copies may differ from the original
   $expect = $origText.Substring(0, $ow.Sec.Start) + (Encode-B64U ([WorldBlob]::Serialize($nw.Cells))) + $origText.Substring($ow.Sec.End)
   $expect = Remove-Copies $expect $built.RemovedGuids
+  $expect = Remove-RGuids $expect $built.ClearedGuids
+  $expect = Remove-ExclusionEntries $expect $built.PlantDrop
+  # every planned plant entry must be gone and every other entry of those lists must still be there
+  $lo = @{}; foreach ($L in (Get-ExclusionLists $origText)) { $lo[$L.Name] = $L.Count }; $ln = @{}; foreach ($L in (Get-ExclusionLists $n)) { $ln[$L.Name] = $L.Count }
+  foreach ($name in $lo.Keys) { $d = 0; if ($built.PlantDrop.ContainsKey($name)) { $d = $built.PlantDrop[$name].Count }
+    if (-not $ln.ContainsKey($name) -and $d -lt $lo[$name]) { $problems.Add("exclusion list vanished: $name") } elseif ($ln.ContainsKey($name) -and $ln[$name] -ne ($lo[$name] - $d)) { $problems.Add("exclusion list size wrong: $name") } }
+  foreach ($g in $built.ClearedGuids) { if ($n.Contains("[rGUID>${g}?")) { $problems.Add("still on the used-up list: $g") } }
   if ($expect -cne $n) { $problems.Add('file differs from the expected result outside the planned edits') }
   foreach ($name in 'PlayerSaveData', 'HostSaveData') { $a = (Get-BlobSection $origText $name).Bytes; $b = (Get-BlobSection $n $name).Bytes; if ([Convert]::ToBase64String($a) -cne [Convert]::ToBase64String($b)) { $problems.Add("$name changed") } }
   if ($origText.Substring(0, $origText.IndexOf('[LevelStreamingData###>')) -cne $n.Substring(0, $n.IndexOf('[LevelStreamingData###>'))) { $problems.Add('save header changed') }
@@ -255,7 +319,7 @@ function Install-WorldReset([string]$savePath, $opt, [switch]$SkipGameCheck) {
   if (-not (Test-Path $savePath)) { throw "Save not found: $savePath" }
   $orig = $script:L1.GetString([IO.File]::ReadAllBytes($savePath))
   $plan = Build-ResetPlan $savePath $opt
-  if ($plan.Items.Count -eq 0) { throw 'nothing to reset with these settings' }
+  if ($plan.Items.Count -eq 0 -and $plan.Plants.Count -eq 0) { throw 'nothing to reset with these settings' }
   $built = Build-ResetSave $plan $opt
   $problems = Test-ResetSave $orig $plan $built
   if ($problems.Count) { throw ('Verification failed, nothing was written: ' + (($problems | Select-Object -First 5) -join '; ')) }
