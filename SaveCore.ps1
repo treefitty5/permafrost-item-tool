@@ -21,10 +21,26 @@ function Find-Bytes([byte[]]$hay, [byte[]]$needle, [int]$from = 0) {
   return -1
 }
 
+# where the [int32 keylen][key\0][int32 vallen][val\0]... entries of a PlayerSaveData / HostSaveData blob start.
+# HostSaveData: int32 entry count, then the entries (start 4). PlayerSaveData: int32 1, int32 len + UUID text, int32 entry count, then the entries.
+# (Not found through the 'PlayerBuildParts' key: a brand-new character has not built anything, so that entry does not exist yet.)
+function Test-EntryStart([byte[]]$b, [int]$p) {
+  if ($p + 8 -gt $b.Length) { return $false }; $kl = [BitConverter]::ToInt32($b, $p); if ($kl -lt 2 -or $kl -gt 80 -or $p + 4 + $kl + 4 -gt $b.Length) { return $false }
+  if ($b[$p + 4 + $kl - 1] -ne 0) { return $false }
+  for ($k = 0; $k -lt $kl - 1; $k++) { $c = $b[$p + 4 + $k]; if (-not (($c -ge 48 -and $c -le 57) -or ($c -ge 65 -and $c -le 90) -or ($c -ge 97 -and $c -le 122) -or $c -eq 95)) { return $false } }
+  return $true }
+function Get-BlobEntryStart([byte[]]$blob) {
+  if ($blob.Length -lt 16) { throw 'blob layout not recognised' }
+  $hl = [BitConverter]::ToInt32($blob, 4)
+  if ([BitConverter]::ToInt32($blob, 0) -eq 1 -and $hl -ge 1 -and $hl -le 64 -and (Test-EntryStart $blob (8 + $hl + 4))) { $start = 8 + $hl + 4 }
+  elseif (Test-EntryStart $blob 4) { $start = 4 }
+  else { throw 'blob layout not recognised' }
+  $i = Find-Bytes $blob ($script:L1.GetBytes("PlayerBuildParts`0")); if ($i -ge 4 -and ($i - 4) -ne $start) { throw 'blob layout not recognised' }
+  return $start }
+
 # walk [int32 keylen][key\0][int32 vallen][val\0]... ; returns entry count or throws
 function Walk-Blob([byte[]]$blob) {
-  $i = Find-Bytes $blob ($script:L1.GetBytes("PlayerBuildParts`0")); if ($i -lt 4) { throw 'blob layout not recognised' }
-  $pos = $i - 4; $n = 0
+  $pos = Get-BlobEntryStart $blob; $n = 0
   while ($pos -lt $blob.Length) {
     $kl = [BitConverter]::ToInt32($blob, $pos); if ($kl -lt 2 -or $kl -gt 80) { throw "bad key length $kl at $pos" }
     if ($blob[$pos + 4 + $kl - 1] -ne 0) { throw "key not NUL-terminated at $pos" }

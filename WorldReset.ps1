@@ -108,9 +108,22 @@ function Remove-Copies([string]$s, $guids) {
 function Get-WorldHistory([string]$savePath) {
   $leaf = [IO.Path]::GetFileName($savePath); $list = New-Object System.Collections.Generic.List[object]
   $dir = Get-BackupDir
+  # 1) other worlds on the same map (their saves and the tool's backups of them): the same object has the same id in every world, so what one
+  #    world still has untouched can be put back into another. They come FIRST (oldest), so this world's own backups win; containers ignore them
+  #    (loot is rolled per world).
+  try {
+    $myText = $script:L1.GetString([IO.File]::ReadAllBytes($savePath)); $myLevel = [regex]::Match($myText, 'LevelName>([^?]*)').Groups[1].Value
+    $folder = Split-Path $savePath -Parent; $others = @()
+    foreach ($o in (Get-ChildItem -LiteralPath $folder -Filter '*.pfs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $leaf })) {
+      $others += $o; foreach ($b in (Get-ChildItem $dir -Filter "*_$($o.Name)" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' } | Sort-Object Name)) { $others += $b } }
+    foreach ($f in $others) {
+      try { $t = $script:L1.GetString([IO.File]::ReadAllBytes($f.FullName)); if ([regex]::Match($t, 'LevelName>([^?]*)').Groups[1].Value -ne $myLevel) { continue }
+        $w = Read-WorldCells $t; $list.Add([pscustomobject]@{ Name = $f.Name; Cells = $w.Cells; Copies = (Get-CopyGuids $t); Other = $true }) } catch { } }
+  } catch { }
+  # 2) this world's own backups
   foreach ($f in (Get-ChildItem $dir -Filter "*_$leaf" | Where-Object { $_.Name -notmatch '_NEW_' } | Sort-Object Name)) {
     try { $t = $script:L1.GetString([IO.File]::ReadAllBytes($f.FullName)); $w = Read-WorldCells $t
-      $list.Add([pscustomobject]@{ Name = $f.Name; Cells = $w.Cells; Copies = (Get-CopyGuids $t) }) } catch { }
+      $list.Add([pscustomobject]@{ Name = $f.Name; Cells = $w.Cells; Copies = (Get-CopyGuids $t); Other = $false }) } catch { }
   }
   return $list
 }
@@ -130,7 +143,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
     $h = $r.Get('Scavengeable_CurrentHealth'); if (-not $h) { continue }
     if (-not $seen.ContainsKey($r.Cls)) { $seen[$r.Cls] = @{} }; $seen[$r.Cls][$h] = 1 + [int]$seen[$r.Cls][$h] } } }
   foreach ($k in $seen.Keys) { if ($seen[$k].Count -eq 1) { $nodes[$k] = [double]::Parse(@($seen[$k].Keys)[0], $script:ResetInv) } }
-  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Plants = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = $hist.Count; Radius = $opt.RadiusM }
+  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Plants = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = @($hist | Where-Object { -not $_.Other }).Count; HistoryOther = @($hist | Where-Object { $_.Other }).Count; Radius = $opt.RadiusM }
   function Skip($why) { if ($plan.Skipped.Contains($why)) { $plan.Skipped[$why]++ } else { $plan.Skipped[$why] = 1 } }
 
   $cellByName = @{}; $byGuid = @{}; $byKey = @{}; $itemsByCls = @{}
@@ -201,7 +214,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
       $pk = & $poolKey $r.Cls
       if (-not $pool.ContainsKey($pk)) { $pool[$pk] = New-Object System.Collections.Generic.List[string] }
       if (-not $pool[$pk].Contains($inv)) { $pool[$pk].Add($inv) } }
-    foreach ($hs in $hist) { foreach ($hc in $hs.Cells) { foreach ($r in $hc.Recs) {
+    foreach ($hs in $hist) { if ($hs.Other) { continue }; foreach ($hc in $hs.Cells) { foreach ($r in $hc.Recs) {
       if ((Get-ResetKind $r.Cls $r.ClsPath) -ne 'container') { continue }
       $inv = $r.Get('Inventory'); if ($inv -and $r.Get('bEverOpened') -eq 'false') { if (-not $orig.ContainsKey($r.GuidHex)) { $orig[$r.GuidHex] = $inv }; $k = Get-RecKey $r; if (-not $orig.ContainsKey($k)) { $orig[$k] = $inv }; & $addPool $r } } } }
     foreach ($c in $cells) { foreach ($r in $c.Recs) { if ((Get-ResetKind $r.Cls $r.ClsPath) -eq 'container') { & $addPool $r } } }
@@ -243,7 +256,7 @@ function Get-ResetSummary($plan) {
   if ($plan.Plants -and $plan.Plants.Count) { $lines.Add(("{0,5}  Bushes and other generated plants / rocks: harvested, put back" -f $plan.Plants.Count)) }
   if ($lines.Count -eq 0) { $lines.Add('Nothing to reset with these settings.') }
   if ($plan.Skipped.Count) { $lines.Add(''); $lines.Add('Left alone:'); foreach ($k in $plan.Skipped.Keys) { $lines.Add(("{0,5}  {1}" -f $plan.Skipped[$k], $k)) } }
-  $lines.Add(''); $lines.Add("Backups used as history: $($plan.History)")
+  $lines.Add(''); $lines.Add("Backups used as history: $($plan.History)" + $(if ($plan.HistoryOther) { "  (+ $($plan.HistoryOther) save(s) of your other worlds on the same map)" } else { '' }))
   return $lines
 }
 

@@ -8,8 +8,9 @@ function Format-Num([double]$v) { $v.ToString('0.0#####', $script:Inv) }
 
 # ---------- blob entries (robust: walks the real entry list, no substring matching) ----------
 function Read-BlobEntries([byte[]]$blob) {
-  $i = Find-Bytes $blob ($script:L1.GetBytes("PlayerBuildParts`0")); if ($i -lt 4) { throw 'blob layout not recognised' }
-  $start = $i - 4; $pos = $start; $list = New-Object System.Collections.Generic.List[object]
+  # layout: int32 1, int32 len + UUID text (33 bytes), int32 (entry count), then the entries. A brand-new character has no PlayerBuildParts yet,
+  # so the start is computed from the header (checked against the PlayerBuildParts position when that entry exists).
+  $start = Get-BlobEntryStart $blob; $pos = $start; $list = New-Object System.Collections.Generic.List[object]
   while ($pos -lt $blob.Length) {
     $kl = [BitConverter]::ToInt32($blob, $pos); if ($kl -lt 2 -or $kl -gt 80) { throw "bad key length $kl at $pos" }
     $key = $script:L1.GetString($blob, $pos + 4, $kl - 1)
