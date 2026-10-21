@@ -47,8 +47,8 @@ public static class Bcn {
 '@
 }
 
-function Get-TextureInfo([string]$uassetPath) {
-  $b = [IO.File]::ReadAllBytes($uassetPath); $hs = [BitConverter]::ToUInt32($b, 4)
+function Get-TextureInfo([byte[]]$b) {
+  $hs = [BitConverter]::ToUInt32($b, 4)
   if ($hs -ge $b.Length) { return $null }
   [byte[]]$d = $b[$hs..($b.Length - 1)]; $s = [Text.Encoding]::Latin1.GetString($d)
   $m = [regex]::Match($s, '[\x08\x0C]\x00\x00\x00(PF_DXT5|PF_DXT1|PF_B8G8R8A8)\x00')
@@ -59,16 +59,15 @@ function Get-TextureInfo([string]$uassetPath) {
   return @{ Format = $m.Groups[1].Value; Width = $w; Height = $h; Data = $d }
 }
 
-# returns a System.Drawing.Bitmap (top picture of the texture) or $null
-function Convert-TextureToBitmap([string]$uassetPath) {
-  $t = Get-TextureInfo $uassetPath; if (-not $t) { return $null }
+# returns a System.Drawing.Bitmap (top picture of the texture) or $null; $ubulk may be $null (small textures keep the picture in the .uasset)
+function Convert-TextureBytesToBitmap([byte[]]$uasset, [byte[]]$ubulk) {
+  $t = Get-TextureInfo $uasset; if (-not $t) { return $null }
   $w = $t.Width; $h = $t.Height
   $size = switch ($t.Format) { 'PF_DXT5' { [int]([math]::Ceiling($w / 4) * [math]::Ceiling($h / 4) * 16) } 'PF_DXT1' { [int]([math]::Ceiling($w / 4) * [math]::Ceiling($h / 4) * 8) } 'PF_B8G8R8A8' { $w * $h * 4 } default { 0 } }
   if ($size -le 0) { return $null }
   [byte[]]$px = $null
-  $ubulk = $uassetPath -replace '\.uasset$', '.ubulk'
-  if (Test-Path -LiteralPath $ubulk) {
-    $ub = [IO.File]::ReadAllBytes($ubulk); if ($ub.Length -lt $size) { return $null }
+  if ($ubulk -and $ubulk.Length -gt 0) {
+    $ub = $ubulk; if ($ub.Length -lt $size) { return $null }
     $px = New-Object byte[] $size; [Array]::Copy($ub, 0, $px, 0, $size)       # the biggest picture is stored first
   } else {
     # small textures keep the picture inside the .uasset, right before the (width, height, 1) triple that closes the mip entry
@@ -84,4 +83,11 @@ function Convert-TextureToBitmap([string]$uassetPath) {
   $bd = $bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   [System.Runtime.InteropServices.Marshal]::Copy($bgra, 0, $bd.Scan0, $bgra.Length); $bmp.UnlockBits($bd)
   return $bmp
+}
+
+# same, from files on disk (FModel raw export: X.uasset with an optional X.ubulk beside it)
+function Convert-TextureToBitmap([string]$uassetPath) {
+  $ub = $uassetPath -replace '\.uasset$', '.ubulk'
+  [byte[]]$bulk = $null; if (Test-Path -LiteralPath $ub) { $bulk = [IO.File]::ReadAllBytes($ub) }
+  return Convert-TextureBytesToBitmap ([IO.File]::ReadAllBytes($uassetPath)) $bulk
 }

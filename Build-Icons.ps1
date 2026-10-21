@@ -1,22 +1,34 @@
 param(
   # where FModel put its exports (raw .uasset/.ubulk textures, or PNGs if you exported those)
   [string]$ExportRoot = '',
-  [int]$MaxSize = 128
+  [int]$MaxSize = 128,
+  # read the pictures straight from the installed game (no FModel): the game folder, e.g. ...\steamapps\common\Permafrost
+  [string]$GameDir = '',
+  [string]$OodleDll = ''
 )
 . (Join-Path $PSScriptRoot 'Paths.ps1')
-if (-not $ExportRoot) { $ExportRoot = PF-ExportRoot }
+if (-not $ExportRoot -and -not $GameDir) { $ExportRoot = PF-ExportRoot }
 # Builds  icons\<item id>.png  for every item in items.json, from FModel's texture export.
 # Works with RAW exports (.uasset + .ubulk, decoded by TextureDecode.ps1) and with PNG exports.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'TextureDecode.ps1')
+$reader = $null
+if ($GameDir) {
+  . (Join-Path $PSScriptRoot 'GameFiles.ps1')
+  $utoc = Get-GameUtoc $GameDir; if (-not $utoc) { throw "No Permafrost-Windows.utoc found under $GameDir" }
+  if (-not $OodleDll) { $OodleDll = Find-OodleDll }; if (-not $OodleDll) { throw 'The Oodle decompressor (oodle-data-shared.dll) was not found.' }
+  $reader = Open-GameContainer $utoc $OodleDll
+}
+if (-not $ExportRoot) { $ExportRoot = Join-Path ([IO.Path]::GetTempPath()) 'pf-no-fmodel-export' }   # reading the game files directly: no FModel export needed
 $items = Get-Content (Join-Path $PSScriptRoot 'items.json') -Raw | ConvertFrom-Json
 $outDir = Join-Path $PSScriptRoot 'icons'; if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 $content = Join-Path $ExportRoot 'Permafrost\Content'
 $cache = @{}          # icon path -> decoded bitmap (many items share one icon, e.g. all keys)
-$written = 0; $missing = New-Object System.Collections.Generic.List[string]; $viaRaw = 0; $viaPng = 0
+$written = 0; $missing = New-Object System.Collections.Generic.List[string]; $viaRaw = 0; $viaPng = 0; $viaGame = 0
 
 function Get-IconBitmap([string]$gamePath) {
+  if ($script:reader) { $b = Get-GameBitmap $script:reader $gamePath; if ($b) { $script:viaGame++; return $b } }
   $rel = ($gamePath -replace '^/Game/', '').Replace('/', '\')
   $raw = Join-Path $content "$rel.uasset"
   if (Test-Path -LiteralPath $raw) { $b = Convert-TextureToBitmap $raw; if ($b) { $script:viaRaw++; return $b } }
@@ -39,7 +51,7 @@ foreach ($it in $items) {
 }
 foreach ($v in $cache.Values) { if ($v) { $v.Dispose() } }
 $total = @($items | Where-Object { $_.icon }).Count
-"pictures written: $written of $total items  ->  $outDir   (decoded from raw: $viaRaw textures, from PNG: $viaPng)"
+"pictures written: $written of $total items  ->  $outDir   (from the game files: $viaGame textures, from FModel raw: $viaRaw, from PNG: $viaPng)"
 $listFile = Join-Path $PSScriptRoot 'icons-missing.txt'
 if ($missing.Count) { "still missing: $($missing.Count) items (their hover shows text only)"; $missing | Set-Content $listFile -Encoding utf8; "list written to $listFile" }
 elseif (Test-Path -LiteralPath $listFile) { Remove-Item -LiteralPath $listFile -Force; "no missing icons" }

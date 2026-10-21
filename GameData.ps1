@@ -271,7 +271,7 @@ function GD-FillRules {
   $g = $script:GD.Rules; $f = $g.Filter.Text.Trim(); $lv = $g.LV; $label = [string]$g.Combo.SelectedItem; if (-not $label) { return }; $csv = $script:RulesTables[$label]; $rows = GD-RulesRows $csv
   $lv.BeginUpdate(); $lv.Items.Clear()
   if ($g.ShownCsv -ne $csv) { $lv.Columns.Clear(); $cols = @(); if ($rows.Count) { $cols = @($rows[0].PSObject.Properties.Name | Where-Object { $_ -ne 'Asset' } | Select-Object -First 6) }
-    foreach ($c in $cols) { $w = switch -Regex ($c) { 'Description|Journal|Modifiers|Settings|FollowUp|Benefit' { 380 } 'Name|Label|Effect|Skill' { 190 } default { 110 } }; [void]$lv.Columns.Add($c, $w) }; $g.ShownCsv = $csv; $g.Cols = $cols }
+    foreach ($c in $cols) { $w = switch -Regex ($c) { 'Description|Journal|Modifiers|Settings|FollowUp|Benefit' { 380 } 'Name|Label|Effect|Skill' { 190 } default { 110 } }; [void]$lv.Columns.Add($c, $w) }; $g.ShownCsv = $csv; $g.Cols = $cols; Fit-LastColumn $lv }   # stretch the last column so the header has no blank (white) strip beside it
   $shown = 0; $capped = $false
   foreach ($r in $rows) { if ($shown -ge 1500) { $capped = $true; break }; $sc = @(GD-SpoilCols $csv $r); $hide = (Get-HideSpoilers) -and $sc.Count; $all = (($r.PSObject.Properties | Where-Object { -not ($hide -and $sc -contains $_.Name) }).Value -join ' '); if (-not (Test-Match $all $f)) { continue }; $shown++
     $row = [pscustomobject]@{ Table = 'rules'; Asset = [string]$r.PSObject.Properties.Value[0]; Folder = $label; Items = ''; References = ''; R = $r; Csv = $csv }

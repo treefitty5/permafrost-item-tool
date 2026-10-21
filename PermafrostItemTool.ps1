@@ -13,6 +13,10 @@ try {
   . (Join-Path $PSScriptRoot 'WorldCore.ps1')
   . (Join-Path $PSScriptRoot 'WorldReset.ps1')
   . (Join-Path $PSScriptRoot 'WorldResetUI.ps1')
+  . (Join-Path $PSScriptRoot 'GameFiles.ps1')
+  . (Join-Path $PSScriptRoot 'PicturesUI.ps1')
+  . (Join-Path $PSScriptRoot 'WorldPicker.ps1')
+  . (Join-Path $PSScriptRoot 'OverviewUI.ps1')
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
@@ -22,7 +26,7 @@ try {
   # first run (no data made yet): say what to do instead of failing
   if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'items.json'))) {
     if ($SelfTest -or $Headless) { Write-Output 'FIRST-RUN: no items.json yet (game data not made)'; return }
-    [void][System.Windows.Forms.MessageBox]::Show("The game data has not been made yet.`r`n`r`nThis tool does not ship any game files. Follow the README (steps 3 to 6): export the game files with FModel, then run Build-Everything.ps1. After that, start the tool again.", 'Permafrost Item Tool - first run', 'OK', 'Information')
+    [void][System.Windows.Forms.MessageBox]::Show("The tool's data files (items.json and the catalog folder) are missing.`r`n`r`nDownload the full release ZIP from the repository's Releases page (not only the source code), or rebuild the data from your own game files with Build-Everything.ps1 (see the README, Advanced). Then start the tool again.", 'Permafrost Item Tool - first run', 'OK', 'Information')
     return
   }
   $script:SavePath = PF-SavePath
@@ -44,7 +48,14 @@ try {
   $btnBrowse = New-Ctl System.Windows.Forms.Button 852 10 80 26 'Browse...'; $btnBrowse.Anchor = 'Top,Right'
   $btnReload = New-Ctl System.Windows.Forms.Button 938 10 80 26 'Reload'; $btnReload.Anchor = 'Top,Right'
   $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help / how it works'; $btnHelp.Anchor = 'Top,Right'
-  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'
+  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures...'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview...'
+  # first-run bar: shown under the save row while no pictures exist (Update-PicsBar), so the player does not have to find the top button
+  $script:PicsBarOn = $false; $pnlPics = New-Object System.Windows.Forms.Panel; $pnlPics.Visible = $false; $form.Controls.Add($pnlPics)
+  $lblPics = New-Object System.Windows.Forms.Label; $lblPics.AutoSize = $false; $lblPics.BackColor = [System.Drawing.Color]::Transparent; $lblPics.TextAlign = 'MiddleLeft'; $lblPics.Text = 'Item pictures are not built yet. Build them from your installed game: read-only, about 20 seconds, one time.'; $pnlPics.Controls.Add($lblPics)
+  $btnPicsGo = New-Object System.Windows.Forms.Button; $btnPicsGo.Text = 'Build pictures now'; $btnPicsGo.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $pnlPics.Controls.Add($btnPicsGo)
+  $btnPicsLater = New-Object System.Windows.Forms.Button; $btnPicsLater.Text = 'Not now'; $pnlPics.Controls.Add($btnPicsLater)
+  $btnPicsNever = New-Object System.Windows.Forms.Button; $btnPicsNever.Text = "Don't ask again"; $pnlPics.Controls.Add($btnPicsNever)
+  $pnlPics.Add_Paint({ param($s, $e) $c = $script:Th.Accent; $b = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(46, $c.R, $c.G, $c.B)); $e.Graphics.FillRectangle($b, 0, 0, $s.Width, $s.Height); $b.Dispose(); $p = New-Object System.Drawing.Pen($c); $e.Graphics.DrawRectangle($p, 0, 0, $s.Width - 1, $s.Height - 1); $p.Dispose() })
   $lblGame = New-Ctl System.Windows.Forms.Label 12 44 1140 22; $lblGame.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $lblGame.Anchor = 'Top,Left,Right'
   $lblInfo = New-Ctl System.Windows.Forms.Label 12 66 1140 20; $lblInfo.Anchor = 'Top,Left,Right'
   $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'
@@ -138,7 +149,7 @@ try {
   }
 
   # ---- spec helpers for the catalog list, the selected-item panel and the hover tips
-  function Get-StatusText($i) { switch ($i.confidence) { 'verified' { 'In your saves' } 'guess' { 'Name unsure' } default { 'Game data' } } }
+  function Get-StatusText($i) { switch ($i.confidence) { 'verified' { 'Verified' } 'guess' { 'Name unsure' } default { 'Game data' } } }
   function Get-StackText($i) { if ($i.stackSource -in 'game data', 'game default', 'confirmed in game') { [string]$i.stackSize } elseif ($i.category -in 'Weapons', 'Clothing', 'QuestItems') { '1' } else { "$($i.stackSize)~" } }
   function Get-CondText($i) { if ($i.category -in 'Weapons', 'Clothing', 'Accessories', 'Traps', 'QuestItems' -and $i.maxCondition) { $c = ('{0:0.#}' -f [double]$i.maxCondition); if ($i.condSource -ne 'game data') { $c += '~' }; return $c }; return '' }
   function Get-AmmoText($i) {
@@ -206,7 +217,7 @@ try {
     if ($lvCat.SelectedItems.Count -eq 0) { $script:Selected = $null; $lblSelId.Text = 'Pick an item on the left'; $lblSelInfo.Text = 'Search or choose a category, click an item, set how many, then Add to queue (double-click also works).'; $script:ShowCond = $false; $script:ShowLoaded = $false; Layout-SelRows; Fit-SelInfo; return }
     $i = $lvCat.SelectedItems[0].Tag; $script:Selected = $i
     $lblSelId.Text = $i.id
-    $nameTxt = switch ($i.confidence) { 'verified' { 'name seen in your saves' } 'guess' { 'WARNING: best-guess name, may not load' } default { 'name read from the game data' } }; if ($i.formatInferred) { $nameTxt += ', format inferred' }
+    $nameTxt = switch ($i.confidence) { 'verified' { 'name verified in real saves' } 'guess' { 'WARNING: best-guess name, may not load' } default { 'name read from the game data' } }; if ($i.formatInferred) { $nameTxt += ', format inferred' }
     $stackTxt = switch ($i.stackSource) { 'game data' { "Stack limit $($i.stackSize) (game data)" } 'confirmed in game' { "Stack limit $($i.stackSize) (confirmed in game)" } 'game default' { "Stack limit $($i.stackSize) (game data has no stack value, so the default of 1 applies)" } 'your saves' { "Stack $($i.stackSize) (largest seen in your saves)" } default { "Stack $($i.stackSize) (estimate)" } }
     $condTxt = if ($i.maxCondition -and $i.category -in 'Weapons', 'Clothing', 'Accessories', 'Traps', 'QuestItems') { "    |    Max condition $('{0:0.#}' -f [double]$i.maxCondition) ($(if ($i.condSource -eq 'game data') { 'game data' } else { 'highest seen in your saves' }))" } else { '' }
     $foundTxt = if ($i.sources -and @($i.sources).Count) { "Found via: " + (@($i.sources) -join ', ') } else { 'No loot, pickup, trade or recipe link found in the game files' }
@@ -391,13 +402,14 @@ Before you start (every time)
 THE WINDOW
 The window opens maximized and resizes with you. Press F11 for true full screen (Esc or F11 again to leave it).
 
-- Save file / Browse / Reload (top): Shows which .pfs save is edited (World#2 by default). Browse picks another. Reload re-reads the save.
+- Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
 - Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
 - Backpack slots (top right): How many slots your worn backpack has. The tool now takes this from the game's own item data, so it is exact for every backpack (the label says 'game data'). The box only matters for a backpack the data does not cover; type the real number there and press Remember.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
-- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool (built by Build-Icons.ps1). An item without a picture shows text only.
+- Overview (top right): a read-only report of your save - world and play time, character, skills, inventory, recipes known, quests, buildings, explored area, companion, backups - with a Copy button. Nothing in it changes the save.
+- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures...' (top right) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
 
 Item catalog (left)
 All 380 items found in the game's files. Type in the search box or pick a category. Click a column header to sort. Columns (everything comes from the game's own data unless it says otherwise):
@@ -407,7 +419,7 @@ All 380 items found in the game's files. Type in the search box or pick a catego
 - Dmg - weapon damage per hit (shots for guns); Frost = cold protection of clothing; Value = trade value. Click the header to sort, ("melee" = none). Ammo: how many weapons use it ("no gun" = none found).
 - Where to find (shown under the item when it applies) lists the best sources with the chance per opening, worked out from the loot weights: e.g. '2.9% Military_Car_01 +5 [Container]' = about a 3% chance each time one of those is opened. 'sold by' = traders.
 - Found via - which game files link the item: Loot (loot tables/containers), Pickup (a world pickup exists), Craft (a crafting recipe makes it; the ingredients are shown in the Selected item panel), Trader, Quest (reward pool or quest; the exact group and amount are shown as 'Quest reward'), Animal. It says WHERE it is linked, not how likely it is - drop chances are not readable. "-" = no link found at all (likely unreleased).
-- Status - In your saves = this exact name already exists in your own saves (known to work). Game data = name read from the game's data files (worked every time so far, but it is not in your saves). Name unsure (red) = several names were possible; the game may ignore it.
+- Status - Verified = this exact name has been seen in real saves (known to work). Game data = name read from the game's data files (worked every time so far, but never seen in a save). Name unsure (red) = several names were possible; the game may ignore it.
 
 Selected item (right)
 - Hint text - for weapons it says which ammo they use (or that they use none); for ammo it lists the weapons that use it.
@@ -459,7 +471,7 @@ THE EXTRA WINDOWS
 These windows use the same save file as the main window (World reset has its own World box). The ones that change your save (Player tools, World reset) go through the same safety steps: game must be closed, confirmation first, automatic backup, result re-checked. Recipe tweaks and Build move change the game while it runs and never touch your save.
 
 PLAYER TOOLS...
-- Vitals & skills - Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save). Levels above anything in your save (highest 29) are flagged as untested.
+- Vitals and skills - Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save). Levels above anything in your save (highest 29) are flagged as untested.
 - Recipes - All recipes found in the game files (item recipes and building recipes), marked learned / not learned. Tick the ones you want and press 'Learn ticked recipes'. Hold the mouse over a recipe to see its picture and details (building recipes: build cost, requirements, description; item recipes: ingredients, what it makes, where and how long). Pictures come from the icons folder (built by Build-RecipeIcons.ps1); the few recipes with no picture in the game files show text only.
 - Teleport - Moves you to your bed, the crash site, or any workbench/campfire/etc. you built. You load above the spot (150 cm by default; the 'Drop height' box changes it, use about 500 if a spot is inside rock or a hillside) and drop onto it. The game's own named locations have no coordinates in the exported data, so they cannot be listed; instead open the in-game map, read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them in the 'Coordinates' boxes under the list and press 'Teleport to coordinates'. Works on any world: pick it in the main window first. If the game spawns you at the start instead, the spot was not accepted (it happened a few times with spots in mid-air or inside rock): try again with a higher drop height or a spot you stood on yourself.
 - Quest progress - READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters, rewards already claimed, journal. Quests are not edited.
@@ -501,8 +513,8 @@ GAME DATA...
 - Recipes - Crafting recipes (ingredients, amounts, what they make, crafting time, station) and learning recipes (what they teach, how they are learned, cost, which rewards hand them out), with 'learned' status from your save. CRAFT LIST: pick a crafting recipe, set the number in the box to the number of crafts, press the button: all the ingredients are queued.
 - Loot tables - Every loot list: items with spawn weight and amount range, guaranteed loot, which containers/NPCs use it.
 - Building parts - Cost, health, refund, repair cost and requirements of everything you can build.
-- Recordings/notes - The text of recordings, radio messages and notes.
-- Game rules - Pick a table: gameplay effects (what food, medicine, wounds and cold do), status effects, difficulty presets, animals (health, damage, loot), NPCs, skills, attributes, plants, destructibles, random encounters, fast travel, achievements, world locations, and ALL in-game text (search any phrase, e.g. a line of dialogue). Pick a row to see every field.
+- Recordings/notes - The text of recordings, radio messages and notes. This story text is NOT part of the shipped data pack, so the tab is empty until you rebuild the data from your own game files (README, Advanced).
+- Game rules - Pick a table: gameplay effects (what food, medicine, wounds and cold do), status effects, difficulty presets, animals (health, damage, loot), NPCs, skills, attributes, plants, destructibles, random encounters, fast travel, achievements, world locations, and, after you rebuild the data yourself, ALL in-game text (the shipped data pack leaves the full text table out). Pick a row to see every field.
 - All tables - Every table built from the game files (loot, containers, NPCs, animals, locations, building parts...).
 - Bundles - One-click groups: all quest items, a full stack of every ammo, ammo for the weapons you carry now, or everything one reward pool can give. They go into the Queue; you still Preview / Apply as usual.
 
@@ -520,7 +532,7 @@ The tool refreshes the save's modified time after every apply and restore so it 
 
 LIMITS
 - Single-player worlds only - do not use on online/multiplayer worlds.
-- Maximum condition values and skill-level caps cannot be read from the game files.
+- The data describes ONE version of the game (datapack.json says which); after a game update it can be out of date until a new release or a rebuild. The Overview warns when the installed game differs.
 - An unknown item name is silently ignored by the game (the item just does not appear).
 - Quest items are added but do not mark quest progress.
 - World reset cannot restore destroyed ores or picked-up items in a world that has no backups.
@@ -549,9 +561,11 @@ WHERE THINGS ARE
     $W = $form.ClientSize.Width; $H = $form.ClientSize.Height
     if ($W -lt 900 -or $H -lt 600) { return }
     foreach ($c in @($gbCat,$gbSel,$gbQ,$gbInv,$gbLog,$txtSave,$btnBrowse,$btnReload,$btnHelp,$lblGame,$lblInfo,$lblNote,$lvCat,$lvInv,$txtLog,$lbQ,$txtSearch,$cmbCat,$btnRestore,$btnOpenBk,$btnRemove,$btnClear,$btnPreview,$btnApply,$btnAdd,$tip)) { $c.Anchor = 'Top,Left' }
-    $off = 66; $m = 12; $gap = 12; $top = 112 + $off
+    $off = 66; $m = 12; $gap = 12; $top = 112 + $off + $(if ($script:PicsBarOn) { 38 } else { 0 })
+    $pnlPics.SetBounds($m, 108 + $off, $W - 2 * $m, 32); $bw1 = 150; $bw2 = 90; $bw3 = 130; $by = 3
+    $btnPicsNever.SetBounds($pnlPics.Width - 6 - $bw3, $by, $bw3, 26); $btnPicsLater.SetBounds($btnPicsNever.Left - 6 - $bw2, $by, $bw2, 26); $btnPicsGo.SetBounds($btnPicsLater.Left - 6 - $bw1, $by, $bw1, 26); $lblPics.SetBounds(10, 0, [math]::Max(120, $btnPicsGo.Left - 16), 32)
     $lblGame.Top = 44 + $off; $lblInfo.Top = 66 + $off; $lblNote.Top = 86 + $off
-    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20)
+    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20); $btnPics.SetBounds($lblTheme.Left - 14 - 100, 19, 100, 26); $btnOv.SetBounds($btnPics.Left - 8 - 100, 19, 100, 26)
     $btnHelp.SetBounds($W - $m - 132, 10 + $off, 132, 26)
     $btnData.SetBounds($btnHelp.Left - 6 - 110, 10 + $off, 110, 26); $btnPlayer.SetBounds($btnData.Left - 6 - 110, 10 + $off, 110, 26)
     $btnTweaks.SetBounds($btnPlayer.Left - 6 - 120, 10 + $off, 120, 26); $btnWorld.SetBounds($btnTweaks.Left - 6 - 110, 10 + $off, 110, 26); $btnMove.SetBounds($btnWorld.Left - 6 - 110, 10 + $off, 110, 26); $btnReload.SetBounds($btnMove.Left - 6 - 80, 10 + $off, 80, 26)
@@ -561,8 +575,9 @@ WHERE THINGS ARE
     foreach ($l in @($lblGame, $lblInfo, $lblNote)) { $l.Width = $W - 2 * $m }
     $leftW = [int](($W - 3 * $m) * 0.46); $rightX = $m + $leftW + $m; $rightW = $W - $rightX - $m
     $avail = $H - $top - $m
-    $topH = [math]::Max((346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })), [int](($avail - $gap) * 0.55)); $botH = $avail - $topH - $gap
-    if ($botH -lt 200) { $botH = 200; $topH = $avail - $gap - $botH }
+    $minTopH = 372 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
+    $topH = [math]::Max($minTopH, [int](($avail - $gap) * 0.55)); $botH = $avail - $topH - $gap
+    if ($botH -lt 200) { $botH = 200; $topH = [math]::Max($minTopH, $avail - $gap - $botH) }
     # catalog (top-left)
     $gbCat.SetBounds($m, $top, $leftW, $topH)
     $cmbCat.SetBounds($leftW - 10 - 190, 22, 190, 24)
@@ -594,10 +609,10 @@ WHERE THINGS ARE
   $banner.GetType().GetProperty('DoubleBuffered', [Reflection.BindingFlags]'Instance,NonPublic').SetValue($banner, $true)
   $banner.Add_Paint({ param($s, $e) Paint-Banner $e.Graphics $s.Width $s.Height 'single-player saves only   |   items - skills - recipes - teleport' })
   $banner.Add_Resize({ $banner.Invalidate() })
-  $lblTheme = New-Object System.Windows.Forms.Label; $lblTheme.Text = 'Theme'; $lblTheme.TextAlign = 'MiddleRight'; $lblTheme.BackColor = [System.Drawing.Color]::Transparent; $lblTheme.ForeColor = [System.Drawing.Color]::White; $banner.Controls.Add($lblTheme)
-  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme)
+  $lblTheme = New-Object System.Windows.Forms.Label; $lblTheme.Text = 'Theme'; $lblTheme.TextAlign = 'MiddleRight'; $lblTheme.BackColor = [System.Drawing.Color]::Transparent; $lblTheme.ForeColor = (Get-BannerFore); $banner.Controls.Add($lblTheme)
+  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme); $banner.Controls.Add($btnPics); $banner.Controls.Add($btnOv)
   $form.Controls.Add($banner)
-  function Switch-Theme([string]$name) { Set-Theme $name; Save-ThemeName $name; Apply-Theme $form; $lblTheme.ForeColor = [System.Drawing.Color]::White; $banner.Invalidate(); Update-GameState; Refresh-Catalog; Do-Layout; $form.Invalidate($true) }
+  function Switch-Theme([string]$name) { Set-Theme $name; Save-ThemeName $name; Apply-Theme $form; $lblTheme.ForeColor = (Get-BannerFore); $banner.Invalidate(); Update-GameState; Refresh-Catalog; Do-Layout; $form.Invalidate($true) }
   $cmbTheme.Add_SelectedIndexChanged({ if ([string]$cmbTheme.SelectedItem -ne $script:ThName) { Switch-Theme ([string]$cmbTheme.SelectedItem) } })
 
   $script:IsFull = $false
@@ -672,6 +687,13 @@ WHERE THINGS ARE
   $script:IconCache = @{}
   $script:TipData = $null
   $script:HoverKey = $null
+
+  # shows the first-run pictures bar while fewer than 20 pictures exist (and the player has not said "Don't ask again")
+  function Update-PicsBar {
+    $n = 0; try { $n = @(Get-ChildItem -LiteralPath $script:IconDir -Filter *.png -File -ErrorAction SilentlyContinue).Count } catch { }
+    $vis = ($n -lt 20) -and -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'pictures.json'))
+    if ($script:PicsBarOn -ne $vis) { $script:PicsBarOn = $vis; $pnlPics.Visible = $vis; Do-Layout }
+  }
 
   function Get-ItemIcon([string]$id) {
     if ($script:IconCache.ContainsKey($id)) { return $script:IconCache[$id] }
@@ -752,10 +774,10 @@ WHERE THINGS ARE
   $btnApply.Add_Click({ Apply-Queue })
   $btnPreview.Add_Click({ Show-Preview })
   $btnHelp.Add_Click({ Show-Help })
-  $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnOv.Add_Click({ try { Show-Overview $form $script:SavePath } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Show-Pictures $form $script:SavePath; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Remember-BackpackSlots })
   $btnReload.Add_Click({ Reload-Inventory })
-  $btnBrowse.Add_Click({ $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'Permafrost saves (*.pfs)|*.pfs'; if ($d.ShowDialog() -eq 'OK') { $txtSave.Text = $d.FileName; PF-SetConfig 'SavePath' $d.FileName; Reload-Inventory } })
+  $btnBrowse.Add_Click({ $pick = Show-WorldPicker $form $txtSave.Text; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
   $btnRestore.Add_Click({ Do-Restore })
   $btnOpenBk.Add_Click({ Start-Process explorer.exe (Get-BackupDir) })
   $form.Add_Resize({ Do-Layout })
@@ -763,8 +785,8 @@ WHERE THINGS ARE
   $form.Add_KeyDown({ param($s, $e) if ($e.KeyCode -eq 'F11') { Toggle-FullScreen; $e.Handled = $true } elseif ($e.KeyCode -eq 'Escape' -and $script:IsFull) { Toggle-FullScreen; $e.Handled = $true } })
   $timer = New-Object System.Windows.Forms.Timer; $timer.Interval = 2500; $timer.Add_Tick({ Update-GameState; Check-SaveChanged }); $timer.Start()
 
-  Do-Layout; Refresh-Catalog; On-SelectItem; Reload-Inventory; Update-GameState; Apply-Theme $form; $lblTheme.ForeColor = [System.Drawing.Color]::White; Do-Layout
-  Log ("Catalog: {0} items. Items marked 'verified' use names already present in your saves." -f $script:Cat.Count)
+  Do-Layout; Refresh-Catalog; On-SelectItem; Reload-Inventory; Update-GameState; Apply-Theme $form; $lblTheme.ForeColor = (Get-BannerFore); Do-Layout
+  Log ("Catalog: {0} items. Items marked 'verified' use names confirmed in real saves." -f $script:Cat.Count)
 
   if ($SelfTest) {
     # invisible self-test with the real code paths: shows the form off-screen, resizes, lets the timer tick, reports any UI exception
@@ -783,13 +805,17 @@ WHERE THINGS ARE
       foreach ($tn in @($script:Palettes.Keys)) {
         Switch-Theme $tn; $cmbTheme.SelectedItem = $tn; $txtSearch.Text = 'Weapon_'; [System.Windows.Forms.Application]::DoEvents()
         $lvCat.Items[3].Selected = $true; [void](Queue-ById 'Whiskey' 6); [System.Windows.Forms.Application]::DoEvents()
-        Save-WindowShot $form (Join-Path $env:PF_SHOTS "main_$tn.png")
+        Update-PicsBar; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS "main_$tn.png")
         $script:Queue.Clear(); Refresh-Queue; $txtSearch.Text = ''
         $script:TestMode = $true
         $dw = New-DataForm; $dw.Opacity = 0; $dw.ShowInTaskbar = $false; $dw.StartPosition = 'Manual'; $dw.Location = New-Object System.Drawing.Point(-4000, -4000); $dw.Show(); $script:GD.Find.Filter.Text = 'KeyAnnas'; [System.Windows.Forms.Application]::DoEvents(); $script:GD.Find.LV.Items[0].Selected = $true; [System.Windows.Forms.Application]::DoEvents()
         Save-WindowShot $dw (Join-Path $env:PF_SHOTS "data_$tn.png"); $dw.Close()
-        $pw = New-PlayerForm; $pw.Opacity = 0; $pw.ShowInTaskbar = $false; $pw.StartPosition = 'Manual'; $pw.Location = New-Object System.Drawing.Point(-4000, -4000); $pw.Show(); [System.Windows.Forms.Application]::DoEvents()
-        Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_$tn.png"); $pw.Close(); $script:TestMode = $false
+        $pw = New-PlayerForm; $pw.Opacity = 0; $pw.ShowInTaskbar = $false; $pw.StartPosition = 'Manual'; $pw.Location = New-Object System.Drawing.Point(-4000, -4000); $pw.Size = New-Object System.Drawing.Size(1500, 820); $pw.Show(); [System.Windows.Forms.Application]::DoEvents()
+        Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_$tn.png"); $pw.Close()
+        foreach ($sw in @(@{ F = { New-OverviewForm $script:SavePath }; N = 'overview' }, @{ F = { New-PicturesForm $script:SavePath }; N = 'pictures' })) {
+          $sf = & $sw.F; $sf.Opacity = 0; $sf.ShowInTaskbar = $false; $sf.StartPosition = 'Manual'; $sf.Location = New-Object System.Drawing.Point(-4000, -4000); $sf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300; [System.Windows.Forms.Application]::DoEvents()
+          Save-WindowShot $sf (Join-Path $env:PF_SHOTS "$($sw.N)_$tn.png"); $sf.Close() }
+        $script:TestMode = $false
       }
       Switch-Theme 'Frostbite'
       $cmbCat.SelectedItem = 'All'; $txtSearch.Text = ''; [System.Windows.Forms.Application]::DoEvents(); $lvCat.Items[40].Selected = $true; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS 'cat_specs.png')
@@ -844,7 +870,7 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
     $script:RtModsDirOverride = $null; $script:RtStateOverride = $null; $script:TestMode = $false; Remove-Item -LiteralPath $rtTmp -Recurse -Force -ErrorAction SilentlyContinue
     # World reset window on a COPY of the save (temp folder; the real save and Backups are never touched)
     $wrTmp = Join-Path $env:TEMP ('wr-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force "$wrTmp\Backups" | Out-Null
-    if (Test-Path (Join-Path $PSScriptRoot 'Backups')) { Copy-Item (Join-Path $PSScriptRoot 'Backups\*') "$wrTmp\Backups" -Force }; Copy-Item $script:SavePath "$wrTmp\World#2.pfs" -Force
+    if (Test-Path (Join-Path $PSScriptRoot 'Backups')) { Get-ChildItem (Join-Path $PSScriptRoot 'Backups') -File -Filter '*.pfs' | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | Copy-Item -Destination "$wrTmp\Backups" -Force }   # only the newest few: copying the whole history made the self-test take minutes; Copy-Item $script:SavePath "$wrTmp\World#2.pfs" -Force
     $script:WRSavePathOverride = "$wrTmp\World#2.pfs"; $script:BackupDirOverride = "$wrTmp\Backups"; $script:TestMode = $true
     try { $wf = New-WorldResetForm; $wf.Opacity = 0; $wf.ShowInTaskbar = $false; $wf.StartPosition = 'Manual'; $wf.Location = New-Object System.Drawing.Point(-4000, -4000); $wf.Show(); [System.Windows.Forms.Application]::DoEvents(); $wu = $script:WR
       $h0 = (Get-FileHash "$wrTmp\World#2.pfs").Hash; $nb0 = @(Get-ChildItem "$wrTmp\Backups").Count
@@ -880,6 +906,15 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
     $pf = New-PlayerForm; $pf.Opacity = 0; $pf.ShowInTaskbar = $false; $pf.StartPosition = 'Manual'; $pf.Location = New-Object System.Drawing.Point(-4000, -4000); $pf.Show(); [System.Windows.Forms.Application]::DoEvents()
     $out += "Player tools: skills $($script:PT.LvSkills.Items.Count), recipes $($script:PT.LvRecipes.Items.Count), teleport $($script:PT.LvTele.Items.Count), quests $($script:PT.LvQuest.Items.Count)"
     $out += "icons: main=$($null -ne $form.Icon) data=$($null -ne $dataWin.Icon) player=$($null -ne $pf.Icon)"
+    $script:TestMode = $true
+    try {
+      $ovl = @(Get-SaveOverview $script:SavePath); $out += "overview: $($ovl.Count) lines, sections " + ((@($ovl | Where-Object { $_ -cmatch '^[A-Z][A-Z ()]+$' }).Count))
+      if ($ovl.Count -lt 30) { $errs.Add('Overview report too short') }
+      $wl = @(Get-WorldFiles $script:SavePath); $out += "world picker: $($wl.Count) world(s) found"
+      $wf = Show-WorldPicker $form $script:SavePath; $out += "world picker form: $($wf.Text) / rows $($script:WP.List.Items.Count)"
+      $pif = New-PicturesForm $script:SavePath; $out += "pictures form: [$($script:PIC.GameState.Text)] [$($script:PIC.OodleState.Text -replace '(Decompressor found:).*', '$1 ...')]"
+      $ovf = New-OverviewForm $script:SavePath; $out += "overview form: $($ovf.Text)"
+    } catch { $errs.Add("new windows test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $pf.Close(); $script:TestMode = $false; $script:Queue.Clear(); Refresh-Queue
     $end = (Get-Date).AddSeconds(6); while ((Get-Date) -lt $end) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 50 }
     $timer.Stop(); $form.Close()
@@ -887,6 +922,7 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
   }
 
   if ($Headless) { return @{ Form = $form; Search = $txtSearch; ListCat = $lvCat; Qty = $numQty; Stack = $numStack; Cond = $numCond; Loaded = $numLoaded; Target = $cmbTarget; Inv = $lvInv; Queue = $lbQ; Log = $txtLog; GameLabel = $lblGame; Info = $lblInfo; Apply = $btnApply; BtnPlayer = $btnPlayer; BtnData = $btnData; BtnWorld = $btnWorld; Fn = @{ AddSel = ${function:Add-Selected}; Select = ${function:On-SelectItem}; Refresh = ${function:Refresh-Catalog} } } }
+  $form.Add_Shown({ try { Update-PicsBar } catch { } })
   $form.WindowState = 'Maximized'
   [void]$form.ShowDialog()
 }

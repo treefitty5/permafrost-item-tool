@@ -288,7 +288,7 @@ function New-PlayerForm {
   function NewTab([string]$title) { $p = New-Object System.Windows.Forms.TabPage; $p.Text = $title; $p.Padding = New-Object System.Windows.Forms.Padding(8); $tabs.TabPages.Add($p); return $p }
 
   # --- tab 1: vitals & skills
-  $t1 = NewTab 'Vitals && skills'
+  $t1 = NewTab 'Vitals and skills'
   $gv = New-Object ThemedGroup; $gv.Text = 'Vitals (current value and maximum)'; $gv.Location = '10,10'; $gv.Size = '470,262'; $t1.Controls.Add($gv)
   New-Lbl $gv 'Current' 170 24 80 | Out-Null; New-Lbl $gv 'Maximum' 290 24 80 | Out-Null
   $ui.VCur = @{}; $ui.VMax = @{}; $y = 48
@@ -303,6 +303,8 @@ function New-PlayerForm {
   $gs = New-Object ThemedGroup; $gs.Text = 'Skills'; $gs.Location = '496,10'; $gs.Size = '560,500'; $gs.Anchor = 'Top,Left,Right,Bottom'; $t1.Controls.Add($gs)
   $pe = New-Object System.Windows.Forms.Panel; $pe.Dock = 'Bottom'; $pe.Height = 150; $gs.Controls.Add($pe)
   $ui.LvSkills = New-LV $gs @('Skill', 'Level', 'XP', 'XP needed for next', 'Max level', 'Benefit (from the game data)') @(170, 60, 80, 120, 80, 330); $ui.LvSkills.Dock = 'Fill'; $ui.LvSkills.BringToFront()
+  # the last column (Benefit) takes whatever width the table has left, so nothing is cut off on a wide window
+  $ui.LvSkills.Add_Resize({ $lv = $script:PT.LvSkills; if ($lv.Columns.Count -ge 6) { $o = 0; for ($i = 0; $i -lt 5; $i++) { $o += $lv.Columns[$i].Width }; $lv.Columns[5].Width = [math]::Max(260, $lv.ClientSize.Width - $o - 4) } })
   $ui.LvSkills.Add_SelectedIndexChanged({ PT-SelectSkill })
   New-Lbl $pe 'Selected skill - level' 8 10 140 | Out-Null; $ui.SkLevel = New-Num $pe 154 7 70 1 100 0
   New-Lbl $pe 'XP' 240 10 30 | Out-Null; $ui.SkXp = New-Num $pe 274 7 90 0 99999 1
@@ -327,13 +329,15 @@ function New-PlayerForm {
   $ui.TeleNow = New-Lbl $t3 '' 8 8 900 22; $ui.TeleNow.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   New-Lbl $t3 'Search' 8 40 50 | Out-Null; $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Location = '60,37'; $ui.TeleFilter.Size = '240,24'; $t3.Controls.Add($ui.TeleFilter)
   $bTp = New-Btn $t3 'Teleport to selected place' 320 33 220 32; $bTp.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)') @(380, 140, 110); $ui.LvTele.Location = '8,76'; $ui.LvTele.Size = '640,500'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
-  $nt3 = New-Lbl $t3 "How it works: it writes a new position into the save (game closed, backup first). You load above that spot (150 cm by default, change it with 'Drop height') and drop onto it. If a spot sits inside rock or a hillside, raise the drop height to about 500 (map heights from the game's data run low).`r`n`r`nCoordinates box: open the in-game map and read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them under the list and press 'Teleport to coordinates'.`r`n`r`nPlaces come from your own save: your bed, the crash site, and everything you built that isn't a plain wall/floor. Distances are straight-line.`r`n`r`nThe game's own named locations (Hunters Glade, Solar Fields, ...) have no coordinates in the exported data, so they can't be listed here. If you need one, stand there once and build/place something (e.g. a campfire) - it will show up in this list." 666 76 380 300; $nt3.ForeColor = $script:Th.Muted; $nt3.Anchor = 'Top,Left,Right'
-  # drop height and teleport-to-coordinates row (below the list)
-  New-Lbl $t3 'Drop height (cm above the spot)' 8 606 200 | Out-Null; $ui.TeleDrop = New-Num $t3 212 603 70 50 2000 0; $ui.TeleDrop.Value = 150
-  New-Lbl $t3 'Coordinates (map X / Y / Z)' 300 606 170 | Out-Null; $ui.TeleX = New-Num $t3 474 603 80 -400000 400000 0; $ui.TeleY = New-Num $t3 560 603 80 -400000 400000 0; $ui.TeleZ = New-Num $t3 646 603 70 -20000 40000 0
-  $bXyz = New-Btn $t3 'Teleport to coordinates' 724 600 170 28; $bXyz.Add_Click({ PT-TeleportXYZ })
-  foreach ($c in @($ui.TeleDrop, $ui.TeleX, $ui.TeleY, $ui.TeleZ, $bXyz)) { $c.Anchor = 'Bottom,Left' }; foreach ($c in $t3.Controls) { if ($c -is [System.Windows.Forms.Label] -and $c.Top -ge 600) { $c.Anchor = 'Bottom,Left' } }
+  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)') @(380, 140, 110); $ui.LvTele.Location = '8,146'; $ui.LvTele.Size = '640,430'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
+  $nt3 = New-Lbl $t3 "How it works: it writes a new position into the save (game closed, backup first). You load above that spot (150 cm by default, change it with 'Drop height') and drop onto it. If a spot sits inside rock or a hillside, raise the drop height to about 500 (map heights from the game's data run low).`r`n`r`nCoordinates box: open the in-game map and read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them under the list and press 'Teleport to coordinates'.`r`n`r`nPlaces come from your own save: your bed, the crash site, and everything you built that isn't a plain wall/floor. Distances are straight-line.`r`n`r`nThe game's own named locations (Hunters Glade, Solar Fields, ...) have no coordinates in the exported data, so they can't be listed here. If you need one, stand there once and build/place something (e.g. a campfire) - it will show up in this list." 666 76 380 300; $nt3.Top = 146; $nt3.ForeColor = $script:Th.Muted; $nt3.Anchor = 'Top,Left,Right'
+  # keep the help text inside the tab at any window size (it was running off the right edge and clipping)
+  $ui.TeleNote = $nt3; $nt3.Anchor = 'Top,Left'
+  $t3.Add_Resize({ $n = $script:PT.TeleNote; if ($n) { $n.Width = [math]::Max(240, $this.ClientSize.Width - $n.Left - 16); $n.Height = [math]::Max(200, $this.ClientSize.Height - $n.Top - 50) } })
+  # teleport-to-coordinates row and drop height (above the list so they are always visible)
+  New-Lbl $t3 'Drop height (cm above the spot)' 8 114 200 | Out-Null; $ui.TeleDrop = New-Num $t3 212 111 70 50 2000 0; $ui.TeleDrop.Value = 150
+  New-Lbl $t3 'Coordinates (map X / Y / Z)' 8 78 190 | Out-Null; $ui.TeleX = New-Num $t3 212 75 90 -400000 400000 0; $ui.TeleY = New-Num $t3 308 75 90 -400000 400000 0; $ui.TeleZ = New-Num $t3 404 75 80 -20000 40000 0
+  $bXyz = New-Btn $t3 'Teleport to coordinates' 496 72 190 28; $bXyz.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $bXyz.Add_Click({ PT-TeleportXYZ })
   $ui.TeleFilter.Add_TextChanged({ PT-FillTele }); $bTp.Add_Click({ PT-Teleport }); $ui.LvTele.Add_DoubleClick({ PT-Teleport })
 
   # --- tab 4: quest progress
@@ -354,5 +358,5 @@ function New-PlayerForm {
   Apply-Theme $f; Set-AppIcon $f
   return $f
 }
-function Show-PlayerTools($owner) { $f = New-PlayerForm; $script:ActiveForm = $f; try { [void]$f.ShowDialog($owner) } finally { $script:ActiveForm = $null } }
+function Show-PlayerTools($owner) { $f = New-PlayerForm; $f.WindowState = 'Maximized'; $script:ActiveForm = $f; try { [void]$f.ShowDialog($owner) } finally { $script:ActiveForm = $null } }
 

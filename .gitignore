@@ -1,24 +1,63 @@
-# Everything below is made on YOUR computer from YOUR copy of the game (or is personal) - never commit it.
-# Game-derived data
-catalog/
-items.json
+# =====================================================================================================================
+# What must NEVER be committed: anything private to one player's PC, the game's own files, anyone's saves.
+# The shipped data pack (items.json, catalog/, datapack.json) and the tool's own icon are the only game-derived/binary files that belong in git.
+# =====================================================================================================================
+
+# --- Private / personal: made on each player's computer ---
+Backups/
 icons/
 icons-missing.txt
-Mappings.usmap
-*.usmap
-Output/
-# Personal / generated
 config.json
-Backups/
-error.log
-spoiler.json
 theme.json
+spoiler.json
 backpacks.json
 recipe-tweaks.json
+pictures.json
+error.log
+*.log
+ForumPost.txt
+release-scan.txt
+
+# --- The game's files and anyone's saves: never ---
+*.pfs
+*.pfs.*
+*.pak
+*.utoc
+*.ucas
+*.uasset
+*.ubulk
+*.uexp
+*.umap
+*.usmap
+Output/
+Exports/
+
+# --- Artwork: the repo ships only the tool's own icon; everything else under assets/ is local (game art, shortcut icon...) ---
+assets/*
+!assets/app.ico
+!assets/app-icon.png
+
+# --- Story text and internal indexes: made locally by the Build scripts, never part of the data pack ---
+catalog/text.csv
+catalog/lore.csv
+catalog/export-index.csv
+catalog/_types.json
+catalog/_tops.txt
+catalog/_numbers.json
+
+# --- Downloaded / built binaries ---
+oodle-data-shared.dll
+*.dll
+*.exe
+*.zip
+
+# --- Temp, backups, editors, OS ---
 *.bak
 *.bak-*
-# Game artwork (this repository ships none)
-assets/logo.png
-assets/art_*.jpg
-# Private drafts
-ForumPost.txt
+*.tmp
+*.orig
+~$*
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

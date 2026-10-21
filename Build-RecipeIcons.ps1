@@ -1,9 +1,12 @@
 param(
   [string]$ExportRoot = '',
-  [int]$MaxSize = 128
+  [int]$MaxSize = 128,
+  # read the pictures straight from the installed game (no FModel): the game folder, e.g. ...\steamapps\common\Permafrost
+  [string]$GameDir = '',
+  [string]$OodleDll = ''
 )
 . (Join-Path $PSScriptRoot 'Paths.ps1')
-if (-not $ExportRoot) { $ExportRoot = PF-ExportRoot }
+if (-not $ExportRoot -and -not $GameDir) { $ExportRoot = PF-ExportRoot }
 # Pictures for the Player tools > Recipes hover tip.
 #  - Building recipes: the build part's own Icon texture (DA_Build_* / DA_Outpost_* JSON) -> icons\build\<build id>.png
 #  - Item recipes: the picture of the item the recipe makes (icons\<item id>.png from Build-Icons.ps1)
@@ -12,19 +15,39 @@ if (-not $ExportRoot) { $ExportRoot = PF-ExportRoot }
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'TextureDecode.ps1')
+$reader = $null
+if ($GameDir) {
+  . (Join-Path $PSScriptRoot 'GameFiles.ps1')
+  $utoc = Get-GameUtoc $GameDir; if (-not $utoc) { throw "No Permafrost-Windows.utoc found under $GameDir" }
+  if (-not $OodleDll) { $OodleDll = Find-OodleDll }; if (-not $OodleDll) { throw 'The Oodle decompressor (oodle-data-shared.dll) was not found.' }
+  $reader = Open-GameContainer $utoc $OodleDll
+}
+if (-not $ExportRoot) { $ExportRoot = Join-Path ([IO.Path]::GetTempPath()) 'pf-no-fmodel-export' }   # reading the game files directly: no FModel export needed
 $content = Join-Path $ExportRoot 'Permafrost\Content'
 $dataRoot = Join-Path $content 'Permafrost\Blueprints\BuildingParts\Data'
 $bdir = Join-Path $PSScriptRoot 'icons\build'; if (-not (Test-Path $bdir)) { New-Item -ItemType Directory -Path $bdir | Out-Null }
 function Safe([string]$s) { $s -replace '[\/:*?"<>|]', '_' }
 
 # ---- 1. build part icons
-$cache = @{}; $made = 0; $noIcon = @(); $buildIcon = @{}
-foreach ($f in [IO.Directory]::EnumerateFiles($dataRoot, 'DA_*.json', [IO.SearchOption]::AllDirectories)) {
-  $o = (Get-Content $f -Raw | ConvertFrom-Json) | Where-Object { $_.Properties -and $_.Properties.ID } | Select-Object -First 1; if (-not $o) { continue }
-  $id = [string]$o.Properties.ID; $ip = [string]$o.Properties.Icon.AssetPathName; if (-not $ip) { $noIcon += $id; continue }
+# build id -> icon texture path: read from the JSON export (and saved to catalog\build-icon-paths.csv), or, when reading the game files directly, from that CSV
+$pathsCsv = Join-Path $PSScriptRoot 'catalog\build-icon-paths.csv'
+$entries = New-Object System.Collections.Generic.List[object]; $noIcon = @()
+if ($GameDir -and (Test-Path -LiteralPath $pathsCsv)) { foreach ($r in (Import-Csv $pathsCsv)) { $entries.Add([pscustomobject]@{ Id = $r.Id; Icon = $r.Icon }) } }
+else {
+  foreach ($f in [IO.Directory]::EnumerateFiles($dataRoot, 'DA_*.json', [IO.SearchOption]::AllDirectories)) {
+    $o = (Get-Content $f -Raw | ConvertFrom-Json) | Where-Object { $_.Properties -and $_.Properties.ID } | Select-Object -First 1; if (-not $o) { continue }
+    $id = [string]$o.Properties.ID; $ip = [string]$o.Properties.Icon.AssetPathName; if (-not $ip) { $noIcon += $id; continue }
+    $entries.Add([pscustomobject]@{ Id = $id; Icon = $ip })
+  }
+  $entries | Export-Csv $pathsCsv -NoTypeInformation -Encoding UTF8
+}
+$cache = @{}; $made = 0; $buildIcon = @{}
+foreach ($e in $entries) {
+  $id = $e.Id; $ip = $e.Icon
   if (-not $cache.ContainsKey($ip)) {
-    $rel = (($ip -replace '^/Game/', '' -replace '\.[^./]*$', '')).Replace('/', '\'); $raw = Join-Path $content "$rel.uasset"; $b = $null
-    if (Test-Path -LiteralPath $raw) { $b = Convert-TextureToBitmap $raw }
+    $b = $null
+    if ($reader) { $b = Get-GameBitmap $reader $ip }
+    if (-not $b) { $rel = (($ip -replace '^/Game/', '' -replace '\.[^./]*$', '')).Replace('/', '\'); $raw = Join-Path $content "$rel.uasset"; if (Test-Path -LiteralPath $raw) { $b = Convert-TextureToBitmap $raw } }
     $cache[$ip] = $b
   }
   $src = $cache[$ip]; if (-not $src) { $noIcon += $id; continue }
@@ -34,7 +57,6 @@ foreach ($f in [IO.Directory]::EnumerateFiles($dataRoot, 'DA_*.json', [IO.Search
   $bmp.Save((Join-Path $bdir ((Safe $id) + '.png')), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose(); $buildIcon[$id] = "icons\build\$(Safe $id).png"; $made++
 }
 foreach ($v in $cache.Values) { if ($v) { $v.Dispose() } }
-
 # ---- 2. recipe -> picture + detail line
 $items = Get-Content (Join-Path $PSScriptRoot 'items.json') -Raw | ConvertFrom-Json
 $byId = @{}; $byAsset = @{}; foreach ($i in $items) { $byId[$i.id] = $i; $byAsset[$i.asset] = $i }

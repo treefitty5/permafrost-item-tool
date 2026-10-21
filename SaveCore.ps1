@@ -302,14 +302,14 @@ function Get-Preview([string]$savePath, $requests) {
     if ($i.category -eq 'Weapons' -and $i.usesAmmo -and @($i.usesAmmo).Count) { foreach ($am in @($i.usesAmmo)) { $have = Get-CarriedCount $s $am; $queued = 0; foreach ($q in $requests) { if ($q.item.id -eq $am) { $queued += [int]$q.count } }; $w.Add(@{ Level = 'info'; Text = "$id uses $am. You carry $have now" + $(if ($queued) { " and are adding $queued in this batch." } else { " and are not adding any in this batch." }) }) } }
     if ($seen.ContainsKey($id)) { $w.Add(@{ Level = 'info'; Text = "$id is queued more than once; each entry uses its own slots." }) }; $seen[$id] = 1
     if ($i.confidence -eq 'guess') { $w.Add(@{ Level = 'warn'; Text = "$id : the game files listed several possible names and this is a BEST GUESS. If it is wrong the game will silently ignore it (nothing breaks, the item just will not appear)." }) }
-    elseif ($i.confidence -ne 'verified') { $w.Add(@{ Level = 'info'; Text = "$id : the name was read from the game's files but has never appeared in your saves, so it is untested. If the game does not recognise it, it just will not appear." }) }
+    elseif ($i.confidence -ne 'verified') { $w.Add(@{ Level = 'info'; Text = "$id : the name was read from the game's files but has not been confirmed in a real save, so it is untested. If the game does not recognise it, it just will not appear." }) }
     if ($r.stack -gt $i.stackSize) {
       if ($i.stackSource -in 'game data', 'confirmed in game') { $w.Add(@{ Level = 'warn'; Text = "$id : $($r.stack) per slot is ABOVE this item's stack limit of $($i.stackSize) (read from the game's own data). The game may cap it, split it, or misbehave." }) }
       else { $w.Add(@{ Level = 'warn'; Text = "$id : you raised the stack size to $($r.stack); the largest stack seen in your saves is $($i.stackSize) (the game's real limit for this item could not be read, so it may be higher or lower). The game may cap it, split it, or misbehave." }) }
     }
     if ($i.fieldsUsed -ge 2 -and $i.category -in 'Weapons','Clothing' -and [double]$i.condition -gt ([double]$(if ($i.maxCondition) { $i.maxCondition } else { $i.defaultCondition }) + 0.5)) { $w.Add(@{ Level = 'warn'; Text = "$id : condition $($i.condition) is above the item's maximum ($(if ($i.maxCondition) { $i.maxCondition } else { $i.defaultCondition })). A value above the real maximum may behave oddly." }) }
     if ($i.category -eq 'QuestItems') { $w.Add(@{ Level = 'warn'; Text = "$id is a quest item. Adding it does not mark any quest step as done; the quest may still need its own dialogue or event." }) }
-    if ($i.formatInferred) { $w.Add(@{ Level = 'info'; Text = "$id : its storage format was inferred from similar items (never seen in your saves)." }) }
+    if ($i.formatInferred) { $w.Add(@{ Level = 'info'; Text = "$id : its storage format was inferred from similar items (never seen in a real save)." }) }
     if ($r.target -eq 'Hotbar' -and $i.category -in 'Resources','Projectiles') { $w.Add(@{ Level = 'info'; Text = "$id is a stackable material; hotbar slots are normally used for tools and weapons." }) }
   }
   $eq = Parse-Equipment $s.Equip

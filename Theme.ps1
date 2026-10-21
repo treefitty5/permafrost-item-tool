@@ -127,6 +127,8 @@ function Get-ThemeImage([string]$file) {
   if (-not $script:BannerImgs.ContainsKey($file)) { $p = Join-Path $PSScriptRoot "assets\$file"; $img = $null; if (Test-Path -LiteralPath $p) { try { $ms = New-Object IO.MemoryStream (, [IO.File]::ReadAllBytes($p)); $img = [System.Drawing.Image]::FromStream($ms) } catch { } }; $script:BannerImgs[$file] = $img }
   return $script:BannerImgs[$file]
 }
+# colour of the plain labels that sit on the banner (the Theme label): white over the key art or on dark themes, the theme text colour on a light plain header
+function Get-BannerFore { if ($script:Th.Dark -or (Get-ThemeImage $script:PaletteDefs[$script:ThName].Art)) { return [System.Drawing.Color]::White }; return $script:Th.Text }
 function Paint-Banner($g, [int]$W, [int]$H, [string]$subtitle) {
   $t = $script:Th; $g.SmoothingMode = 'AntiAlias'; $g.InterpolationMode = 'HighQualityBicubic'
   $b = New-Object System.Drawing.SolidBrush($t.Back); $g.FillRectangle($b, 0, 0, $W, $H); $b.Dispose()
@@ -146,9 +148,9 @@ function Paint-Banner($g, [int]$W, [int]$H, [string]$subtitle) {
     if (-not $t.Dark) { $sh = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(70, 20, 30, 45)); $g.FillRectangle($sh, $lx - 4, $ly - 2, $lw + 8, $lh + 4); $sh.Dispose() }
     $g.DrawImage($logo, $lx, $ly, $lw, $lh); $lx += $lw + 18 }
   $f1 = New-Object System.Drawing.Font('Segoe UI Semibold', 15); $f2 = New-Object System.Drawing.Font('Segoe UI', 9)
-  $tc = if ($t.Dark) { $t.Text } else { [System.Drawing.Color]::White }
-  [System.Windows.Forms.TextRenderer]::DrawText($g, 'ITEM TOOL', $f1, (New-Object System.Drawing.Point($lx, 8)), $tc)
-  [System.Windows.Forms.TextRenderer]::DrawText($g, $subtitle, $f2, (New-Object System.Drawing.Point(($lx + 2), 38)), $(if ($t.Dark) { $t.Accent2 } else { [System.Drawing.Color]::FromArgb(230, 238, 245) }))
+  $tc = if ($t.Dark) { $t.Text } elseif ($art) { [System.Drawing.Color]::White } else { $t.Text }   # light theme: white text only over the key art, dark text on the plain header
+  [System.Windows.Forms.TextRenderer]::DrawText($g, $(if ($logo) { 'ITEM TOOL' } else { 'PERMAFROST ITEM TOOL' }), $f1, (New-Object System.Drawing.Point($lx, 8)), $tc)
+  [System.Windows.Forms.TextRenderer]::DrawText($g, $subtitle, $f2, (New-Object System.Drawing.Point(($lx + 2), 38)), $(if ($t.Dark) { $t.Accent2 } elseif ($art) { [System.Drawing.Color]::FromArgb(230, 238, 245) } else { $t.Accent }))
   $f1.Dispose(); $f2.Dispose()
   $p = New-Object System.Drawing.Pen($t.Accent, 2); $g.DrawLine($p, 0, $H - 1, $W, $H - 1); $p.Dispose()
 }
