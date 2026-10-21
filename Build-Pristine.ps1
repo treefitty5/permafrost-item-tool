@@ -4,12 +4,22 @@
 # nobody had played, plus records (not dropped by a player; damaged ores are fine, World reset heals them when it restores them) of the same kinds from other saves of the same map for objects
 # that world did not spawn. Only class, position, state and health are stored - nothing about any player.
 #
+# It also writes catalog\loot-pool.json: real loot rolls of UNOPENED containers per loot group (same grouping as the World reset's own pools), quest items and keys left out.
+# World reset only uses them when a world has no unopened container of that group left to copy from.
+#
 # Usage:  pwsh -Command "& .\Build-Pristine.ps1 -Base <flown save.pfs> -Extra <other save.pfs>,<other save.pfs> -ExtraDir <folder of saves / backups>"
 param([Parameter(Mandatory)][string]$Base, [string[]]$Extra = @(), [string]$ExtraDir = '', [string]$OutDir = (Join-Path $PSScriptRoot 'catalog'))
 $ErrorActionPreference = 'Stop'
 foreach ($f in 'Paths.ps1', 'SaveCore.ps1', 'WorldCore.ps1', 'PlayerCore.ps1', 'WorldReset.ps1') { . (Join-Path $PSScriptRoot $f) | Out-Null }
 $L1 = [Text.Encoding]::Latin1
 $kinds = 'ore', 'breakable', 'item'
+$prot = Get-ProtectedIds
+$cfgOf = @{}; $llp = Join-Path $PSScriptRoot 'catalog\loot-links.csv'; if (Test-Path $llp) { foreach ($l in (Import-Csv $llp)) { if ($l.FromFolder -eq 'Container') { $cfgOf[$l.From + '_C'] = $l.To } } }
+$loot = @{}
+function Add-Loot($r) {
+  $inv = $r.Get('Inventory'); if (-not $inv -or $r.Get('bEverOpened') -ne 'false' -or (Test-InvProtected $inv $prot)) { return }
+  $k = if ($cfgOf.ContainsKey($r.Cls)) { 'cfg:' + $cfgOf[$r.Cls] } else { $r.Cls }
+  if (-not $loot.ContainsKey($k)) { $loot[$k] = New-Object 'System.Collections.Generic.SortedSet[string]' }; [void]$loot[$k].Add($inv) }
 
 function Read-Save([string]$p) { $t = $L1.GetString([IO.File]::ReadAllBytes($p)); [pscustomobject]@{ Text = $t; World = (Read-WorldCells $t); Level = [regex]::Match($t, 'LevelName>([^?]*)').Groups[1].Value; Copies = (Get-CopyGuids $t) } }
 
@@ -18,7 +28,8 @@ $cells = [ordered]@{}; $have = @{}; $added = @{ base = 0; extra = 0 }
 function Get-OutCell($c) { if (-not $cells.Contains($c.Name)) { $nc = New-Object WCell; $nc.NameRaw = $c.NameRaw; $nc.Name = $c.Name; $cells[$c.Name] = $nc }; return $cells[$c.Name] }
 
 foreach ($c in $b.World.Cells) { foreach ($r in $c.Recs) {
-  if ($kinds -notcontains (Get-ResetKind $r.Cls $r.ClsPath)) { continue }
+  $bk = Get-ResetKind $r.Cls $r.ClsPath; if ($bk -eq 'container') { Add-Loot $r; continue }
+  if ($kinds -notcontains $bk) { continue }
   if ($b.Copies.ContainsKey($r.TextGuid)) { continue }
   (Get-OutCell $c).Recs.Add($r); $have[$r.GuidHex] = 1; $added.base++ } }
 
@@ -34,7 +45,7 @@ foreach ($e in $Extra) {
   try { $s = Read-Save $e } catch { continue }; if ($s.Level -ne $b.Level) { continue }
   $n = 0
   foreach ($c in $s.World.Cells) { foreach ($r in $c.Recs) {
-    $k = Get-ResetKind $r.Cls $r.ClsPath; if ($kinds -notcontains $k) { continue }
+    $k = Get-ResetKind $r.Cls $r.ClsPath; if ($k -eq 'container') { Add-Loot $r; continue }; if ($kinds -notcontains $k) { continue }
     if ($have.ContainsKey($r.GuidHex)) { continue }
     if ($s.Copies.ContainsKey($r.TextGuid)) { $skipped['dropped by a player (plain-text copy)']++; continue }
     if ($r.Get('PlacedOnLevel') -ne '1') { $skipped['not placed on the level']++; continue }
@@ -51,3 +62,6 @@ if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory $OutDir | Out-Null 
 $meta = [ordered]@{ Level = $b.Level; Records = ($added.base + $added.extra); FromFlight = $added.base; FromOtherSaves = $added.extra; Cells = $list.Count; Note = 'untouched ore / breakable / world-item records of the playable map; used by World reset when a world has no backup of an object' }
 ($meta | ConvertTo-Json) | Set-Content (Join-Path $OutDir 'pristine-world.json') -Encoding UTF8
 Write-Host ("pristine-world.bin: {0} records in {1} cells ({2} from the flown world, {3} from other saves), {4} KB gzip; skipped: {5}" -f $meta.Records, $meta.Cells, $added.base, $added.extra, [int]($gzBytes.Length / 1KB), (($skipped.GetEnumerator() | % { "$($_.Value) $($_.Key)" }) -join '; '))
+$pool = [ordered]@{}; foreach ($k in ($loot.Keys | Sort-Object)) { $pool[$k] = @($loot[$k]) }
+($pool | ConvertTo-Json -Depth 3 -Compress) | Set-Content (Join-Path $OutDir 'loot-pool.json') -Encoding UTF8
+Write-Host ("loot-pool.json: {0} loot groups, {1} distinct rolls, {2} KB" -f $pool.Count, (($pool.Values | ForEach-Object { $_.Count } | Measure-Object -Sum).Sum), [int]((Get-Item (Join-Path $OutDir 'loot-pool.json')).Length / 1KB))

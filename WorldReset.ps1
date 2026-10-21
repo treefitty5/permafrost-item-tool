@@ -30,6 +30,15 @@ function Get-ResetKind([string]$cls, [string]$path) {
   return ''
 }
 
+# real loot rolls of unopened containers per loot group (catalog\loot-pool.json, made by Build-Pristine.ps1): the LAST resort for a container whose loot group has no
+# unopened example left in the world and no backup. Keys are the same pool keys the plan uses.
+function Get-ShippedLootPool {
+  $p = Join-Path $PSScriptRoot 'catalog\loot-pool.json'; $h = @{}
+  if (-not (Test-Path $p)) { return $h }
+  try { $o = Get-Content $p -Raw | ConvertFrom-Json; foreach ($pr in $o.PSObject.Properties) { $h[$pr.Name] = @($pr.Value) } } catch { }
+  return $h
+}
+
 function Get-ProtectedIds {
   # items a container must never be re-rolled for: quest items and keys
   $ids = @{}; $p = Join-Path $PSScriptRoot 'items.json'
@@ -234,6 +243,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
       if ((Get-ResetKind $r.Cls $r.ClsPath) -ne 'container') { continue }
       $inv = $r.Get('Inventory'); if ($inv -and $r.Get('bEverOpened') -eq 'false') { if (-not $orig.ContainsKey($r.GuidHex)) { $orig[$r.GuidHex] = $inv }; $k = Get-RecKey $r; if (-not $orig.ContainsKey($k)) { $orig[$k] = $inv }; & $addPool $r } } } }
     foreach ($c in $cells) { foreach ($r in $c.Recs) { if ((Get-ResetKind $r.Cls $r.ClsPath) -eq 'container') { & $addPool $r } } }
+    $shipPool = Get-ShippedLootPool
     $rng = New-Object System.Random ([int]$opt.Seed); $usedPool = @{}
     foreach ($c in $cells) { foreach ($r in $c.Recs) {
       if ((Get-ResetKind $r.Cls $r.ClsPath) -ne 'container') { continue }
@@ -257,6 +267,11 @@ function Build-ResetPlan([string]$savePath, $opt) {
           $tbl = @(@('Wire', 7.0), @('Components', 5.0), @('ElectricalParts', 2.0), @('MetalJunk', 0.1)); $tot = 0.0; foreach ($t in $tbl) { $tot += $t[1] }
           $pick = $rng.NextDouble() * $tot; $item = $tbl[0][0]; foreach ($t in $tbl) { if ($pick -lt $t[1]) { $item = $t[0]; break }; $pick -= $t[1] }
           $inv = "@0=$item&1"; $src = 'a roll from the game''s solar panel loot table' }
+        elseif ($shipPool.ContainsKey($pk) -and @($shipPool[$pk] | Where-Object { -not (Test-InvProtected $_ $prot) }).Count -gt 0) {
+          # nothing of this loot group is left unopened in the world and no backup has it: a real roll from the shipped pool
+          $cand = @($shipPool[$pk] | Where-Object { -not (Test-InvProtected $_ $prot) }); $free = @($cand | Where-Object { -not $usedPool.ContainsKey($pk + '|' + $_) })
+          if ($free.Count -eq 0) { $free = $cand }
+          $inv = $free[$rng.Next($free.Count)]; $usedPool[$pk + '|' + $inv] = 1; $src = 'a real roll from the shipped loot pool' }
         else { Skip "no loot sample for $($r.Cls)"; continue } }
       $plan.Items.Add([pscustomobject]@{ Kind = 'container'; Action = 'Refill'; Cls = $r.Cls; Cell = $c.Name; Rec = $r; Pos = $r.Pos; Inv = $inv; Note = $src })
     } }

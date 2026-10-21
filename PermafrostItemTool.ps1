@@ -909,6 +909,27 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
           if ($pmOk -ne $pmGone.Count) { $errs.Add("shipped map apply failed: $pmOk of $($pmGone.Count)") }
         } } } catch { $errs.Add("shipped map test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $script:BackupDirOverride = $null; Remove-Item -LiteralPath $pmTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # shipped loot pool: empty and open EVERY container of one loot group in a COPY of the save (nothing left to copy from, no backups) - all of them must refill from the shipped pool
+    $lpTmp = Join-Path $env:TEMP ('lp-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force "$lpTmp\Backups" | Out-Null
+    try {
+      $lpPool = Get-ShippedLootPool
+      if ($lpPool.Count -eq 0) { $out += "shipped loot pool: not installed, skipped" }
+      else {
+        $script:BackupDirOverride = "$lpTmp\Backups"
+        $lpCfg = @{}; $lpl = Join-Path $PSScriptRoot 'catalog\loot-links.csv'; if (Test-Path $lpl) { foreach ($l in (Import-Csv $lpl)) { if ($l.FromFolder -eq 'Container') { $lpCfg[$l.From + '_C'] = $l.To } } }
+        $lpKeyOf = { param($cls) if ($lpCfg.ContainsKey($cls)) { 'cfg:' + $lpCfg[$cls] } else { $cls } }
+        $lpText = $script:L1.GetString([IO.File]::ReadAllBytes($script:SavePath)); $lpW = Read-WorldCells $lpText; $lpKey = $null
+        foreach ($c in $lpW.Cells) { foreach ($r in $c.Recs) { if (-not $lpKey -and (Get-ResetKind $r.Cls $r.ClsPath) -eq 'container' -and $r.Cls -notmatch '^BP_SolarPanel' -and $lpPool.ContainsKey((& $lpKeyOf $r.Cls))) { $lpKey = & $lpKeyOf $r.Cls } } }
+        if (-not $lpKey) { $out += "shipped loot pool: this save has no container of a pooled loot group, skipped" }
+        else {
+          $lpN = 0; foreach ($c in $lpW.Cells) { foreach ($r in $c.Recs) { if ((Get-ResetKind $r.Cls $r.ClsPath) -eq 'container' -and (& $lpKeyOf $r.Cls) -eq $lpKey) { $r.Set('bEverOpened', 'true'); $r.Set('Inventory', ''); $r.Set('InteractionBase_InteractionState', 'EIS_Deactivated'); $lpN++ } } }
+          [IO.File]::WriteAllBytes("$lpTmp\World#2.pfs", $script:L1.GetBytes($lpText.Substring(0, $lpW.Sec.Start) + (Encode-B64U ([WorldBlob]::Serialize($lpW.Cells))) + $lpText.Substring($lpW.Sec.End)))
+          $lpPlan = Build-ResetPlan "$lpTmp\World#2.pfs" ([pscustomobject]@{ Trees = $false; Ores = $false; Breakables = $false; Items = $false; Containers = $true; Plants = $false; RadiusM = 0; KeepFilled = $false; Seed = 1 })
+          $lpRef = @($lpPlan.Items | Where-Object { $_.Action -eq 'Refill' -and $_.Note -match 'shipped loot pool' }).Count
+          $out += "shipped loot pool: group '$lpKey', $lpN containers opened and emptied, refilled from the shipped pool = $lpRef (pool has $(@($lpPool[$lpKey]).Count) rolls)"
+          if ($lpN -eq 0 -or $lpRef -ne $lpN) { $errs.Add("shipped loot pool refill failed: $lpRef of $lpN") }
+        } } } catch { $errs.Add("shipped loot pool test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:BackupDirOverride = $null; Remove-Item -LiteralPath $lpTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Build move installer against a temporary mods folder
     $bmTmp = Join-Path $env:TEMP ('bm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bmTmp | Out-Null
     [IO.File]::WriteAllText("$bmTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bmTmp
