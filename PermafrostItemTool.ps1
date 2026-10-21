@@ -871,7 +871,8 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
     $script:RtModsDirOverride = $null; $script:RtStateOverride = $null; $script:TestMode = $false; Remove-Item -LiteralPath $rtTmp -Recurse -Force -ErrorAction SilentlyContinue
     # World reset window on a COPY of the save (temp folder; the real save and Backups are never touched)
     $wrTmp = Join-Path $env:TEMP ('wr-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force "$wrTmp\Backups" | Out-Null
-    if (Test-Path (Join-Path $PSScriptRoot 'Backups')) { Get-ChildItem (Join-Path $PSScriptRoot 'Backups') -File -Filter '*.pfs' | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | Copy-Item -Destination "$wrTmp\Backups" -Force }   # only the newest few: copying the whole history made the self-test take minutes; Copy-Item $script:SavePath "$wrTmp\World#2.pfs" -Force
+    if (Test-Path (Join-Path $PSScriptRoot 'Backups')) { Get-ChildItem (Join-Path $PSScriptRoot 'Backups') -File -Filter '*.pfs' | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | Copy-Item -Destination "$wrTmp\Backups" -Force }   # only the newest few: copying the whole history made the self-test take minutes
+    Copy-Item $script:SavePath "$wrTmp\World#2.pfs" -Force
     $script:WRSavePathOverride = "$wrTmp\World#2.pfs"; $script:BackupDirOverride = "$wrTmp\Backups"; $script:TestMode = $true
     try { $wf = New-WorldResetForm; $wf.Opacity = 0; $wf.ShowInTaskbar = $false; $wf.StartPosition = 'Manual'; $wf.Location = New-Object System.Drawing.Point(-4000, -4000); $wf.Show(); [System.Windows.Forms.Application]::DoEvents(); $wu = $script:WR
       $h0 = (Get-FileHash "$wrTmp\World#2.pfs").Hash; $nb0 = @(Get-ChildItem "$wrTmp\Backups").Count
@@ -881,8 +882,33 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $wu.Reset.PerformClick(); [System.Windows.Forms.Application]::DoEvents()
       $out += "world reset applied: file changed = $((Get-FileHash "$wrTmp\World#2.pfs").Hash -ne $h0); new backups = $(@(Get-ChildItem "$wrTmp\Backups").Count - $nb0); message: $($wu.Msg.Text)"
       $wu.Preview.PerformClick(); [System.Windows.Forms.Application]::DoEvents(); $out += "world reset preview again: " + (($wu.Out.Text -split "`r?`n" | Where-Object { $_ } | Select-Object -First 2) -join ' | ')
-      $wf.Close() } catch { $out += "world reset TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)" }
+      $wf.Close() } catch { $out += "world reset TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)"; $errs.Add("world reset test: $($_.Exception.Message)") }
     $script:WRSavePathOverride = $null; $script:BackupDirOverride = $null; $script:TestMode = $false; Remove-Item -LiteralPath $wrTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # shipped map of untouched objects: take three ores out of a COPY of the save, then plan a reset with NO backups and no other worlds - all three must come back from the shipped map alone
+    $pmTmp = Join-Path $env:TEMP ('pm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force "$pmTmp\Backups" | Out-Null
+    try {
+      if (-not (Test-Path (Join-Path $PSScriptRoot 'catalog\pristine-world.bin'))) { $out += "shipped map: not installed, skipped" }
+      else {
+        $script:BackupDirOverride = "$pmTmp\Backups"; Copy-Item $script:SavePath "$pmTmp\World#2.pfs" -Force
+        $pmShip = @(Get-WorldHistory "$pmTmp\World#2.pfs" | Where-Object { $_.Pristine })
+        if ($pmShip.Count -eq 0) { $out += "shipped map: belongs to another map than this save, skipped" }
+        else {
+          $pmKnown = @{}; foreach ($c in $pmShip[0].Cells) { foreach ($r in $c.Recs) { $pmKnown[$r.TextGuid] = 1 } }
+          $pmText = $script:L1.GetString([IO.File]::ReadAllBytes("$pmTmp\World#2.pfs")); $pmW = Read-WorldCells $pmText; $pmGone = @()
+          foreach ($c in $pmW.Cells) { foreach ($r in @($c.Recs)) { if ($pmGone.Count -lt 3 -and (Get-ResetKind $r.Cls $r.ClsPath) -eq 'ore' -and $pmKnown.ContainsKey($r.TextGuid)) { [void]$c.Recs.Remove($r); $pmGone += $r.TextGuid } } }
+          $pmOutText = $pmText.Substring(0, $pmW.Sec.Start) + (Encode-B64U ([WorldBlob]::Serialize($pmW.Cells))) + $pmText.Substring($pmW.Sec.End)
+          [IO.File]::WriteAllBytes("$pmTmp\World#2.pfs", $script:L1.GetBytes($pmOutText))
+          $pmPlan = Build-ResetPlan "$pmTmp\World#2.pfs" ([pscustomobject]@{ Trees = $false; Ores = $true; Breakables = $true; Items = $false; Containers = $false; Plants = $false; RadiusM = 0; KeepFilled = $true; Seed = 1 })
+          $pmBack = @($pmPlan.Items | Where-Object { $_.Action -eq 'Restore' -and $pmGone -contains $_.Rec.TextGuid }).Count
+          $out += "shipped map: $($pmShip[0].Cells.Count) cells loaded as history (own backups $($pmPlan.History), other saves $($pmPlan.HistoryOther)); removed $($pmGone.Count) ores, restored from the shipped map alone = $pmBack"
+          if ($pmGone.Count -eq 0 -or $pmBack -ne $pmGone.Count) { $errs.Add("shipped map restore failed: $pmBack of $($pmGone.Count)") }
+          $pmRes = Install-WorldReset "$pmTmp\World#2.pfs" ([pscustomobject]@{ Trees = $false; Ores = $true; Breakables = $true; Items = $false; Containers = $false; Plants = $false; RadiusM = 0; KeepFilled = $true; Seed = 1 }) -SkipGameCheck
+          $pmAfter = Read-WorldCells ($script:L1.GetString([IO.File]::ReadAllBytes("$pmTmp\World#2.pfs"))); $pmHave = @{}; foreach ($c in $pmAfter.Cells) { foreach ($r in $c.Recs) { $pmHave[$r.TextGuid] = 1 } }
+          $pmOk = @($pmGone | Where-Object { $pmHave.ContainsKey($_) }).Count
+          $out += "shipped map applied: ores back in the file = $pmOk of $($pmGone.Count) (verified by the tool, backup made)"
+          if ($pmOk -ne $pmGone.Count) { $errs.Add("shipped map apply failed: $pmOk of $($pmGone.Count)") }
+        } } } catch { $errs.Add("shipped map test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:BackupDirOverride = $null; Remove-Item -LiteralPath $pmTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Build move installer against a temporary mods folder
     $bmTmp = Join-Path $env:TEMP ('bm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bmTmp | Out-Null
     [IO.File]::WriteAllText("$bmTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bmTmp

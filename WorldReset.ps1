@@ -109,6 +109,18 @@ function Remove-Copies([string]$s, $guids) {
 function Get-WorldHistory([string]$savePath) {
   $leaf = [IO.Path]::GetFileName($savePath); $list = New-Object System.Collections.Generic.List[object]
   $dir = Get-BackupDir
+  # 0) the shipped map of untouched objects (catalog\pristine-world.bin, made by Build-Pristine.ps1 from a flight over the whole map): the OLDEST source, so any backup
+  #    or other world wins over it. Only objects whose id is on this save's used-up list are ever restored from it (see Build-ResetPlan).
+  try {
+    $pb = Join-Path $PSScriptRoot 'catalog\pristine-world.bin'; $pj = Join-Path $PSScriptRoot 'catalog\pristine-world.json'
+    if ((Test-Path $pb) -and (Test-Path $pj)) {
+      $pm = Get-Content $pj -Raw | ConvertFrom-Json
+      $myT = $script:L1.GetString([IO.File]::ReadAllBytes($savePath))
+      if ([regex]::Match($myT, 'LevelName>([^?]*)').Groups[1].Value -eq $pm.Level) {
+        $ms = New-Object IO.MemoryStream (, [IO.File]::ReadAllBytes($pb)); $gz = New-Object IO.Compression.GZipStream($ms, [IO.Compression.CompressionMode]::Decompress)
+        $out = New-Object IO.MemoryStream; $gz.CopyTo($out); $gz.Close()
+        $list.Add([pscustomobject]@{ Name = 'shipped map of untouched objects'; Cells = [WorldBlob]::Parse($out.ToArray()); Copies = @{}; Other = $true; Pristine = $true }) } }
+  } catch { }
   # 1) other worlds on the same map (their saves and the tool's backups of them): the same object has the same id in every world, so what one
   #    world still has untouched can be put back into another. They come FIRST (oldest), so this world's own backups win; containers ignore them
   #    (loot is rolled per world).
@@ -144,7 +156,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
     $h = $r.Get('Scavengeable_CurrentHealth'); if (-not $h) { continue }
     if (-not $seen.ContainsKey($r.Cls)) { $seen[$r.Cls] = @{} }; $seen[$r.Cls][$h] = 1 + [int]$seen[$r.Cls][$h] } } }
   foreach ($k in $seen.Keys) { if ($seen[$k].Count -eq 1) { $nodes[$k] = [double]::Parse(@($seen[$k].Keys)[0], $script:ResetInv) } }
-  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Plants = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = @($hist | Where-Object { -not $_.Other }).Count; HistoryOther = @($hist | Where-Object { $_.Other }).Count; Radius = $opt.RadiusM }
+  $plan = [ordered]@{ Items = (New-Object System.Collections.Generic.List[object]); Plants = (New-Object System.Collections.Generic.List[object]); Skipped = [ordered]@{}; History = @($hist | Where-Object { -not $_.Other }).Count; HistoryOther = @($hist | Where-Object { $_.Other -and -not $_.Pristine }).Count; Pristine = [bool](@($hist | Where-Object { $_.Pristine }).Count); Radius = $opt.RadiusM }
   function Skip($why) { if ($plan.Skipped.Contains($why)) { $plan.Skipped[$why]++ } else { $plan.Skipped[$why] = 1 } }
 
   $cellByName = @{}; $byGuid = @{}; $byKey = @{}; $itemsByCls = @{}
@@ -186,19 +198,22 @@ function Build-ResetPlan([string]$savePath, $opt) {
 
   # 2) destroyed ores / breakables and picked-up items: newest backup that still has the record
   $wantRestore = $opt.Ores -or $opt.Breakables -or $opt.Items
+  $usedUp = New-Object 'System.Collections.Generic.HashSet[string]'; foreach ($m in [regex]::Matches($s, '\[rGUID>([0-9A-F]{32})\?')) { [void]$usedUp.Add($m.Groups[1].Value) }
   if ($wantRestore) {
     for ($hi = $hist.Count - 1; $hi -ge 0; $hi--) { $hs = $hist[$hi]
       foreach ($hc in $hs.Cells) { if (-not $cellByName.ContainsKey($hc.Name)) { continue }
         foreach ($r in $hc.Recs) {
           $kind = Get-ResetKind $r.Cls $r.ClsPath
           if (-not (($kind -eq 'ore' -and $opt.Ores) -or ($kind -eq 'breakable' -and $opt.Breakables) -or ($kind -eq 'item' -and $opt.Items))) { continue }
+          # ores and breakables are placed at fixed spots, so a missing record in a cell this save has means destroyed; items spawn at random per world, so the shipped map is only trusted for item ids this save lists as used up
+          if ($hs.Pristine -and $kind -eq 'item' -and -not $usedUp.Contains($r.TextGuid)) { continue }
           $key = Get-RecKey $r; if ($byGuid.ContainsKey($r.GuidHex) -or $byKey.ContainsKey($key) -or $queued.ContainsKey($r.GuidHex) -or $queued.ContainsKey($key)) { continue }
           if ($hs.Copies.ContainsKey($r.TextGuid)) { Skip 'dropped/dynamic object (has a plain-text copy)'; continue }
           if ($kind -ne 'item' -and -not $nodes.ContainsKey($r.Cls)) { Skip "unknown max health: $($r.Cls)"; continue }
           if (-not (Test-NearPos $r.Pos $center $radius)) { Skip 'outside the chosen radius'; continue }
-          if ($kind -eq 'item' -and $itemsByCls.ContainsKey($r.Cls)) { $near = $false; foreach ($o in $itemsByCls[$r.Cls]) { if (Test-NearPos $o.Pos $r.Pos 100) { $near = $true; break } }; if ($near) { Skip 'same item already lying within 1 m (it only moved)'; continue } }
+          if ($kind -eq 'item' -and -not $hs.Pristine -and $itemsByCls.ContainsKey($r.Cls)) { $near = $false; foreach ($o in $itemsByCls[$r.Cls]) { if (Test-NearPos $o.Pos $r.Pos 100) { $near = $true; break } }; if ($near) { Skip 'same item already lying within 1 m (it only moved)'; continue } }
           $queued[$r.GuidHex] = 1; $queued[$key] = 1
-          $plan.Items.Add([pscustomobject]@{ Kind = $kind; Action = 'Restore'; Cls = $r.Cls; Cell = $hc.Name; Rec = $r; Pos = $r.Pos; Note = "from backup $($hs.Name)" })
+          $plan.Items.Add([pscustomobject]@{ Kind = $kind; Action = 'Restore'; Cls = $r.Cls; Cell = $hc.Name; Rec = $r; Pos = $r.Pos; Note = $(if ($hs.Pristine) { "from the shipped map of untouched objects" } else { "from backup $($hs.Name)" }) })
         } } }
   }
 
@@ -263,7 +278,7 @@ function Get-ResetSummary($plan) {
   if ($plan.Plants -and $plan.Plants.Count) { $lines.Add(("{0,5}  Bushes and other generated plants / rocks: harvested, put back" -f $plan.Plants.Count)) }
   if ($lines.Count -eq 0) { $lines.Add('Nothing to reset with these settings.') }
   if ($plan.Skipped.Count) { $lines.Add(''); $lines.Add('Left alone:'); foreach ($k in $plan.Skipped.Keys) { $lines.Add(("{0,5}  {1}" -f $plan.Skipped[$k], $k)) } }
-  $lines.Add(''); $lines.Add("Backups used as history: $($plan.History)" + $(if ($plan.HistoryOther) { "  (+ $($plan.HistoryOther) save(s) of your other worlds on the same map)" } else { '' }))
+  $lines.Add(''); $lines.Add("Backups used as history: $($plan.History)" + $(if ($plan.HistoryOther) { "  (+ $($plan.HistoryOther) save(s) of your other worlds on the same map)" } else { '' }) + $(if ($plan.Pristine) { "  + the shipped map of untouched objects" } else { '' }))
   return $lines
 }
 

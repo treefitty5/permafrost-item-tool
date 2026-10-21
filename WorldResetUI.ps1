@@ -21,7 +21,7 @@ function WR-WorldInfo {
     $hrs = [regex]::Match($s, 'TotalPlayTime>([\d\.]+)').Groups[1].Value; $when = [regex]::Match($s, 'LastUpdatedAt>([^\?]+)').Groups[1].Value
     $nb = @(Get-ChildItem (Get-BackupDir) -Filter "*_$leaf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' }).Count
     $h = ''; if ($hrs) { $h = ('{0:0.0} h played, ' -f ([double]::Parse($hrs, [Globalization.CultureInfo]::InvariantCulture) / 3600)) }
-    $u.WorldInfo.Text = "$h" + "last saved $when, $nb backup(s) of this world" + $(if ($nb -eq 0) { ' (no history: destroyed ores and picked-up items cannot be restored)' } else { '' })
+    $u.WorldInfo.Text = "$h" + "last saved $when, $nb backup(s) of this world" + $(if ($nb -eq 0) { ' (no backups: the tool restores from its shipped map of untouched objects)' } else { '' })
   } catch { $u.WorldInfo.Text = "Could not read this save: $($_.Exception.Message)" }
 }
 
