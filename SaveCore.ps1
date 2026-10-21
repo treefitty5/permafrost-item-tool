@@ -248,6 +248,23 @@ function Test-EditedSave([string]$origPath, [byte[]]$newBytes, $plan, [bool]$chE
 # ---------- backup / install / restore ----------
 function Get-BackupDir { if ($script:BackupDirOverride) { return $script:BackupDirOverride }; $d = Join-Path $PSScriptRoot 'Backups'; if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }; return $d }
 
+# The first time the tool sees a world that has NO backup yet, copy it into Backups as a "starting snapshot" (<stamp>_BASELINE_<world>.pfs).
+# World reset restores destroyed ores and picked-up items from earlier copies of the world, so a snapshot taken before the player starts
+# destroying things is what makes that possible for a brand-new single world. Read-only on the save; skipped while the game runs (the file may be
+# half-written) and tried again at the next reload. Returns the snapshot path, or $null when nothing was made.
+function Ensure-BaselineBackup([string]$savePath, [switch]$SkipGameCheck) {
+  if (-not $script:BaselineChecked) { $script:BaselineChecked = @{} }
+  if (-not $savePath -or $script:BaselineChecked.ContainsKey($savePath) -or -not (Test-Path -LiteralPath $savePath)) { return $null }
+  if (-not $SkipGameCheck -and (Test-GameRunning)) { return $null }          # not cached: try again later
+  $script:BaselineChecked[$savePath] = $true
+  $leaf = [IO.Path]::GetFileName($savePath); $dir = Get-BackupDir
+  if (@(Get-ChildItem -LiteralPath $dir -Filter "*_$leaf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' }).Count -gt 0) { return $null }
+  $dest = Join-Path $dir ((Get-Date -Format 'yyyyMMdd-HHmmss') + "_BASELINE_$leaf")
+  Copy-Item -LiteralPath $savePath -Destination $dest -Force
+  if ((Get-Item -LiteralPath $dest).Length -ne (Get-Item -LiteralPath $savePath).Length -or (Get-FileHash -LiteralPath $dest).Hash -ne (Get-FileHash -LiteralPath $savePath).Hash) { Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue; $script:BaselineChecked.Remove($savePath); return $null }
+  return $dest
+}
+
 function Install-Items([string]$savePath, $requests, [switch]$SkipGameCheck) {
   if ((-not $SkipGameCheck) -and (Test-GameRunning)) { throw 'The game is running. Save and close it first.' }
   if (-not (Test-Path $savePath)) { throw "Save not found: $savePath" }
