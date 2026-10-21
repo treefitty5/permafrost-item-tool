@@ -21,6 +21,12 @@ try {
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   if ($SelfTest) { [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException) }
+  # All windows are laid out in 96-DPI pixels. PowerShell 7 starts system-DPI-aware, so at 125% / 150% display scaling the FONTS grow but the boxes and buttons do not
+  # (text gets clipped: "World rese", "Add to s"...). Ask Windows to draw our windows DPI-unaware instead: it scales each window as a whole, so the layout is the same at every scaling.
+  try {
+    if (-not ('PfDpiAwareness' -as [type])) { Add-Type -Namespace '' -Name PfDpiAwareness -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr SetThreadDpiAwarenessContext(System.IntPtr c);' }
+    [void][PfDpiAwareness]::SetThreadDpiAwarenessContext([IntPtr](-1))   # DPI_AWARENESS_CONTEXT_UNAWARE; needs Windows 10 1607+, ignored otherwise
+  } catch { }
   [System.Windows.Forms.Application]::EnableVisualStyles()
 
   # first run (no data made yet): say what to do instead of failing
