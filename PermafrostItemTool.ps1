@@ -23,9 +23,13 @@ try {
   if ($SelfTest) { [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException) }
   # All windows are laid out in 96-DPI pixels. PowerShell 7 starts system-DPI-aware, so at 125% / 150% display scaling the FONTS grow but the boxes and buttons do not
   # (text gets clipped: "World rese", "Add to s"...). Ask Windows to draw our windows DPI-unaware instead: it scales each window as a whole, so the layout is the same at every scaling.
+  # Only when the window still fits: the main window needs about 1100 x 826 of its own pixels (it keeps a 12 px margin at the bottom, so 820 is enough), and Windows' scaled-down screen has (physical size / scaling) of them
+  # (1920x1080 at 150% leaves only 1280x720). On such a screen the windows stay DPI-aware (the old behaviour) so nothing is cut off at the bottom.
   try {
-    if (-not ('PfDpiAwareness' -as [type])) { Add-Type -Namespace '' -Name PfDpiAwareness -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr SetThreadDpiAwarenessContext(System.IntPtr c);' }
-    [void][PfDpiAwareness]::SetThreadDpiAwarenessContext([IntPtr](-1))   # DPI_AWARENESS_CONTEXT_UNAWARE; needs Windows 10 1607+, ignored otherwise
+    if (-not ('PfDpiAwareness' -as [type])) { Add-Type -Namespace '' -Name PfDpiAwareness -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr SetThreadDpiAwarenessContext(System.IntPtr c); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern int GetDpiForSystem();' }
+    $dpiScale = [PfDpiAwareness]::GetDpiForSystem() / 96.0; $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $script:DpiUnaware = ($dpiScale -le 1.0) -or (($wa.Width / $dpiScale) -ge 1100 -and ($wa.Height / $dpiScale) -ge 820)
+    if ($script:DpiUnaware) { [void][PfDpiAwareness]::SetThreadDpiAwarenessContext([IntPtr](-1)) }   # DPI_AWARENESS_CONTEXT_UNAWARE; needs Windows 10 1607+, ignored otherwise
   } catch { }
   [System.Windows.Forms.Application]::EnableVisualStyles()
 
