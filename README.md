@@ -468,7 +468,7 @@ Read the output: each builder prints a one-line summary (items, recipes, quests.
 
 ## 20. For developers: one working copy, tests, releases
 
-There is **one** copy of the tool: this repository folder. You run it from the folder, you edit it in the folder, and you release it from the folder. Your private files (Backups, icons, `config.json`, theme / settings files, `ForumPost.txt`, the story-text tables) sit next to the code but are **git-ignored**, so they can never be committed or end up in a release ZIP.
+There is **one** copy of the tool: this repository folder. You run it from the folder, you edit it in the folder, and you release it from the folder. Your private files (`Backups\`, `Releases\` with the built ZIPs, `Archive\` with old copies / saves / screenshots, `icons\`, `config.json`, theme / settings files, `ForumPost.txt`, the story-text tables) sit next to the code but are **git-ignored**, so they can never be committed or end up in a release ZIP.
 
 **Everyday loop**
 
@@ -492,7 +492,7 @@ There is **one** copy of the tool: this repository folder. You run it from the f
 **Making a release**
 
 ```powershell
-pwsh -NoProfile -File .\Make-Release.ps1 -Version 1.2.0     # -> ..\PermafrostItemTool-v1.2.0.zip
+pwsh -NoProfile -File .\Make-Release.ps1 -Version 1.2.0     # -> Releases\PermafrostItemTool-v1.2.0.zip
 ```
 
 It zips exactly the files git would commit (tracked + new non-ignored files), scans them for personal strings, and refuses to include private files. Then tag the commit and attach the ZIP to a GitHub release.
