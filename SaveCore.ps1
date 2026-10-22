@@ -163,7 +163,7 @@ function Build-Plan([string]$equipText, [string]$hotText, $requests) {
     while ($remaining -gt 0) {
       $used = @{}; foreach ($x in $list) { $used[$x.Slot] = $true }
       $free = $null; for ($s = 0; $s -le $max; $s++) { if (-not $used.ContainsKey($s)) { $free = $s; break } }
-      if ($null -eq $free) { throw "Not enough free $($r.target.ToLower()) slots for $($r.item.id) (needs $([math]::Ceiling($remaining / $stack)) more). Free some space in the game first." }
+      if ($null -eq $free) { throw "Not enough free $($r.target.ToLower()) slots for $($r.item.id) (needs $([math]::Ceiling($remaining / $stack)) more). Free some space in the game first$(if ($r.target -eq 'Backpack') { ', add less, use the Hotbar target, or make the backpack bigger with the Backpack slots box (top right, Apply in game)' } else { '' })." }
       $n = [math]::Min($stack, $remaining)
       $entry = Format-Entry $r.item $free $n
       $m = [regex]::Match($entry, '^@(\d+)=([^&]+)(.*)$')

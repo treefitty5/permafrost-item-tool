@@ -260,7 +260,7 @@ try {
     $tgA = [string]$cmbTarget.SelectedItem; $leftA = Get-SpaceLeft $tgA; $needA = [int][math]::Ceiling([int]$numQty.Value / [math]::Max(1, [int]$numStack.Value))
     $script:Queue.Add([pscustomobject]@{ item = $c; count = [int]$numQty.Value; stack = [int]$numStack.Value; target = [string]$cmbTarget.SelectedItem })
     Refresh-Queue; Log ("Queued {0}: total {1}, {2} per slot = {3} slot(s) ({4})" -f $c.id, $numQty.Value, $numStack.Value, [int][math]::Ceiling([int]$numQty.Value / [math]::Max(1, [int]$numStack.Value)), $cmbTarget.SelectedItem)
-    if ($null -ne $leftA -and $needA -gt $leftA) { Log ("WARNING: $($c.id) needs $needA slot(s) but only $leftA $(($tgA).ToLower()) slot(s) are free. It is queued, but Apply will refuse until you free space in the game or add less.") }
+    if ($null -ne $leftA -and $needA -gt $leftA) { Log ("WARNING: $($c.id) needs $needA slot(s) but only $leftA $(($tgA).ToLower()) slot(s) are free. It is queued, but Apply will refuse until you free space in the game, add less, or make the backpack bigger (Backpack slots box, top right).") }
   }
 
   # ---------- hooks for the Player tools / Game data windows ----------
