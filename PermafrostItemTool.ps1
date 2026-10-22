@@ -416,7 +416,7 @@ The window opens maximized and resizes with you. Press F11 for true full screen 
 
 - Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
 - Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). Nothing in your save changes, and putting the number back to the game's own size (or deleting the mod) undoes it. The tool refuses a size that would leave an item outside the backpack, and shows a red WARNING under the box if an item already sits above the size it counts (for example because the mod is off). Add items counts your size as soon as the mod is installed and on.
+- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). The tool makes a backup of your save first. IMPORTANT: the game DELETES every item that has no slot the next time it saves (tested: after one save with the mod off, the items in the extra slots were gone). So the tool refuses a size that would leave an item outside the backpack, and shows a red DANGER line under the box if an item already sits above the size the game will use (for example because the mod is off or not loading). If you see it, do NOT play: switch the mod on (Apply in game) or restore a backup. Add items counts your size as soon as the mod is installed and on.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
@@ -547,7 +547,7 @@ LIMITS
 - The data describes ONE version of the game (datapack.json says which); after a game update it can be out of date until a new release or a rebuild. The Overview warns when the installed game differs.
 - An unknown item name is silently ignored by the game (the item just does not appear).
 - Quest items are added but do not mark quest progress.
-- A bigger backpack exists only while the BackpackSlots mod is on: if you remove the mod or lower the size, move your items into the lower slots first.
+- A bigger backpack exists only while the BackpackSlots mod is on. If the mod stops loading (UE4SS reinstalled or updated, a game update, mods.txt changed) the backpack goes back to the game's own size and the game DELETES the items in the extra slots at its next save. Before playing after any such change, check the box under Backpack slots (no red DANGER line) and keep your backups.
 - World reset cannot know the few objects that get a different random id in every world (about 1-2% of ores, up to 6% of items), and without a backup it refills container loot with a real roll of the same loot group, not the original contents.
 - Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
 
@@ -646,7 +646,7 @@ WHERE THINGS ARE
     if ($ov) {
       # an item sits above the size the tool counts (the in-game mod was switched off or removed?): the game may delete such items
       $lblBpHint.ForeColor = [System.Drawing.Color]::Tomato
-      $lblBpHint.Text = "WARNING: slot $($ov.Highest + 1) holds an item; backpack has only $($ov.Slots) slots" + $(if ($tw -and -not (BT-ModActive)) { ' (mod off?)' } else { '' }) }
+      $lblBpHint.Text = $(if ($tw -and -not (BT-ModActive)) { "DANGER: items beyond slot $($ov.Slots) are deleted on save - turn the mod on" } else { "DANGER: slot $($ov.Highest + 1) is beyond the $($ov.Slots) slots: the game deletes it on save" }) }
     elseif ($tw -and -not (BT-ModActive)) { $lblBpHint.ForeColor = $script:Th.Muted; $lblBpHint.Text = "Worn: $($eq.Name) - your size $tw is saved but the in-game mod is not on: using $n" }
     else { $lblBpHint.ForeColor = $script:Th.Muted; $lblBpHint.Text = "Worn: $($eq.Name) - using $n slots ($(Get-BackpackSource $eq))" }
   }
@@ -665,6 +665,7 @@ WHERE THINGS ARE
           $ok = [System.Windows.Forms.MessageBox]::Show("Changing the size of a backpack needs a small in-game mod (BackpackSlots, for UE4SS). It only changes numbers inside the running game and never touches your save.`n`nInstall it now?", 'Backpack size', 'YesNo', 'Question')
           if ($ok -ne 'Yes') { return } }
         BT-InstallMod; Log 'Installed the BackpackSlots in-game mod (UE4SS Mods folder).' }
+      $bk = BT-BackupSave $script:SavePath; if ($bk) { Log ("Backup of your save made first: " + (Split-Path $bk -Leaf)) } else { Log 'No backup made (the game is running or the copy failed) - close the game and use Restore a backup if anything looks wrong.' }
       $r = Set-BackpackTweak $script:BpName $n $used $gs
       if ($r.Removed) { Log ("Backpack size: {0} goes back to the game's own {1} slots." -f $script:BpName, $gs) }
       else { Log ("Backpack size saved: {0} = {1} slots (the game's own is {2}). It is applied every time the game starts, before your save loads. If the game is running now, take the backpack off and put it back on (drag it to the hotbar and back)." -f $script:BpName, $n, $gs) }
@@ -974,6 +975,10 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $r1 = Set-BackpackTweak 'ScavengerBackpack' 50 -1 $game; $lua1 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap1 = (Get-BackpackMaxSlot $fake) + 1
       $refused = $false; try { [void](Set-BackpackTweak 'ScavengerBackpack' 20 24 $game) } catch { $refused = $true }
       $r2 = Set-BackpackTweak 'ScavengerBackpack' $game -1 $game; $lua2 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap2 = (Get-BackpackMaxSlot $fake) + 1
+      $bkSrc = "$bsTmp\World#9.pfs"; [IO.File]::WriteAllText($bkSrc, 'test'); $script:BackupDirOverride = "$bsTmp\Backups9"; New-Item -ItemType Directory -Force "$bsTmp\Backups9" | Out-Null
+      $bkOut = BT-BackupSave $bkSrc; $script:BackupDirOverride = $null
+      $out += "backpack size backup: made = $([bool]$bkOut), name ok = $($bkOut -match '_BACKPACKSIZE_World#9\.pfs$'), same content = $($bkOut -and ((Get-FileHash $bkOut).Hash -eq (Get-FileHash $bkSrc).Hash))"
+      if (-not $bkOut -or $bkOut -notmatch '_BACKPACKSIZE_World#9\.pfs$') { $errs.Add('backpack size backup test failed') }
       $ovBp = @{ Name = 'ScavengerBackpack'; Contents = @([pscustomobject]@{ Slot = 40 }) }; $ov1 = BT-Overflow $ovBp; $ov2 = BT-Overflow @{ Name = 'ScavengerBackpack'; Contents = @([pscustomobject]@{ Slot = 3 }) }
       $out += "backpack overflow warning: item in slot 41 of a 35-slot backpack -> $(if ($ov1) { "warns (slots $($ov1.Slots), highest $($ov1.Highest))" } else { 'NO WARNING' }); item in slot 4 -> $(if ($ov2) { 'WARNS' } else { 'no warning' })"
       if (-not $ov1 -or $ov1.Slots -ne $game -or $ov2) { $errs.Add('backpack overflow warning test failed') }

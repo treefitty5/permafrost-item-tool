@@ -63,7 +63,7 @@ function Set-BackpackTweak([string]$name, [int]$slots, [int]$usedHighest = -1, [
   if ($slots -lt 5 -or $slots -gt 200) { throw 'Backpack slots must be between 5 and 200.' }
   if ($usedHighest -ge $slots) { throw "NOT APPLIED - nothing was changed.
 
-Your backpack holds an item in slot $($usedHighest + 1). A size of $slots slots would leave that item OUTSIDE the backpack, and the game may delete it.
+Your backpack holds an item in slot $($usedHighest + 1). A size of $slots slots would leave that item OUTSIDE the backpack, and the game DELETES such items the next time it saves (tested).
 
 First move or use the items in the higher slots (inside the game, or take them out), or choose at least $($usedHighest + 1) slots." }
   $h = Get-BackpackTweaks
@@ -80,4 +80,15 @@ function BT-Overflow($bp) {
   foreach ($x in $bp.Contents) { if ($x.Slot -gt $used) { $used = $x.Slot } }
   if ($used -ge $cap) { return @{ Highest = $used; Slots = $cap } }
   return $null
+}
+
+# A copy of the save before a backpack size is applied (the game deletes items that have no slot when it saves, so a mistake here must be undoable).
+# Not made while the game runs (the file may be half-written). Returns the path, or $null.
+function BT-BackupSave([string]$savePath) {
+  if (-not $savePath -or -not (Test-Path -LiteralPath $savePath)) { return $null }
+  if (Test-GameRunning) { return $null }
+  $dest = Join-Path (Get-BackupDir) ((Get-Date -Format 'yyyyMMdd-HHmmss') + '_BACKPACKSIZE_' + [IO.Path]::GetFileName($savePath))
+  Copy-Item -LiteralPath $savePath -Destination $dest -Force
+  if ((Get-FileHash -LiteralPath $dest).Hash -ne (Get-FileHash -LiteralPath $savePath).Hash) { Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue; return $null }
+  return $dest
 }
