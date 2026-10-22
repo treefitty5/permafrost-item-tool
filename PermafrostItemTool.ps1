@@ -71,7 +71,7 @@ try {
   $lblInfo = New-Ctl System.Windows.Forms.Label 12 66 1140 20; $lblInfo.Anchor = 'Top,Left,Right'
   $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'
   $lblBp = New-Ctl System.Windows.Forms.Label 700 66 104 20 'Backpack slots:'
-  $numBp = New-Ctl System.Windows.Forms.NumericUpDown 810 64 70 24; $numBp.Minimum = 5; $numBp.Maximum = 200; $numBp.Value = 25
+  $numBp = New-Ctl System.Windows.Forms.NumericUpDown 810 64 70 24; $numBp.Minimum = 5; $numBp.Maximum = 100; $numBp.Increment = 5; $numBp.Value = 25
   $btnBp = New-Ctl System.Windows.Forms.Button 868 62 104 26 'Apply in game'
   $lblBpHint = New-Ctl System.Windows.Forms.Label 700 88 380 18; $lblBpHint.TextAlign = 'MiddleRight'; $lblBpHint.ForeColor = $script:Th.Muted
 
@@ -416,7 +416,7 @@ The window opens maximized and resizes with you. Press F11 for true full screen 
 
 - Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
 - Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). The tool makes a backup of your save first. IMPORTANT: the game DELETES every item that has no slot the next time it saves (tested: after one save with the mod off, the items in the extra slots were gone). So the tool refuses a size that would leave an item outside the backpack, and shows a red DANGER line under the box if an item already sits above the size the game will use (for example because the mod is off or not loading). If you see it, do NOT play: switch the mod on (Apply in game) or restore a backup. Add items counts your size as soon as the mod is installed and on.
+- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want (a multiple of 5: the screen is a grid with 5 columns) and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). The tool makes a backup of your save first. IMPORTANT: the game DELETES every item that has no slot the next time it saves (tested: after one save with the mod off, the items in the extra slots were gone). So the tool refuses a size that would leave an item outside the backpack, and shows a red DANGER line under the box if an item already sits above the size the game will use (for example because the mod is off or not loading). If you see it, do NOT play: switch the mod on (Apply in game) or restore a backup. Add items counts your size as soon as the mod is installed and on.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
@@ -657,8 +657,8 @@ WHERE THINGS ARE
       $sv = Read-Save $script:SavePath; $eq = Parse-Equipment $sv.Equip; $used = -1
       if ($eq) { foreach ($x in $eq.Contents) { if ($x.Slot -gt $used) { $used = $x.Slot } } }
       $n = [int]$numBp.Value; $gs = Get-BackpackGameSlots $script:BpName
-      if ($n -gt 60 -and -not $script:TestMode) {
-        $ok = [System.Windows.Forms.MessageBox]::Show("$n slots is much bigger than any backpack in the game (the largest is 50). Sizes above 60 are untested: the screen scrolls, but please try a smaller number first if you are unsure.`n`nUse $n slots?", 'Backpack size', 'YesNo', 'Question', 'Button2')
+      if ($n -gt 80 -and -not $script:TestMode) {
+        $ok = [System.Windows.Forms.MessageBox]::Show("$n slots is much bigger than any backpack in the game (the largest is 50). Sizes above 80 are untested (80 was tried and the screen scrolls); please try a smaller number first if you are unsure.`n`nUse $n slots?", 'Backpack size', 'YesNo', 'Question', 'Button2')
         if ($ok -ne 'Yes') { return } }
       if ($n -ne $gs -and -not (BT-ModStatus).Active) {
         if (-not $script:TestMode) {
@@ -974,6 +974,7 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $mtx = Get-Content "$bsTmp\mods.txt" -Raw
       $r1 = Set-BackpackTweak 'ScavengerBackpack' 50 -1 $game; $lua1 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap1 = (Get-BackpackMaxSlot $fake) + 1
       $refused = $false; try { [void](Set-BackpackTweak 'ScavengerBackpack' 20 24 $game) } catch { $refused = $true }
+      $notFive = $false; try { [void](Set-BackpackTweak 'ScavengerBackpack' 52 -1 $game) } catch { $notFive = $true }; $out += "backpack size 52 (not a multiple of 5) refused = $notFive"; if (-not $notFive) { $errs.Add('multiple-of-5 test failed') }
       $r2 = Set-BackpackTweak 'ScavengerBackpack' $game -1 $game; $lua2 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap2 = (Get-BackpackMaxSlot $fake) + 1
       $bkSrc = "$bsTmp\World#9.pfs"; [IO.File]::WriteAllText($bkSrc, 'test'); $script:BackupDirOverride = "$bsTmp\Backups9"; New-Item -ItemType Directory -Force "$bsTmp\Backups9" | Out-Null
       $bkOut = BT-BackupSave $bkSrc; $script:BackupDirOverride = $null

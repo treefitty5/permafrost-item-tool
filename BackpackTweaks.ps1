@@ -60,7 +60,8 @@ function BT-InstallMod {
 # $usedHighest = the highest slot number that holds an item in the worn backpack (-1 = empty); a size that would leave an item outside the backpack is refused
 function Set-BackpackTweak([string]$name, [int]$slots, [int]$usedHighest = -1, [int]$gameSlots = 0) {
   if ($name -notmatch '^[A-Za-z0-9_]+Backpack$') { throw "Not a backpack: $name" }
-  if ($slots -lt 5 -or $slots -gt 200) { throw 'Backpack slots must be between 5 and 200.' }
+  if ($slots -lt 5 -or $slots -gt 100) { throw 'Backpack slots must be between 5 and 100.' }
+  if ($slots % 5 -ne 0) { throw "NOT APPLIED. A backpack size must be a multiple of 5 (5, 10, 15 ... 50 ...): the backpack screen is a grid with 5 columns, every backpack in the game has a multiple of 5, and the game deletes items that have no slot, so other numbers are not allowed." }
   if ($usedHighest -ge $slots) { throw "NOT APPLIED - nothing was changed.
 
 Your backpack holds an item in slot $($usedHighest + 1). A size of $slots slots would leave that item OUTSIDE the backpack, and the game DELETES such items the next time it saves (tested).
