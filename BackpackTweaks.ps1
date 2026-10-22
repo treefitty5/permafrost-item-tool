@@ -61,11 +61,23 @@ function BT-InstallMod {
 function Set-BackpackTweak([string]$name, [int]$slots, [int]$usedHighest = -1, [int]$gameSlots = 0) {
   if ($name -notmatch '^[A-Za-z0-9_]+Backpack$') { throw "Not a backpack: $name" }
   if ($slots -lt 5 -or $slots -gt 200) { throw 'Backpack slots must be between 5 and 200.' }
-  if ($usedHighest -ge $slots) { throw "Your backpack holds an item in slot $($usedHighest + 1) - a size below that would put items outside it. Move or use those items first, or pick at least $($usedHighest + 1) slots." }
+  if ($usedHighest -ge $slots) { throw "NOT APPLIED - nothing was changed.
+
+Your backpack holds an item in slot $($usedHighest + 1). A size of $slots slots would leave that item OUTSIDE the backpack, and the game may delete it.
+
+First move or use the items in the higher slots (inside the game, or take them out), or choose at least $($usedHighest + 1) slots." }
   $h = Get-BackpackTweaks
   if ($gameSlots -gt 0 -and $slots -eq $gameSlots) { [void]$h.Remove($name) } else { $h[$name] = $slots }   # the game's own size = no tweak
   $o = [ordered]@{}; foreach ($k in ($h.Keys | Sort-Object)) { $o[$k] = [int]$h[$k] }
   ($o | ConvertTo-Json) | Set-Content -LiteralPath (BT-TweakPath) -Encoding utf8
   $script:BtStatusCache = $null
   return @{ Wrote = (BT-WriteLua $h); Removed = (-not $h.ContainsKey($name)) }
+}
+
+# the worn backpack holds an item in a slot above what the tool counts as its size (for example the in-game mod was switched off or removed): the game may drop such items
+function BT-Overflow($bp) {
+  $cap = (Get-BackpackMaxSlot $bp) + 1; $used = -1
+  foreach ($x in $bp.Contents) { if ($x.Slot -gt $used) { $used = $x.Slot } }
+  if ($used -ge $cap) { return @{ Highest = $used; Slots = $cap } }
+  return $null
 }

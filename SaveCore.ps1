@@ -135,7 +135,7 @@ function Get-BackpackMaxSlot($bp) {
   return [math]::Max(9, [int]$used)
 }
 function Get-BackpackSource($bp) {
-  if ((Get-BackpackTweakSlots $bp.Name) -gt 0) { return "your size, set with the in-game mod; the game's own is $(Get-BackpackGameSlots $bp.Name)" }
+  if ((Get-BackpackTweakSlots $bp.Name) -gt 0) { return "your size; the game's own is $(Get-BackpackGameSlots $bp.Name)" }
   if ((Get-BackpackGameSlots $bp.Name) -gt 0) { return 'game data' }
   $h = Get-BackpackSettings; if ($h.ContainsKey($bp.Name)) { return 'your setting' }
   if ($bp.Name -eq 'UtilityBackpack') { return 'known size' }

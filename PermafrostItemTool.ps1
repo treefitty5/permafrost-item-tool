@@ -416,7 +416,7 @@ The window opens maximized and resizes with you. Press F11 for true full screen 
 
 - Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
 - Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). Nothing in your save changes, and putting the number back to the game's own size (or deleting the mod) undoes it. The tool refuses a size that would leave an item outside the backpack. Add items counts your size as soon as the mod is installed and on.
+- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). Nothing in your save changes, and putting the number back to the game's own size (or deleting the mod) undoes it. The tool refuses a size that would leave an item outside the backpack, and shows a red WARNING under the box if an item already sits above the size it counts (for example because the mod is off). Add items counts your size as soon as the mod is installed and on.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
@@ -642,9 +642,13 @@ WHERE THINGS ARE
     $script:FreeInfo = $null; $script:BpName = $eq.Name; $n = (Get-BackpackMaxSlot $eq) + 1
     $numBp.Enabled = $true; $btnBp.Enabled = $true
     $numBp.Value = [math]::Min([math]::Max([decimal]$n, $numBp.Minimum), $numBp.Maximum)
-    $tw = (Get-BackpackTweaks)[$eq.Name]
-    if ($tw -and -not (BT-ModActive)) { $lblBpHint.Text = "Worn: $($eq.Name) - your size $tw is saved but the in-game mod is not on: using $n" }
-    else { $lblBpHint.Text = "Worn: $($eq.Name) - using $n slots ($(Get-BackpackSource $eq))" }
+    $tw = (Get-BackpackTweaks)[$eq.Name]; $ov = BT-Overflow $eq
+    if ($ov) {
+      # an item sits above the size the tool counts (the in-game mod was switched off or removed?): the game may delete such items
+      $lblBpHint.ForeColor = [System.Drawing.Color]::Tomato
+      $lblBpHint.Text = "WARNING: slot $($ov.Highest + 1) holds an item; backpack has only $($ov.Slots) slots" + $(if ($tw -and -not (BT-ModActive)) { ' (mod off?)' } else { '' }) }
+    elseif ($tw -and -not (BT-ModActive)) { $lblBpHint.ForeColor = $script:Th.Muted; $lblBpHint.Text = "Worn: $($eq.Name) - your size $tw is saved but the in-game mod is not on: using $n" }
+    else { $lblBpHint.ForeColor = $script:Th.Muted; $lblBpHint.Text = "Worn: $($eq.Name) - using $n slots ($(Get-BackpackSource $eq))" }
   }
   # Apply the size in the game (BackpackSlots in-game mod): installs the mod the first time and writes tweaks.lua. The game applies it from start-up, before the save loads.
   function Apply-BackpackSize {
@@ -665,7 +669,7 @@ WHERE THINGS ARE
       if ($r.Removed) { Log ("Backpack size: {0} goes back to the game's own {1} slots." -f $script:BpName, $gs) }
       else { Log ("Backpack size saved: {0} = {1} slots (the game's own is {2}). It is applied every time the game starts, before your save loads. If the game is running now, take the backpack off and put it back on (drag it to the hotbar and back)." -f $script:BpName, $n, $gs) }
       Update-BackpackBox
-    } catch { [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Backpack size', 'OK', 'Warning') }
+    } catch { [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Backpack size - not applied', 'OK', 'Warning') }
   }
   $script:LastSaveStamp = $null
   function Check-SaveChanged {
@@ -970,6 +974,9 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $r1 = Set-BackpackTweak 'ScavengerBackpack' 50 -1 $game; $lua1 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap1 = (Get-BackpackMaxSlot $fake) + 1
       $refused = $false; try { [void](Set-BackpackTweak 'ScavengerBackpack' 20 24 $game) } catch { $refused = $true }
       $r2 = Set-BackpackTweak 'ScavengerBackpack' $game -1 $game; $lua2 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap2 = (Get-BackpackMaxSlot $fake) + 1
+      $ovBp = @{ Name = 'ScavengerBackpack'; Contents = @([pscustomobject]@{ Slot = 40 }) }; $ov1 = BT-Overflow $ovBp; $ov2 = BT-Overflow @{ Name = 'ScavengerBackpack'; Contents = @([pscustomobject]@{ Slot = 3 }) }
+      $out += "backpack overflow warning: item in slot 41 of a 35-slot backpack -> $(if ($ov1) { "warns (slots $($ov1.Slots), highest $($ov1.Highest))" } else { 'NO WARNING' }); item in slot 4 -> $(if ($ov2) { 'WARNS' } else { 'no warning' })"
+      if (-not $ov1 -or $ov1.Slots -ne $game -or $ov2) { $errs.Add('backpack overflow warning test failed') }
       $out += "backpack size: game $game; mod before install = $($s0.Installed), after = installed $($s1.Installed) on $($s1.Enabled) current $($s1.UpToDate); mods.txt line before keybinds = $($mtx -match '(?s)BackpackSlots : 1.*Built-in keybinds'); set 50 -> tweaks.lua has it = $($lua1 -match 'DA_ScavengerBackpack = 50'), tool counts $cap1 slots; shrink below used slot refused = $refused; reset -> removed = $($r2.Removed), lua cleared = $($lua2 -notmatch 'DA_ScavengerBackpack'), tool counts $cap2 slots"
       if ($game -lt 5 -or -not $s1.Active -or -not $s1.UpToDate -or $lua1 -notmatch 'DA_ScavengerBackpack = 50' -or $cap1 -ne 50 -or -not $refused -or -not $r2.Removed -or $lua2 -match 'DA_ScavengerBackpack' -or $cap2 -ne $game -or $mtx -notmatch '(?s)BackpackSlots : 1.*Built-in keybinds') { $errs.Add('backpack size test failed') }
     } catch { $errs.Add("backpack size test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
