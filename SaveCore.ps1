@@ -103,6 +103,7 @@ function Parse-Equipment([string]$e) {
 
 # Backpack capacity. The save does not store it, but the game's item data does (ItemConfig_Clothing.ContainerDimensions, exported to items.json
 # as containerSlots; checked: Utility 25 and Scavenger 35 equal what you had set by hand). Order used:
+#   0. a size set with "Apply in game" (backpack-tweaks.json; counts only while the BackpackSlots in-game mod is installed and on, see BackpackTweaks.ps1)
 #   1. the game data (items.json containerSlots)
 #   2. a size you set yourself in the window, remembered per backpack in backpacks.json (only for a backpack the data does not cover)
 #   3. otherwise the highest slot already in use (at least 10 slots) - a safe floor, never an over-estimate
@@ -121,7 +122,12 @@ function Set-BackpackSlots([string]$name, [int]$slots) {
   $h = Get-BackpackSettings; $h[$name] = $slots
   ($h | ConvertTo-Json) | Set-Content (Join-Path $PSScriptRoot 'backpacks.json') -Encoding utf8
 }
+function Get-BackpackTweakSlots([string]$name) {
+  if (-not (Get-Command Get-BackpackTweaks -ErrorAction SilentlyContinue)) { return 0 }
+  $h = Get-BackpackTweaks; if ($h.ContainsKey($name) -and (BT-ModActive)) { return [int]$h[$name] }; return 0
+}
 function Get-BackpackMaxSlot($bp) {
+  $tw = Get-BackpackTweakSlots $bp.Name; if ($tw -gt 0) { return $tw - 1 }
   $g = Get-BackpackGameSlots $bp.Name; if ($g -gt 0) { return $g - 1 }
   $h = Get-BackpackSettings; if ($h.ContainsKey($bp.Name)) { return [int]$h[$bp.Name] - 1 }
   if ($bp.Name -eq 'UtilityBackpack') { return $script:DefaultBackpackMaxSlot }
@@ -129,6 +135,7 @@ function Get-BackpackMaxSlot($bp) {
   return [math]::Max(9, [int]$used)
 }
 function Get-BackpackSource($bp) {
+  if ((Get-BackpackTweakSlots $bp.Name) -gt 0) { return "your size, set with the in-game mod; the game's own is $(Get-BackpackGameSlots $bp.Name)" }
   if ((Get-BackpackGameSlots $bp.Name) -gt 0) { return 'game data' }
   $h = Get-BackpackSettings; if ($h.ContainsKey($bp.Name)) { return 'your setting' }
   if ($bp.Name -eq 'UtilityBackpack') { return 'known size' }

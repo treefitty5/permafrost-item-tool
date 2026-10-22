@@ -27,7 +27,7 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
 13. [Reference: Pictures](#13-reference-pictures)
 14. [Backups, restoring, and Steam Cloud](#14-backups-restoring-and-steam-cloud)
 15. [Files and settings](#15-files-and-settings)
-16. [Installing UE4SS (only for the two in-game mods)](#16-installing-ue4ss-only-for-the-two-in-game-mods)
+16. [Installing UE4SS (only for the in-game mods)](#16-installing-ue4ss-only-for-the-in-game-mods)
 17. [After a game update](#17-after-a-game-update)
 18. [Advanced: rebuild the data from your own game files](#18-advanced-rebuild-the-data-from-your-own-game-files)
 19. [Troubleshooting and FAQ](#19-troubleshooting-and-faq)
@@ -71,7 +71,7 @@ Optional but recommended: a bar near the top offers **Build pictures now**. It b
 | **PowerShell 7** (`pwsh`) | the tool is written in PowerShell 7 | the launcher installs it for you (`winget install Microsoft.PowerShell`), or <https://aka.ms/powershell> |
 | **Permafrost** (Steam) | the game and its save files | |
 
-Nothing else for the main window. **UE4SS** is only needed for the two in-game mods ([section 16](#16-installing-ue4ss-only-for-the-two-in-game-mods)); **FModel** only if you want to rebuild the data yourself ([section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)). There is no installer and no `.exe`: you do not need Python, a .NET SDK or a compiler.
+Nothing else for the main window. **UE4SS** is only needed for the in-game mods ([section 16](#16-installing-ue4ss-only-for-the-in-game-mods)); **FModel** only if you want to rebuild the data yourself ([section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)). There is no installer and no `.exe`: you do not need Python, a .NET SDK or a compiler.
 
 **Step by step**
 
@@ -170,7 +170,7 @@ Click **Build pictures now** (or **Pictures...** in the banner) once ([section 1
 * **Condition** - wear value for weapons, clothing and tools (greyed out for items that have none). **Rounds loaded** - only for firearms.
 * **Put it in** - **Backpack** or **Hotbar**; the tool uses the first free slots.
 * **Add to queue** (or double-click an item) puts it on the list. Nothing is written yet.
-* **Backpack slots** (top right) - how many slots your worn backpack has. It comes from the game data and is exact for every backpack; the box only matters for a backpack the data does not cover (type the real number and press **Remember**).
+* **Backpack slots** (top right) - how many slots your worn backpack has (the line under it says where the number comes from). Type a different number and press **Apply in game** to change the size of that backpack: see [Backpack size](#backpack-size-in-game-mod) below. **Add items** counts the size you set.
 
 **Queue.** *Remove selected* and *Clear queue* edit the list. **Preview** shows exactly which slots would be used plus any warnings, and writes nothing.
 
@@ -256,7 +256,7 @@ Not stored in the game files: how often a container is found in the world, and a
 
 ![Recipe tweaks](docs/screenshot-tweaks.png)
 
-**Recipe tweaks...** edits crafting recipes: ingredient amounts, how many a craft makes, and crafting time. It works through a small mod for UE4SS ([section 16](#16-installing-ue4ss-only-for-the-two-in-game-mods)). **Your save file is never changed, so this window can be used while the game is running.**
+**Recipe tweaks...** edits crafting recipes: ingredient amounts, how many a craft makes, and crafting time. It works through a small mod for UE4SS ([section 16](#16-installing-ue4ss-only-for-the-in-game-mods)). **Your save file is never changed, so this window can be used while the game is running.**
 
 1. Click **Install / update mod** once. It copies the mod into `...\ue4ss\Mods\RecipeTweaks` and adds `RecipeTweaks : 1` to `Mods\mods.txt` (a backup of `mods.txt` is made first). **Restart the game** after installing or updating: UE4SS loads mods at start-up only.
 2. Pick a recipe and edit its boxes, or use the **Change every recipe shown** boxes with **Multiply the recipes shown** (filter with Search / Station first, for example `ammo` and *Amount made x 5*). That button only changes the numbers in the window.
@@ -297,7 +297,7 @@ Two more things the game keeps in the save are handled too:
 
 ## 12. Reference: Build move (in-game mod)
 
-**Build move...** installs a small UE4SS mod that lets you pick up a building you placed and put it somewhere else, without rebuilding it. Click it once (needs UE4SS, [section 16](#16-installing-ue4ss-only-for-the-two-in-game-mods)): it copies the mod into `...\ue4ss\Mods\BuildMove` and adds `BuildMove : 1` to `mods.txt` (a backup is made). **Restart the game** after installing or updating. The tool does not edit your save for this: the game saves the new position itself.
+**Build move...** installs a small UE4SS mod that lets you pick up a building you placed and put it somewhere else, without rebuilding it. Click it once (needs UE4SS, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)): it copies the mod into `...\ue4ss\Mods\BuildMove` and adds `BuildMove : 1` to `mods.txt` (a backup is made). **Restart the game** after installing or updating. The tool does not edit your save for this: the game saves the new position itself.
 
 * **Move from the wheel:** look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press **Q** and choose **Move** (the mod puts it in the wheel's empty padlock slot, between Deconstruction and Call dog). The part follows your crosshair.
 * **Put it down:** **left click**; choosing Move again or pressing **F7** also puts it down. F7 starts a move without opening the wheel.
@@ -306,6 +306,16 @@ Two more things the game keeps in the save are handled too:
 * **Not tested yet:** Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
 * **Log:** `ue4ss\Mods\BuildMove\BuildMove.log` lists every step the mod took (also in `UE4SS.log`, search `[BuildMove]`). Switch it off with `BuildMove : 0` in `mods.txt`.
 
+### Backpack size (in-game mod)
+
+The size of a backpack is not stored in your save: the game builds it from its item data when the world loads. The **Backpack slots** box (top right of the main window) can change that number for the backpack you are wearing.
+
+1. Type the size you want (5 to 200; the largest backpack in the game is 50) and press **Apply in game**.
+2. The first time, the tool offers to install a small UE4SS mod (**BackpackSlots**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)) into the game's `Mods` folder. It only changes numbers inside the running game and never touches your save.
+3. **Start the game.** The mod applies your size from the moment the game starts, before your save loads, so the backpack is already the new size when you load in. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back); the change is picked up then.
+4. To undo it, type the game's own size (shown under the box) and press **Apply in game** again, or switch the mod off (`BackpackSlots : 0` in `Mods\mods.txt`).
+
+What the tool checks: it refuses a size that would leave an item outside the backpack (for example 20 slots while something sits in slot 24), asks before sizes above 60 (untested), and counts your size in **Add items** only while the mod is installed and switched on. **If you remove the mod or lower the size later, move your items into the lower slots first.** Each backpack keeps its own setting, so a different backpack you wear later uses its own (or the game's) size. Tested in the game: raising a Casual backpack from 15 to 25 slots, then back.
 ## 13. Reference: Pictures
 
 ![Pictures window](docs/screenshot-pictures.png)
@@ -341,7 +351,8 @@ The bar has **Not now** (hide it until the next start) and **Don't ask again** (
 | `config.json` | Only if needed (see below); also remembers your chosen world. |
 | `theme.json` | Your colour theme. |
 | `spoiler.json` | Whether story text is hidden. |
-| `backpacks.json` | Backpack slot numbers you typed with **Remember**. |
+| `backpack-tweaks.json` | Backpack sizes you set with **Apply in game** (also written to the mod's `tweaks.lua`). |
+| `backpacks.json` | Only an older version used it (slot numbers typed with "Remember"); safe to delete. |
 | `recipe-tweaks.json` | What the Recipe tweaks window last saved. |
 | `pictures.json` | Exists only if you pressed *Don't ask again*. |
 | `oodle-data-shared.dll` | The decompressor, if you let the Pictures window download it. |
@@ -361,9 +372,9 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 **Moving the tool:** close it, move the whole folder (keep `Backups` with it), and start the `.cmd` from the new place. **Uninstalling:** delete the folder; the only things outside it are the optional UE4SS mods (`RecipeTweaks`, `BuildMove` in `...\ue4ss\Mods`, listed in `mods.txt`).
 
-## 16. Installing UE4SS (only for the two in-game mods)
+## 16. Installing UE4SS (only for the in-game mods)
 
-**Recipe tweaks** and **Build move** work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
+**Recipe tweaks**, **Build move** and the **Backpack slots** box work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
@@ -379,7 +390,7 @@ Permafrost is in active development. The shipped data (`items.json`, `catalog\`;
 2. **Copy your save file** (the `.pfs` in `SaveGame`) somewhere safe. The tool also makes its own backup, but this is cheap insurance.
 3. **Check for a new release** of this tool: the data pack is rebuilt after game updates. Download the new ZIP, copy your `Backups` folder and settings files into it (or unzip over the old folder), and run **Pictures...** again if you use the pictures.
 4. If there is no new release yet, you can rebuild the data from your own game files ([section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)). Until then, do not trust items the old data does not know, and test any big queue on a copy of your save first.
-5. **Recipe tweaks / Build move:** restart the game once. The mods change things in memory only, so after an update the worst case is that they log an error and do nothing; your save is never touched by them.
+5. **Recipe tweaks / Build move / Backpack size:** restart the game once. The mods change things in memory only, so after an update the worst case is that they log an error and do nothing; your save is never touched by them.
 
 **Also worth knowing**
 
@@ -399,7 +410,7 @@ Normally you never need this: the release already contains the data. Use it afte
 
 **18.1 Make the mappings file (one time per game version).** Permafrost stores its data without field names ("unversioned properties"), so FModel can only turn it into readable JSON if you give it a **mappings** (`.usmap`) file. UE4SS can produce one from the running game.
 
-1. Install UE4SS ([section 16](#16-installing-ue4ss-only-for-the-two-in-game-mods)).
+1. Install UE4SS ([section 16](#16-installing-ue4ss-only-for-the-in-game-mods)).
 2. Copy the folder `UE4SSMods\DumpUsmapNative` from this repository into `...\Binaries\Win64\ue4ss\Mods\`.
 3. Open `...\ue4ss\Mods\mods.txt` and add this line **above** the `; Built-in keybinds` comment:
    ```
@@ -506,7 +517,7 @@ PowerShell traps seen in this code base (worth knowing before you edit): a funct
 * `Paths.ps1` - finds your game folder and save (and FModel's export for the advanced rebuild); reads `config.json`.
 * `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README).
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all and then `Build-Finalize.ps1`; `Rebuild-All.ps1` runs the JSON-based ones. `Make-Release.ps1` builds the release ZIP.
-* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
+* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `docs\` - screenshots and the announcement text.
 
 To check what the tool will do to your save, read `SaveCore.ps1`: it only touches the inventory entries, and it refuses to write if its checks fail.

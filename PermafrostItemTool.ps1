@@ -10,6 +10,7 @@ try {
   . (Join-Path $PSScriptRoot 'PlayerTools.ps1')
   . (Join-Path $PSScriptRoot 'GameData.ps1')
 . (Join-Path $PSScriptRoot 'RecipeTweaks.ps1')
+  . (Join-Path $PSScriptRoot 'BackpackTweaks.ps1')
   . (Join-Path $PSScriptRoot 'WorldCore.ps1')
   . (Join-Path $PSScriptRoot 'WorldReset.ps1')
   . (Join-Path $PSScriptRoot 'WorldResetUI.ps1')
@@ -71,7 +72,7 @@ try {
   $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'
   $lblBp = New-Ctl System.Windows.Forms.Label 700 66 104 20 'Backpack slots:'
   $numBp = New-Ctl System.Windows.Forms.NumericUpDown 810 64 70 24; $numBp.Minimum = 5; $numBp.Maximum = 200; $numBp.Value = 25
-  $btnBp = New-Ctl System.Windows.Forms.Button 886 62 86 26 'Remember'
+  $btnBp = New-Ctl System.Windows.Forms.Button 868 62 104 26 'Apply in game'
   $lblBpHint = New-Ctl System.Windows.Forms.Label 700 88 380 18; $lblBpHint.TextAlign = 'MiddleRight'; $lblBpHint.ForeColor = $script:Th.Muted
 
   # catalog panel
@@ -415,7 +416,7 @@ The window opens maximized and resizes with you. Press F11 for true full screen 
 
 - Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
 - Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-- Backpack slots (top right): How many slots your worn backpack has. The tool now takes this from the game's own item data, so it is exact for every backpack (the label says 'game data'). The box only matters for a backpack the data does not cover; type the real number there and press Remember.
+- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). Nothing in your save changes, and putting the number back to the game's own size (or deleting the mod) undoes it. The tool refuses a size that would leave an item outside the backpack. Add items counts your size as soon as the mod is installed and on.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
@@ -546,6 +547,7 @@ LIMITS
 - The data describes ONE version of the game (datapack.json says which); after a game update it can be out of date until a new release or a rebuild. The Overview warns when the installed game differs.
 - An unknown item name is silently ignored by the game (the item just does not appear).
 - Quest items are added but do not mark quest progress.
+- A bigger backpack exists only while the BackpackSlots mod is on: if you remove the mod or lower the size, move your items into the lower slots first.
 - World reset cannot know the few objects that get a different random id in every world (about 1-2% of ores, up to 6% of items), and without a backup it refills container loot with a real roll of the same loot group, not the original contents.
 - Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
 
@@ -610,7 +612,7 @@ WHERE THINGS ARE
     $gbLog.SetBounds($rightX, $y2, $rightW, $botH); $txtLog.SetBounds(10, 22, $rightW - 20, $botH - 66)
     $btnRestore.Top = $botH - 38; $btnOpenBk.Top = $botH - 38
     # backpack size box (top-right) and the info line beside it
-    $btnBp.SetBounds($W - $m - 86, 66 + $off, 86, 24); $numBp.SetBounds($btnBp.Left - 6 - 70, 66 + $off, 70, 24); $lblBp.SetBounds($numBp.Left - 4 - 104, 69 + $off, 104, 20)
+    $btnBp.SetBounds($W - $m - 104, 66 + $off, 104, 24); $numBp.SetBounds($btnBp.Left - 6 - 70, 66 + $off, 70, 24); $lblBp.SetBounds($numBp.Left - 4 - 104, 69 + $off, 104, 20)
     $lblInfo.Width = $lblBp.Left - 8 - $m
     $lblBpHint.SetBounds($W - $m - 420, 90 + $off, 420, 18); $lblNote.Width = $W - 2 * $m - 430
   }
@@ -640,12 +642,30 @@ WHERE THINGS ARE
     $script:FreeInfo = $null; $script:BpName = $eq.Name; $n = (Get-BackpackMaxSlot $eq) + 1
     $numBp.Enabled = $true; $btnBp.Enabled = $true
     $numBp.Value = [math]::Min([math]::Max([decimal]$n, $numBp.Minimum), $numBp.Maximum)
-    $lblBpHint.Text = "Worn: $($eq.Name) - using $n slots ($(Get-BackpackSource $eq))"
+    $tw = (Get-BackpackTweaks)[$eq.Name]
+    if ($tw -and -not (BT-ModActive)) { $lblBpHint.Text = "Worn: $($eq.Name) - your size $tw is saved but the in-game mod is not on: using $n" }
+    else { $lblBpHint.Text = "Worn: $($eq.Name) - using $n slots ($(Get-BackpackSource $eq))" }
   }
-  function Remember-BackpackSlots {
+  # Apply the size in the game (BackpackSlots in-game mod): installs the mod the first time and writes tweaks.lua. The game applies it from start-up, before the save loads.
+  function Apply-BackpackSize {
     if (-not $script:BpName) { return }
-    try { Set-BackpackSlots $script:BpName ([int]$numBp.Value); Log ("Backpack size remembered: {0} = {1} slots" -f $script:BpName, [int]$numBp.Value); Update-BackpackBox }
-    catch { [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Backpack size', 'OK', 'Warning') }
+    try {
+      $sv = Read-Save $script:SavePath; $eq = Parse-Equipment $sv.Equip; $used = -1
+      if ($eq) { foreach ($x in $eq.Contents) { if ($x.Slot -gt $used) { $used = $x.Slot } } }
+      $n = [int]$numBp.Value; $gs = Get-BackpackGameSlots $script:BpName
+      if ($n -gt 60 -and -not $script:TestMode) {
+        $ok = [System.Windows.Forms.MessageBox]::Show("$n slots is much bigger than any backpack in the game (the largest is 50). Sizes above 60 are untested: the screen scrolls, but please try a smaller number first if you are unsure.`n`nUse $n slots?", 'Backpack size', 'YesNo', 'Question', 'Button2')
+        if ($ok -ne 'Yes') { return } }
+      if ($n -ne $gs -and -not (BT-ModStatus).Active) {
+        if (-not $script:TestMode) {
+          $ok = [System.Windows.Forms.MessageBox]::Show("Changing the size of a backpack needs a small in-game mod (BackpackSlots, for UE4SS). It only changes numbers inside the running game and never touches your save.`n`nInstall it now?", 'Backpack size', 'YesNo', 'Question')
+          if ($ok -ne 'Yes') { return } }
+        BT-InstallMod; Log 'Installed the BackpackSlots in-game mod (UE4SS Mods folder).' }
+      $r = Set-BackpackTweak $script:BpName $n $used $gs
+      if ($r.Removed) { Log ("Backpack size: {0} goes back to the game's own {1} slots." -f $script:BpName, $gs) }
+      else { Log ("Backpack size saved: {0} = {1} slots (the game's own is {2}). It is applied every time the game starts, before your save loads. If the game is running now, take the backpack off and put it back on (drag it to the hotbar and back)." -f $script:BpName, $n, $gs) }
+      Update-BackpackBox
+    } catch { [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Backpack size', 'OK', 'Warning') }
   }
   $script:LastSaveStamp = $null
   function Check-SaveChanged {
@@ -786,7 +806,7 @@ WHERE THINGS ARE
   $btnPreview.Add_Click({ Show-Preview })
   $btnHelp.Add_Click({ Show-Help })
   $btnOv.Add_Click({ try { Show-Overview $form $script:SavePath } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Show-Pictures $form $script:SavePath; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
-  $btnBp.Add_Click({ Remember-BackpackSlots })
+  $btnBp.Add_Click({ Apply-BackpackSize })
   $btnReload.Add_Click({ Reload-Inventory })
   $btnBrowse.Add_Click({ $pick = Show-WorldPicker $form $txtSave.Text; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
   $btnRestore.Add_Click({ Do-Restore })
@@ -940,6 +960,20 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
           if ($lpN -eq 0 -or $lpRef -ne $lpN) { $errs.Add("shipped loot pool refill failed: $lpRef of $lpN") }
         } } } catch { $errs.Add("shipped loot pool test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $script:BackupDirOverride = $null; Remove-Item -LiteralPath $lpTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # backpack size: install the mod into a temporary Mods folder, set / refuse / reset a size, and check what the tool counts as capacity
+    $bsTmp = Join-Path $env:TEMP ('bs-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bsTmp | Out-Null
+    [IO.File]::WriteAllText("$bsTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nRecipeTweaks : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bsTmp; $script:BtTweakPathOverride = "$bsTmp\backpack-tweaks.json"; $script:BtStatusCache = $null
+    try {
+      $fake = @{ Name = 'ScavengerBackpack'; Contents = @() }; $game = (Get-BackpackMaxSlot $fake) + 1
+      $s0 = BT-ModStatus; BT-InstallMod; $s1 = BT-ModStatus
+      $mtx = Get-Content "$bsTmp\mods.txt" -Raw
+      $r1 = Set-BackpackTweak 'ScavengerBackpack' 50 -1 $game; $lua1 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap1 = (Get-BackpackMaxSlot $fake) + 1
+      $refused = $false; try { [void](Set-BackpackTweak 'ScavengerBackpack' 20 24 $game) } catch { $refused = $true }
+      $r2 = Set-BackpackTweak 'ScavengerBackpack' $game -1 $game; $lua2 = Get-Content "$bsTmp\BackpackSlots\tweaks.lua" -Raw; $cap2 = (Get-BackpackMaxSlot $fake) + 1
+      $out += "backpack size: game $game; mod before install = $($s0.Installed), after = installed $($s1.Installed) on $($s1.Enabled) current $($s1.UpToDate); mods.txt line before keybinds = $($mtx -match '(?s)BackpackSlots : 1.*Built-in keybinds'); set 50 -> tweaks.lua has it = $($lua1 -match 'DA_ScavengerBackpack = 50'), tool counts $cap1 slots; shrink below used slot refused = $refused; reset -> removed = $($r2.Removed), lua cleared = $($lua2 -notmatch 'DA_ScavengerBackpack'), tool counts $cap2 slots"
+      if ($game -lt 5 -or -not $s1.Active -or -not $s1.UpToDate -or $lua1 -notmatch 'DA_ScavengerBackpack = 50' -or $cap1 -ne 50 -or -not $refused -or -not $r2.Removed -or $lua2 -match 'DA_ScavengerBackpack' -or $cap2 -ne $game -or $mtx -notmatch '(?s)BackpackSlots : 1.*Built-in keybinds') { $errs.Add('backpack size test failed') }
+    } catch { $errs.Add("backpack size test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:RtModsDirOverride = $null; $script:BtTweakPathOverride = $null; $script:BtStatusCache = $null; Remove-Item -LiteralPath $bsTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Build move installer against a temporary mods folder
     $bmTmp = Join-Path $env:TEMP ('bm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bmTmp | Out-Null
     [IO.File]::WriteAllText("$bmTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bmTmp
