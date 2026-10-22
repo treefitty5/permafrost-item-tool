@@ -2,7 +2,7 @@
 
 <img src="assets/app-icon.png" width="96" align="right" alt="icon">
 
-A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
+A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
 
 ![Overview window: everything the tool can read from your save](docs/screenshot-overview.png)
 
@@ -57,7 +57,7 @@ Optional but recommended: a bar near the top offers **Build pictures now**. It b
 * **Keep Steam Cloud off for Permafrost while you edit** (see [section 14](#14-backups-restoring-and-steam-cloud)). Otherwise Steam can put the old save back.
 * **Every change is backed up automatically** (`Backups` folder inside the tool folder) and **checked before it replaces your save**. If a check fails, the tool puts the original back and tells you.
 * **Nothing is written until you press an Apply / Save button.** Previews, the Overview, the Game data browser and the catalog never change your save.
-* **Recipe tweaks and Build move work inside the running game** and never touch your save file.
+* **Recipe tweaks, Build move and the backpack size work inside the running game** and never touch your save file.
 * The tool only edits what each feature names (inventory entries, player values, learned recipes, position, world records). It refuses to write if its own checks fail rather than guessing.
 * **Keep a copy of your save yourself** before big changes: the `.pfs` files live in `...\steamapps\common\Permafrost\Permafrost\SaveGame`.
 
@@ -132,6 +132,9 @@ Close the game → search the catalog (by name or id) → click the item → set
 **...make a crafting recipe cheaper, faster, or give more?**
 **Recipe tweaks...** ([section 10](#10-reference-recipe-tweaks-in-game-mod)). Needs UE4SS. Works while the game runs.
 
+**...make my backpack bigger?**
+Type a bigger number (a multiple of 5) in **Backpack slots** (top right) and press **Apply in game**, then start the game: your backpack already has the new size when you load in. It needs the small BackpackSlots in-game mod (the tool offers to install it) and never touches your save. Read the [safety notes](#backpack-size-in-game-mod) first: the game deletes items that have no slot, so keep the mod on once you use the extra rows.
+
 **...move a building I placed?**
 **Build move...** ([section 12](#12-reference-build-move-in-game-mod)). Needs UE4SS. In the game: look at it, press **Q**, choose **Move**.
 
@@ -193,7 +196,7 @@ Click **Build pictures now** (or **Pictures...** in the banner) once ([section 1
 | Raised stack size | Bigger than anything seen in real saves; the game may cap or mishandle it. |
 | Condition too high | Above the usual value; may exceed the item's real maximum. |
 | Quest item | Adding it does **not** complete or advance any quest step. |
-| Not enough room | Free some backpack/hotbar space in the game first. |
+| Not enough room | Free some backpack/hotbar space in the game first, add less, or make the backpack bigger with the **Backpack slots** box ([Backpack size](#backpack-size-in-game-mod)). |
 | Game is running | Save and close the game, then try again. |
 
 If a step fails, the message says whether your save was left untouched or the original was put back. An unknown item name is silently ignored by the game (the item just does not appear).
