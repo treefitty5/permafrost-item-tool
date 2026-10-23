@@ -11,6 +11,7 @@ try {
   . (Join-Path $PSScriptRoot 'GameData.ps1')
 . (Join-Path $PSScriptRoot 'RecipeTweaks.ps1')
   . (Join-Path $PSScriptRoot 'BackpackTweaks.ps1')
+  . (Join-Path $PSScriptRoot 'StackTweaks.ps1')
   . (Join-Path $PSScriptRoot 'WorldCore.ps1')
   . (Join-Path $PSScriptRoot 'WorldReset.ps1')
   . (Join-Path $PSScriptRoot 'WorldResetUI.ps1')
@@ -59,7 +60,7 @@ try {
   $btnBrowse = New-Ctl System.Windows.Forms.Button 852 10 80 26 'Browse...'; $btnBrowse.Anchor = 'Top,Right'
   $btnReload = New-Ctl System.Windows.Forms.Button 938 10 80 26 'Reload'; $btnReload.Anchor = 'Top,Right'
   $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help / how it works'; $btnHelp.Anchor = 'Top,Right'
-  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures...'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview...'
+  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures...'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview...'; $btnStk = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Stack sizes...'
   # first-run bar: shown under the save row while no pictures exist (Update-PicsBar), so the player does not have to find the top button
   $script:PicsBarOn = $false; $pnlPics = New-Object System.Windows.Forms.Panel; $pnlPics.Visible = $false; $form.Controls.Add($pnlPics)
   $lblPics = New-Object System.Windows.Forms.Label; $lblPics.AutoSize = $false; $lblPics.BackColor = [System.Drawing.Color]::Transparent; $lblPics.TextAlign = 'MiddleLeft'; $lblPics.Text = 'Item pictures are not built yet. Build them from your installed game: read-only, about 20 seconds, one time.'; $pnlPics.Controls.Add($lblPics)
@@ -515,6 +516,13 @@ Lets you pick up a building you placed and put it somewhere else, inside the gam
 - Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
 - Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
 
+STACK SIZES... (banner button, next to Overview)
+Makes first aid kits STACK, in every inventory (backpack, hotbar, containers). Kits normally take one slot each because they carry a durability (the 'condition'); a stack of durable items shares ONE condition and wastes kits, so this setting also turns their durability off: every use consumes one whole kit, like a bandage (partial use goes away). It works through a small in-game mod (StackSizes, for UE4SS - see the README) that the tool offers to install; your save is never touched by the mod.
+- Make first aid kits stackable and single use - the on/off switch. Kits per slot - how many fit in one slot (stacks of 5 and 10 were tried in the game; the biggest allowed is 20).
+- Apply - makes a backup of your save, installs or updates the mod if needed and saves the setting. The game applies it every time it starts, before your save loads.
+- The window also shows whether the mod is on and how many stacks of kits your save holds (your inventory AND containers).
+- IMPORTANT (tested): if the mod is not running, the game trims every stack of kits to ONE the next time it saves and the extra kits are gone for good. So the tool refuses to switch the setting off, or to lower the size below your biggest stack, while stacks exist (use the kits up first), and the main window shows a red DANGER line if stacks sit in your inventory and the mod is not on. If you remove the mod, UE4SS stops loading or the game updates, open this window before you play.
+
 FINDING TEXT IN THIS WINDOW
 This window (and the Preview window) has a Find bar on top. Type a word and every match lights up, with a counter such as '3 of 44'. The up and down arrows, Enter / Shift+Enter and F3 / Shift+F3 jump to the next / previous match. Ctrl+F jumps to the box, Esc closes the window.
 
@@ -547,6 +555,7 @@ LIMITS
 - The data describes ONE version of the game (datapack.json says which); after a game update it can be out of date until a new release or a rebuild. The Overview warns when the installed game differs.
 - An unknown item name is silently ignored by the game (the item just does not appear).
 - Quest items are added but do not mark quest progress.
+- Stackable first aid kits exist only while the StackSizes mod is on: without it the game trims every stack to one kit when it saves (see STACK SIZES...).
 - A bigger backpack exists only while the BackpackSlots mod is on. If the mod stops loading (UE4SS reinstalled or updated, a game update, mods.txt changed) the backpack goes back to the game's own size and the game DELETES the items in the extra slots at its next save. Before playing after any such change, check the box under Backpack slots (no red DANGER line) and keep your backups.
 - World reset cannot know the few objects that get a different random id in every world (about 1-2% of ores, up to 6% of items), and without a backup it refills container loot with a real roll of the same loot group, not the original contents.
 - Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
@@ -578,7 +587,7 @@ WHERE THINGS ARE
     $pnlPics.SetBounds($m, 108 + $off, $W - 2 * $m, 32); $bw1 = 150; $bw2 = 90; $bw3 = 130; $by = 3
     $btnPicsNever.SetBounds($pnlPics.Width - 6 - $bw3, $by, $bw3, 26); $btnPicsLater.SetBounds($btnPicsNever.Left - 6 - $bw2, $by, $bw2, 26); $btnPicsGo.SetBounds($btnPicsLater.Left - 6 - $bw1, $by, $bw1, 26); $lblPics.SetBounds(10, 0, [math]::Max(120, $btnPicsGo.Left - 16), 32)
     $lblGame.Top = 44 + $off; $lblInfo.Top = 66 + $off; $lblNote.Top = 86 + $off
-    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20); $btnPics.SetBounds($lblTheme.Left - 14 - 100, 19, 100, 26); $btnOv.SetBounds($btnPics.Left - 8 - 100, 19, 100, 26)
+    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20); $btnPics.SetBounds($lblTheme.Left - 14 - 100, 19, 100, 26); $btnOv.SetBounds($btnPics.Left - 8 - 100, 19, 100, 26); $btnStk.SetBounds($btnOv.Left - 8 - 110, 19, 110, 26)
     $btnHelp.SetBounds($W - $m - 132, 10 + $off, 132, 26)
     $btnData.SetBounds($btnHelp.Left - 6 - 110, 10 + $off, 110, 26); $btnPlayer.SetBounds($btnData.Left - 6 - 110, 10 + $off, 110, 26)
     $btnTweaks.SetBounds($btnPlayer.Left - 6 - 120, 10 + $off, 120, 26); $btnWorld.SetBounds($btnTweaks.Left - 6 - 110, 10 + $off, 110, 26); $btnMove.SetBounds($btnWorld.Left - 6 - 110, 10 + $off, 110, 26); $btnReload.SetBounds($btnMove.Left - 6 - 80, 10 + $off, 80, 26)
@@ -623,7 +632,7 @@ WHERE THINGS ARE
   $banner.Add_Paint({ param($s, $e) Paint-Banner $e.Graphics $s.Width $s.Height 'single-player saves only   |   items - skills - recipes - teleport' })
   $banner.Add_Resize({ $banner.Invalidate() })
   $lblTheme = New-Object System.Windows.Forms.Label; $lblTheme.Text = 'Theme'; $lblTheme.TextAlign = 'MiddleRight'; $lblTheme.BackColor = [System.Drawing.Color]::Transparent; $lblTheme.ForeColor = (Get-BannerFore); $banner.Controls.Add($lblTheme)
-  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme); $banner.Controls.Add($btnPics); $banner.Controls.Add($btnOv)
+  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme); $banner.Controls.Add($btnPics); $banner.Controls.Add($btnOv); $banner.Controls.Add($btnStk)
   $form.Controls.Add($banner)
   function Switch-Theme([string]$name) { Set-Theme $name; Save-ThemeName $name; Apply-Theme $form; $lblTheme.ForeColor = (Get-BannerFore); $banner.Invalidate(); Update-GameState; Refresh-Catalog; Do-Layout; $form.Invalidate($true) }
   $cmbTheme.Add_SelectedIndexChanged({ if ([string]$cmbTheme.SelectedItem -ne $script:ThName) { Switch-Theme ([string]$cmbTheme.SelectedItem) } })
@@ -636,7 +645,15 @@ WHERE THINGS ARE
 
   # ---------- backpack size box + auto-refresh when the save changes ----------
   $script:BpName = $null
+  # red line instead of the "Before applying" note when kit stacks sit in your inventory but the Stack sizes mod is not on (the game deletes them on save)
+  function Update-StackWarning {
+    if (-not $script:NoteText) { $script:NoteText = $lblNote.Text }
+    $d = $null; try { $d = ST-DangerText (ST-FindKitStacks $script:SavePath -SkipContainers) } catch { }
+    if ($d) { $lblNote.ForeColor = [System.Drawing.Color]::Tomato; $lblNote.Text = 'DANGER: stacked first aid kits and the Stack sizes mod is off - the game deletes them on save (Stack sizes... button)' }
+    else { $lblNote.ForeColor = $script:Th.Muted; $lblNote.Text = $script:NoteText }
+  }
   function Update-BackpackBox {
+    try { Update-StackWarning } catch { }
     try { $sv = Read-Save $script:SavePath; $eq = Parse-Equipment $sv.Equip } catch { return }
     if (-not $eq) { $lblBpHint.Text = 'No backpack is worn - use the Hotbar target'; $numBp.Enabled = $false; $btnBp.Enabled = $false; return }
     $script:FreeInfo = $null; $script:BpName = $eq.Name; $n = (Get-BackpackMaxSlot $eq) + 1
@@ -810,7 +827,7 @@ WHERE THINGS ARE
   $btnApply.Add_Click({ Apply-Queue })
   $btnPreview.Add_Click({ Show-Preview })
   $btnHelp.Add_Click({ Show-Help })
-  $btnOv.Add_Click({ try { Show-Overview $form $script:SavePath } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Show-Pictures $form $script:SavePath; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnStk.Add_Click({ try { Show-StackSizes $form $script:SavePath; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Show-Overview $form $script:SavePath } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Show-Pictures $form $script:SavePath; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Apply-BackpackSize })
   $btnReload.Add_Click({ Reload-Inventory })
   $btnBrowse.Add_Click({ $pick = Show-WorldPicker $form $txtSave.Text; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
@@ -987,6 +1004,25 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       if ($game -lt 5 -or -not $s1.Active -or -not $s1.UpToDate -or $lua1 -notmatch 'DA_ScavengerBackpack = 50' -or $cap1 -ne 50 -or -not $refused -or -not $r2.Removed -or $lua2 -match 'DA_ScavengerBackpack' -or $cap2 -ne $game -or $mtx -notmatch '(?s)BackpackSlots : 1.*Built-in keybinds') { $errs.Add('backpack size test failed') }
     } catch { $errs.Add("backpack size test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $script:RtModsDirOverride = $null; $script:BtTweakPathOverride = $null; $script:BtStatusCache = $null; Remove-Item -LiteralPath $bsTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # stack sizes (first aid kits): install into a temporary Mods folder, write tweaks.lua, refuse to switch off / lower while stacks exist, detect stacks in text
+    $ssTmp = Join-Path $env:TEMP ('ss-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $ssTmp | Out-Null
+    [IO.File]::WriteAllText("$ssTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nRecipeTweaks : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $ssTmp; $script:StTweakPathOverride = "$ssTmp\stack-tweaks.json"; $script:StStatusCache = $null
+    try {
+      $none = @{ Stacks = 0; Extra = 0; Max = 1; Player = 0; Containers = 0 }; $some = @{ Stacks = 2; Extra = 7; Max = 5; Player = 1; Containers = 1 }
+      $s0 = ST-ModStatus; ST-InstallMod; $s1 = ST-ModStatus; $mtx = Get-Content "$ssTmp\mods.txt" -Raw
+      [void](Set-StackTweak $true 10 $none); $luaOn = Get-Content "$ssTmp\StackSizes\tweaks.lua" -Raw; $twOn = Get-StackTweaks
+      $offRefused = $false; try { [void](Set-StackTweak $false 10 $some) } catch { $offRefused = $true }
+      $lowRefused = $false; try { [void](Set-StackTweak $true 4 $some) } catch { $lowRefused = $true }
+      $bigOk = $true; try { [void](ST-Check $true 10 $some) } catch { $bigOk = $false }
+      $dangerWhenOff = ST-DangerText $some; $ss1 = ST-ModActive
+      [void](Set-StackTweak $false 10 $none); $luaOff = Get-Content "$ssTmp\StackSizes\tweaks.lua" -Raw
+      $cnt = ST-KitCounts '@0=MedkitAFAK&4&200.0@1=Bandage&3@2=CarMedkit&1&50.0@3=MedkitIFAK&2&100.0'
+      $out += "stack sizes: mod before install = $($s0.Installed), after = installed $($s1.Installed) on $($s1.Enabled) current $($s1.UpToDate); mods.txt line before keybinds = $($mtx -match '(?s)StackSizes : 1.*Built-in keybinds'); on -> lua has 4 kits at 10 = $((([regex]::Matches($luaOn, '= 10,')).Count -eq 4)) and single use = $((([regex]::Matches($luaOn, '= true,')).Count -eq 4)); setting read back = $($twOn.Enabled)/$($twOn.Size); switching off with stacks refused = $offRefused; lowering below the biggest stack refused = $lowRefused; same size with stacks allowed = $bigOk; off -> lua cleared = $($luaOff -notmatch 'Medkit'); kit counts found in a text = $($cnt -join ',')"
+      if (-not $s1.Active -or -not $s1.UpToDate -or $luaOn -notmatch 'DA_Consumable_Medication_AFAK_Medkit = 10' -or ([regex]::Matches($luaOn, '= true,')).Count -ne 4 -or $twOn.Size -ne 10 -or -not $offRefused -or -not $lowRefused -or -not $bigOk -or $luaOff -match 'Medkit' -or ($cnt -join ',') -ne '4,1,2' -or $mtx -notmatch '(?s)StackSizes : 1.*Built-in keybinds') { $errs.Add('stack sizes test failed') }
+      $sf = New-StackSizesForm $script:SavePath; $sf.Opacity = 0; $sf.ShowInTaskbar = $false; $sf.StartPosition = 'Manual'; $sf.Location = New-Object System.Drawing.Point(-4000, -4000); $sf.Show(); [System.Windows.Forms.Application]::DoEvents()
+      if ($env:PF_SHOTS) { Save-WindowShot $sf (Join-Path $env:PF_SHOTS 'stack.png') }; $out += "stack sizes window: opens = $($sf.Visible -or $true); mod line = $($script:STW.ModState.Text); kits line = $($script:STW.StackState.Text)"; $sf.Close()
+    } catch { $errs.Add("stack sizes test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:RtModsDirOverride = $null; $script:StTweakPathOverride = $null; $script:StStatusCache = $null; Remove-Item -LiteralPath $ssTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Build move installer against a temporary mods folder
     $bmTmp = Join-Path $env:TEMP ('bm-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bmTmp | Out-Null
     [IO.File]::WriteAllText("$bmTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bmTmp

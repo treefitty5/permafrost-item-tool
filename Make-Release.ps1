@@ -13,7 +13,7 @@ $extra = Join-Path $PSScriptRoot 'release-scan.txt'; if (Test-Path -LiteralPath 
 $Scan = ($words | ForEach-Object { [regex]::Escape($_) }) -join '|'
 $files = @(& $git -C $PSScriptRoot ls-files -c -o --exclude-standard)
 if (-not $files.Count) { throw 'git lists no files - is this folder a repository?' }
-$bad = $files | Where-Object { $_ -match '^(icons|Backups|Archive|Releases)/|^(config|theme|spoiler|backpacks|backpack-tweaks|recipe-tweaks|pictures)\.json$|^(ForumPost|release-scan)\.txt$|\.(pfs|pak|utoc|ucas|uasset|ubulk|uexp|umap|usmap|dll|exe)$|^assets/(?!app\.ico$|app-icon\.png$)|^catalog/(text|lore)\.csv$' }
+$bad = $files | Where-Object { $_ -match '^(icons|Backups|Archive|Releases)/|^(config|theme|spoiler|backpacks|backpack-tweaks|stack-tweaks|recipe-tweaks|pictures)\.json$|^(ForumPost|release-scan)\.txt$|\.(pfs|pak|utoc|ucas|uasset|ubulk|uexp|umap|usmap|dll|exe)$|^assets/(?!app\.ico$|app-icon\.png$)|^catalog/(text|lore)\.csv$' }
 if ($bad) { throw "private files would be shipped: $($bad -join ', ')" }
 $stage = Join-Path ([IO.Path]::GetTempPath()) ('pf-release-' + [Guid]::NewGuid().ToString('N')); $root = Join-Path $stage 'PermafrostItemTool'; New-Item -ItemType Directory -Path $root | Out-Null
 $hits = @()

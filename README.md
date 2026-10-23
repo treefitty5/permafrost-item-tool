@@ -2,7 +2,7 @@
 
 <img src="assets/app-icon.png" width="96" align="right" alt="icon">
 
-A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
+A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, stack your first aid kits, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
 
 ![Overview window: everything the tool can read from your save](docs/screenshot-overview.png)
 
@@ -57,7 +57,7 @@ Optional but recommended: a bar near the top offers **Build pictures now**. It b
 * **Keep Steam Cloud off for Permafrost while you edit** (see [section 14](#14-backups-restoring-and-steam-cloud)). Otherwise Steam can put the old save back.
 * **Every change is backed up automatically** (`Backups` folder inside the tool folder) and **checked before it replaces your save**. If a check fails, the tool puts the original back and tells you.
 * **Nothing is written until you press an Apply / Save button.** Previews, the Overview, the Game data browser and the catalog never change your save.
-* **Recipe tweaks, Build move and the backpack size work inside the running game** and never touch your save file.
+* **Recipe tweaks, Build move, the backpack size and the kit stacking work inside the running game** and never touch your save file.
 * The tool only edits what each feature names (inventory entries, player values, learned recipes, position, world records). It refuses to write if its own checks fail rather than guessing.
 * **Keep a copy of your save yourself** before big changes: the `.pfs` files live in `...\steamapps\common\Permafrost\Permafrost\SaveGame`.
 
@@ -134,6 +134,9 @@ Close the game → search the catalog (by name or id) → click the item → set
 
 **...make my backpack bigger?**
 Type a bigger number (a multiple of 5) in **Backpack slots** (top right) and press **Apply in game**, then start the game: your backpack already has the new size when you load in. It needs the small BackpackSlots in-game mod (the tool offers to install it) and never touches your save. Read the [safety notes](#backpack-size-in-game-mod) first: the game deletes items that have no slot, so keep the mod on once you use the extra rows.
+
+**...stack my first aid kits?**
+Click **Stack sizes...** in the top banner, tick the box, pick how many kits per slot (10 by default) and press **Apply**. Kits then stack everywhere (backpack, hotbar, containers) and every use consumes one whole kit. It needs the small StackSizes in-game mod (the tool offers to install it). Read the [safety notes](#stack-sizes-in-game-mod) first: with the mod off, the game deletes the extra kits of every stack when it saves.
 
 **...move a building I placed?**
 **Build move...** ([section 12](#12-reference-build-move-in-game-mod)). Needs UE4SS. In the game: look at it, press **Q**, choose **Move**.
@@ -321,6 +324,20 @@ The size of a backpack is not stored in your save: the game builds it from its i
 What the tool checks: it refuses a size that would leave an item outside the backpack (for example 20 slots while something sits in slot 24; nothing is changed and a message says which slot is in the way), shows a **red warning under the box** whenever an item already sits above the size the tool counts (for example because the mod was switched off or removed), asks before sizes above 80 (untested), and counts your size in **Add items** only while the mod is installed and switched on. > **Important: the game deletes items that have no slot.** In a test, a 30-slot backpack with items in slots 16 to 27 was loaded with the mod switched off (so the game used the normal 15 slots) and saved once: everything above slot 15 was gone from the save, permanently. Nothing is lost while the mod runs; the danger is the mod **not** running while items sit in the extra slots. That can happen if you switch it off, remove it, reinstall or update UE4SS (check `Mods\mods.txt`), or after a game update. So: (1) the tool makes a backup of your save every time you press **Apply in game**; (2) it shows a red **DANGER** line under the box if an item sits above the size the game will use; (3) if you see it, do not play: switch the mod on again (press **Apply in game**) or restore the backup; (4) before removing the mod or lowering the size, move your items into the lower slots in the game.
 
 Each backpack keeps its own setting, so a different backpack you wear later uses its own (or the game's) size. Tested in the game: raising a Casual backpack from 15 to 25 slots, then back.
+### Stack sizes (in-game mod)
+
+Permafrost's first aid kits (`CarMedkit`, `MedkitIFAK`, `MedkitMFAK`, `MedkitAFAK`) take a whole slot each, because they carry a durability (the "condition"). The **Stack sizes...** window (banner button, next to Overview) makes them stack.
+
+What it does and why: the stack limit belongs to the *item*, so one setting makes the kits stack in every inventory (backpack, hotbar, containers). But a stack of items that have a durability shares **one** condition, and in a test the game removed only one kit when that condition reached 0 and left the others at 0% (unusable). So the setting also turns the kits' durability **off**: every use consumes exactly one kit, like a bandage. The trade-off: partial use goes away, and a small wound costs a whole kit.
+
+1. Tick **Make first aid kits stackable and single use**, choose **Kits per slot** (10 by default; 5 and 10 were tried in the game; the largest allowed is 20) and press **Apply**.
+2. The first time, the tool offers to install a small UE4SS mod (**StackSizes**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)) into the game's `Mods` folder. It only changes numbers inside the running game and never touches your save.
+3. **Start the game.** The mod applies the setting from the moment the game starts, before your save loads.
+
+> **Important: with the mod off, the game deletes the extra kits.** Tested: a slot holding 4 kits came back as 1 kit after one save with the mod switched off, permanently. While the mod runs nothing is lost. So the tool (1) makes a backup of your save every time you press **Apply**, (2) shows how many stacks of kits your save holds (inventory **and** containers), (3) **refuses** to switch the setting off, or to lower the size below your biggest stack, while stacks exist (use those kits up first), and (4) shows a red **DANGER** line in the main window if stacks sit in your inventory and the mod is not on. If you see it, do not play: press **Apply** again to switch the mod on, or restore the backup. After a game or UE4SS update, check the window before you play.
+
+Tested in the game: stacks of 5 and 10 in the hotbar, in the backpack and in a container; each use takes one kit; kits that had run down to 0% became usable again. The **Add items** window still adds kits one per slot; merge them in the game.
+
 ## 13. Reference: Pictures
 
 ![Pictures window](docs/screenshot-pictures.png)
@@ -357,6 +374,7 @@ The bar has **Not now** (hide it until the next start) and **Don't ask again** (
 | `theme.json` | Your colour theme. |
 | `spoiler.json` | Whether story text is hidden. |
 | `backpack-tweaks.json` | Backpack sizes you set with **Apply in game** (also written to the mod's `tweaks.lua`). |
+| `stack-tweaks.json` | The Stack sizes setting (kits stackable on/off and the size; also written to the mod's `tweaks.lua`). |
 | `backpacks.json` | Only an older version used it (slot numbers typed with "Remember"); safe to delete. |
 | `recipe-tweaks.json` | What the Recipe tweaks window last saved. |
 | `pictures.json` | Exists only if you pressed *Don't ask again*. |
@@ -379,7 +397,7 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 ## 16. Installing UE4SS (only for the in-game mods)
 
-**Recipe tweaks**, **Build move** and the **Backpack slots** box work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
+**Recipe tweaks**, **Build move**, the **Backpack slots** box and **Stack sizes** work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
@@ -395,7 +413,7 @@ Permafrost is in active development. The shipped data (`items.json`, `catalog\`;
 2. **Copy your save file** (the `.pfs` in `SaveGame`) somewhere safe. The tool also makes its own backup, but this is cheap insurance.
 3. **Check for a new release** of this tool: the data pack is rebuilt after game updates. Download the new ZIP, copy your `Backups` folder and settings files into it (or unzip over the old folder), and run **Pictures...** again if you use the pictures.
 4. If there is no new release yet, you can rebuild the data from your own game files ([section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)). Until then, do not trust items the old data does not know, and test any big queue on a copy of your save first.
-5. **Recipe tweaks / Build move / Backpack size:** restart the game once. The mods change things in memory only, so after an update the worst case is that they log an error and do nothing; your save is never touched by them.
+5. **Recipe tweaks / Build move / Backpack size / Stack sizes:** restart the game once. The mods change things in memory only, so after an update the worst case is that they log an error and do nothing; your save is never touched by them.
 
 **Also worth knowing**
 
@@ -522,7 +540,7 @@ PowerShell traps seen in this code base (worth knowing before you edit): a funct
 * `Paths.ps1` - finds your game folder and save (and FModel's export for the advanced rebuild); reads `config.json`.
 * `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README).
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all and then `Build-Finalize.ps1`; `Rebuild-All.ps1` runs the JSON-based ones. `Make-Release.ps1` builds the release ZIP.
-* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
+* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `StackSizesMod\main.lua` - the in-game kit stacking mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `docs\` - screenshots and the announcement text.
 
 To check what the tool will do to your save, read `SaveCore.ps1`: it only touches the inventory entries, and it refuses to write if its checks fail.
