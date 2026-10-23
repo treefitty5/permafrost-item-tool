@@ -46,7 +46,7 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
 3. Double-click **`Run Permafrost Item Tool.cmd`**.
    - It needs **PowerShell 7**, a free Microsoft download. If it is missing, the launcher offers to install it for you (press **Y**).
    - If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**. The tool is plain text scripts, not a signed program; you can open any `.ps1` or `.cmd` file in Notepad and read exactly what it does.
-4. The tool **finds your saves** and opens the most recently played world. Click **Browse...** to choose another world, and **Overview...** (top of the window) to see everything it can read from the save.
+4. The tool **finds your saves** and opens the most recently played world. Click **Browse...** to choose another world, and **Overview** (top of the window) to see everything it can read from the save.
 
 Optional but recommended: a bar under the status lines offers **Build pictures now**. It builds the item pictures from your own installed game (about 20 seconds, once). See [Pictures](#13-reference-pictures).
 
@@ -86,7 +86,7 @@ Nothing else for the main window. **UE4SS** is only needed for the in-game mods 
    * Antivirus programs sometimes dislike unsigned scripts. The source is all here to read; nothing is downloaded behind your back (the one optional download, the Oodle decompressor, asks first).
 4. **The window opens** (no black console window) and picks your most recently saved world. The status lines under the row of buttons show the world, play time and when it was last saved.
 5. **Check the world.** If it is not the one you want, click **Browse...**: it lists every Permafrost save found on this PC with hours played and last-saved time. Your choice is remembered.
-6. **Click Overview...** for a read-only report of the save. If the numbers match your game, everything is working.
+6. **Click Overview** for a read-only report of the save. If the numbers match your game, everything is working.
 7. **Build the pictures** (optional): press **Build pictures now** in the bar under the status lines ([section 13](#13-reference-pictures)).
 
 To start the tool later, double-click the same `.cmd` file (make a desktop shortcut to it if you like).
@@ -97,9 +97,9 @@ The window opens maximized and follows your window size; the item catalog gets a
 
 | Area | What it is |
 |---|---|
-| **Banner** (top) | The **Overview...** button (the read-only report) and the **Theme** box (three colour themes, remembered). |
+| **Banner** (top) | The **Overview** button (the read-only report) and the **Theme** box (three colour themes, remembered). |
 | **Save file row** | The `.pfs` save being edited. **Browse...** lists all worlds, **Reload** re-reads the save. At the right end: the **Backpack slots** box with **Apply in game**, and under it a line saying which backpack you wear ("Worn: ScavengerBackpack - using 35 slots"), where that number comes from, and a red DANGER text if items are at risk. |
-| **Row of buttons** | One row, always in this order: **Player tools...**, **World reset...**, **Game data...**, **Pictures...**, **Recipe tweaks...**, **Build move...**, **Stack sizes...**, **Help / how it works**. |
+| **Row of buttons** | One row, always in this order: **Player tools**, **World reset**, **Game data**, **Pictures**, **Recipe tweaks**, **Build move**, **Stack sizes**, **Help / how it works**. |
 | **Status lines** | Green/red game status, the world, play time and last-saved time, and a red DANGER line if stacked first aid kits are at risk. |
 | **Pictures bar** | Shown only while there are no item pictures: **Build pictures now**, **Not now**, **Don't ask again**. |
 | **Item catalog** (left) | Every item in the game, searchable and sortable. |
@@ -116,40 +116,40 @@ The window refreshes by itself when the save changes (for example after you play
 Close the game → search the catalog (by name or id) → click the item → set the quantity → **Add to queue** → repeat → **Preview** → **Apply to save** → start the game. Details in [section 6](#6-reference-the-main-window-adding-items).
 
 **...see what's in my save without changing anything?**
-**Overview...** (top of the window) lists world, character, skills, inventory, recipes, quests, buildings, explored area, companion, the state of the in-game mods and your settings for them, and backups. **Copy report** puts it on the clipboard, handy when asking for help.
+**Overview** (top of the window) lists world, character, skills, inventory, recipes, quests, buildings, explored area, companion, the state of the in-game mods and your settings for them, and backups. **Copy report** puts it on the clipboard, handy when asking for help.
 
 **...change health, stamina, skills or skill points?**
-**Player tools... → Vitals and skills.** Edit the numbers, press **Apply changes to save** ([section 8](#8-reference-player-tools)).
+**Player tools → Vitals and skills.** Edit the numbers, press **Apply changes to save** ([section 8](#8-reference-player-tools)).
 
 **...learn recipes I haven't found yet?**
-**Player tools... → Recipes.** Tick the ones you want and press **Learn ticked recipes**.
+**Player tools → Recipes.** Tick the ones you want and press **Learn ticked recipes**.
 
 **...teleport somewhere?**
-**Player tools... → Teleport.** Pick your bed, the crash site or anything you built, or type X / Y / Z coordinates from the in-game map. The new position is written into the save; you appear there when you load. If you appear underground or inside rock, teleport again with a higher *Drop height* (about 500).
+**Player tools → Teleport.** Pick your bed, the crash site or anything you built, or type X / Y / Z coordinates from the in-game map. The new position is written into the save; you appear there when you load. If you appear underground or inside rock, teleport again with a higher *Drop height* (about 500).
 
 **...find out what a stuck quest is waiting for?**
-**Game data... → Quests.** Pick the quest: its states and tasks are listed, and **>>** marks where your save is. The *Items this step needs* box lists what the current step asks for, and a button queues exactly those items. For a missing key or quest item, search it under **Find anything** (for example `KeyAnnas`) and queue it from there.
+**Game data → Quests.** Pick the quest: its states and tasks are listed, and **>>** marks where your save is. The *Items this step needs* box lists what the current step asks for, and a button queues exactly those items. For a missing key or quest item, search it under **Find anything** (for example `KeyAnnas`) and queue it from there.
 
 **...harvest the trees, ores, bushes and loot I already used?**
-**World reset...** ([section 11](#11-reference-world-reset)). Try a radius of 150 m around you first. It restores from your earlier backups and your other worlds, so keep the `Backups` folder.
+**World reset** ([section 11](#11-reference-world-reset)). Try a radius of 150 m around you first. It restores from your earlier backups and your other worlds, so keep the `Backups` folder.
 
 **...make a crafting recipe cheaper, faster, or give more?**
-**Recipe tweaks...** ([section 10](#10-reference-recipe-tweaks-in-game-mod)). Needs UE4SS. Works while the game runs.
+**Recipe tweaks** ([section 10](#10-reference-recipe-tweaks-in-game-mod)). Needs UE4SS. Works while the game runs.
 
 **...make my backpack bigger?**
 Type a bigger number (a multiple of 5) in **Backpack slots** (right end of the Save file row) and press **Apply in game**, then start the game: your backpack already has the new size when you load in. It needs the small BackpackSlots in-game mod (the tool offers to install it) and never touches your save. Read the [safety notes](#12b-reference-backpack-size-in-game-mod) first: the game deletes items that have no slot, so keep the mod on once you use the extra rows.
 
 **...stack my first aid kits?**
-Click **Stack sizes...** (in the row of buttons), tick the box, pick how many kits per slot (10 by default) and press **Apply**. Kits then stack everywhere (backpack, hotbar, containers) and every use consumes one whole kit. It needs the small StackSizes in-game mod (the tool offers to install it). Read the [safety notes](#12c-reference-stack-sizes-in-game-mod) first: with the mod off, the game deletes the extra kits of every stack when it saves.
+Click **Stack sizes** (in the row of buttons), tick the box, pick how many kits per slot (10 by default) and press **Apply**. Kits then stack everywhere (backpack, hotbar, containers) and every use consumes one whole kit. It needs the small StackSizes in-game mod (the tool offers to install it). Read the [safety notes](#12c-reference-stack-sizes-in-game-mod) first: with the mod off, the game deletes the extra kits of every stack when it saves.
 
 **...move a building I placed?**
-**Build move...** ([section 12](#12-reference-build-move-in-game-mod)). Needs UE4SS. In the game: look at it, press **Q**, choose **Move**.
+**Build move** ([section 12](#12-reference-build-move-in-game-mod)). Needs UE4SS. In the game: look at it, press **Q**, choose **Move**.
 
 **...undo something?**
 **Restore a backup...** (bottom right of the main window). Pick the backup; your current save is kept too. Backups made by **Apply in game** and by **Stack sizes** carry `_BACKPACKSIZE_` / `_STACKSIZES_` in their names. See [section 14](#14-backups-restoring-and-steam-cloud).
 
 **...see item pictures when I hover?**
-Click **Build pictures now** (or **Pictures...** in the row of buttons) once ([section 13](#13-reference-pictures)).
+Click **Build pictures now** (or **Pictures** in the row of buttons) once ([section 13](#13-reference-pictures)).
 
 **...switch to another world?**
 **Browse...** and pick it. World reset also has its own World box.
@@ -210,7 +210,7 @@ If a step fails, the message says whether your save was left untouched or the or
 
 ## 7. Reference: Overview
 
-**Overview...** (top of the window) is a **read-only** report built from the save. Sections:
+**Overview** (top of the window) is a **read-only** report built from the save. Sections:
 
 * **World** - world name and file, play time, created / last saved, the installed game's Steam build, and the build the shipped data was made for (with a warning if the game was updated since).
 * **Character** - health, stamina, energy, hunger, body warmth, position, bed, unspent skill points.
@@ -230,7 +230,7 @@ If a step fails, the message says whether your save was left untouched or the or
 
 ![Player tools](docs/screenshot-player.png)
 
-**Player tools...** opens maximized. It works on the save selected in the main window. Anything that changes the save needs the game closed, asks for confirmation, makes a backup first and re-checks the result.
+**Player tools** opens maximized. It works on the save selected in the main window. Anything that changes the save needs the game closed, asks for confirmation, makes a backup first and re-checks the result.
 
 | Tab | What it does |
 |---|---|
@@ -244,7 +244,7 @@ If a step fails, the message says whether your save was left untouched or the or
 
 ![Game data](docs/screenshot-data.png)
 
-**Game data...** is a browser over every table the tool ships. Select a row for its details; most tabs can queue the items they mention.
+**Game data** is a browser over every table the tool ships. Select a row for its details; most tabs can queue the items they mention.
 
 | Tab | What it shows |
 |---|---|
@@ -267,7 +267,7 @@ Not stored in the game files: how often a container is found in the world, and a
 
 ![Recipe tweaks](docs/screenshot-tweaks.png)
 
-**Recipe tweaks...** edits crafting recipes: ingredient amounts, how many a craft makes, and crafting time. It works through a small mod for UE4SS ([section 16](#16-installing-ue4ss-only-for-the-in-game-mods)). **Your save file is never changed, so this window can be used while the game is running.**
+**Recipe tweaks** edits crafting recipes: ingredient amounts, how many a craft makes, and crafting time. It works through a small mod for UE4SS ([section 16](#16-installing-ue4ss-only-for-the-in-game-mods)). **Your save file is never changed, so this window can be used while the game is running.**
 
 1. Click **Install / update mod** once. It copies the mod into `...\ue4ss\Mods\RecipeTweaks` and adds `RecipeTweaks : 1` to `Mods\mods.txt` (a backup of `mods.txt` is made first). **Restart the game** after installing or updating: UE4SS loads mods at start-up only.
 2. Pick a recipe and edit its boxes, or use the **Change every recipe shown** boxes with **Multiply the recipes shown** (filter with Search / Station first, for example `ammo` and *Amount made x 5*). That button only changes the numbers in the window.
@@ -279,7 +279,7 @@ You can edit recipes you have not learned yet; the values are there when you lea
 
 ## 11. Reference: World reset
 
-The game never respawns trees, boulders, picked-up items or container loot. **World reset...** puts them back by editing your save. **Close the game first.** A backup is made before every change, and the result is checked before it replaces the save.
+The game never respawns trees, boulders, picked-up items or container loot. **World reset** puts them back by editing your save. **Close the game first.** A backup is made before every change, and the result is checked before it replaces the save.
 
 1. Pick the **World**. The box lists every `.pfs` in your SaveGame folder; under it you see the hours played, when it was last saved and how many backups that world has.
 2. Tick what to put back:
@@ -308,7 +308,7 @@ Two more things the game keeps in the save are handled too:
 
 ## 12. Reference: Build move (in-game mod)
 
-**Build move...** installs a small UE4SS mod that lets you pick up a building you placed and put it somewhere else, without rebuilding it. Click it once (needs UE4SS, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)): it copies the mod into `...\ue4ss\Mods\BuildMove` and adds `BuildMove : 1` to `mods.txt` (a backup is made). **Restart the game** after installing or updating. The tool does not edit your save for this: the game saves the new position itself.
+**Build move** installs a small UE4SS mod that lets you pick up a building you placed and put it somewhere else, without rebuilding it. Click it once (needs UE4SS, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)): it copies the mod into `...\ue4ss\Mods\BuildMove` and adds `BuildMove : 1` to `mods.txt` (a backup is made). **Restart the game** after installing or updating. The tool does not edit your save for this: the game saves the new position itself.
 
 * **Move from the wheel:** look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press **Q** and choose **Move** (the mod puts it in the wheel's empty padlock slot, between Deconstruction and Call dog). The part follows your crosshair.
 * **Put it down:** **left click**; choosing Move again or pressing **F7** also puts it down. F7 starts a move without opening the wheel.
@@ -334,7 +334,7 @@ Each backpack keeps its own setting, so a different backpack you wear later uses
 
 ## 12c. Reference: Stack sizes (in-game mod)
 
-Permafrost's first aid kits (`CarMedkit`, `MedkitIFAK`, `MedkitMFAK`, `MedkitAFAK`) take a whole slot each, because they carry a durability (the "condition"). The **Stack sizes...** window (one of the buttons under the Save file row) makes them stack.
+Permafrost's first aid kits (`CarMedkit`, `MedkitIFAK`, `MedkitMFAK`, `MedkitAFAK`) take a whole slot each, because they carry a durability (the "condition"). The **Stack sizes** window (one of the buttons under the Save file row) makes them stack.
 
 What it does and why: the stack limit belongs to the *item*, so one setting makes the kits stack in every inventory (backpack, hotbar, containers). But a stack of items that have a durability shares **one** condition, and in a test the game removed only one kit when that condition reached 0 and left the others at 0% (unusable). So the setting also turns the kits' durability **off**: every use consumes exactly one kit, like a bandage. The trade-off: partial use goes away, and a small wound costs a whole kit.
 
@@ -352,14 +352,14 @@ Tested in the game: stacks of 5 and 10 in the hotbar, in the backpack and in a c
 
 The hover pictures (items, recipes, buildings) are optional and are **not included** in the download: they are the game's own artwork. The tool builds them from **your installed game** instead:
 
-1. Click **Build pictures now** in the bar under the status lines (shown while there are no pictures), or **Pictures...** in the row of buttons at any time. The window finds your game folder from your save; use **Browse...** if it cannot.
+1. Click **Build pictures now** in the bar under the status lines (shown while there are no pictures), or **Pictures** in the row of buttons at any time. The window finds your game folder from your save; use **Browse...** if it cannot.
 2. The game's files are packed with Oodle compression, so a small free library, `oodle-data-shared.dll` (about 1 MB, the same file the FModel program uses), is needed once. If it is not found, the window shows **Download it...** and tells you where it comes from before it downloads anything. If you already use FModel, the tool finds FModel's copy.
 3. Press **Build pictures**. It takes about 20 seconds and writes small PNGs to the `icons\` folder next to the tool (item pictures and building pictures). Nothing in the game folder or your save is touched.
 4. Hold the mouse over an item (catalog, inventory, queue) or a recipe (Player tools > Recipes) to see its picture and details. Reopen Player tools to see the recipe pictures.
 
 The bar has **Not now** (hide it until the next start) and **Don't ask again** (writes `pictures.json`; delete that file to bring the bar back). A few items have no texture in the game files (for example `MetropolisMask`); they show text only, and `icons-missing.txt` lists them.
 
-**After a game update**, run **Pictures...** again to pick up new items.
+**After a game update**, run **Pictures** again to pick up new items.
 
 ## 14. Backups, restoring, and Steam Cloud
 
@@ -377,7 +377,7 @@ The bar has **Not now** (hide it until the next start) and **Don't ask again** (
 | `PermafrostItemTool.ps1` and the other `.ps1` files | The program (plain text, readable). |
 | `items.json`, `catalog\`, `datapack.json` | The data pack: item list and tables read from the game files, and which game build they are for. `catalog\pristine-world.bin` (+ `.json`) is the shipped map of untouched objects used by World reset; `catalog\loot-pool.json` is its last-resort pool of real container loot rolls. |
 | `Backups\` | Automatic save backups (yours; never part of the download). |
-| `icons\` | Pictures you built with **Pictures...** (yours). |
+| `icons\` | Pictures you built with **Pictures** (yours). |
 | `config.json` | Only if needed (see below); also remembers your chosen world. |
 | `theme.json` | Your colour theme. |
 | `spoiler.json` | Whether story text is hidden. |
@@ -409,7 +409,7 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
-3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move...**, **Apply in game** next to Backpack slots, **Stack sizes...**) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
+3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move**, **Apply in game** next to Backpack slots, **Stack sizes**) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
 
 If the game ever fails to start after a game update, remove `dwmapi.dll` from `Binaries\Win64` to start it normally (see [section 17](#17-after-a-game-update)).
 
@@ -419,7 +419,7 @@ Permafrost is in active development. The shipped data (`items.json`, `catalog\`;
 
 1. **Let Steam update the game, then start it once** and load your save, to make sure the game itself runs.
 2. **Copy your save file** (the `.pfs` in `SaveGame`) somewhere safe. The tool also makes its own backup, but this is cheap insurance.
-3. **Check for a new release** of this tool: the data pack is rebuilt after game updates. Download the new ZIP, copy your `Backups` folder and settings files into it (or unzip over the old folder), and run **Pictures...** again if you use the pictures.
+3. **Check for a new release** of this tool: the data pack is rebuilt after game updates. Download the new ZIP, copy your `Backups` folder and settings files into it (or unzip over the old folder), and run **Pictures** again if you use the pictures.
 4. If there is no new release yet, you can rebuild the data from your own game files ([section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)). Until then, do not trust items the old data does not know, and test any big queue on a copy of your save first.
 5. **Recipe tweaks / Build move / Backpack size / Stack sizes:** restart the game once. The mods change things in memory only, so after an update the worst case is that they log an error and do nothing; your save is never touched by them.
 
@@ -464,7 +464,7 @@ Normally you never need this: the release already contains the data. Use it afte
 
    * You can skip `Blueprints\AI` and `Blueprints\Characters\Hero`: the tool does not read them. If FModel struggles with the whole `Blueprints` folder, export it sub-folder by sub-folder (`Items`, `BuildingParts`, `QuestSystem`, `Interactions`, `RewardPools`, `GAS`, `CharacterStatus`, `Difficulty`, `Skills`, `Characters`, `World`, `RandomEncounters`, `Destructable`, `Farming`, `FastTravel`, `AchievementsAndStatistics`, `Utils`).
    * Folders exported as JSON get a `.json` file next to each `.uasset`; that is expected.
-   * You do **not** need to export pictures: the **Pictures...** button reads them from the game directly.
+   * You do **not** need to export pictures: the **Pictures** button reads them from the game directly.
 
 **18.3 Build the data.** Open PowerShell 7 in the tool folder and run:
 
@@ -495,7 +495,7 @@ Read the output: each builder prints a one-line summary (items, recipes, quests.
 | Some item has no picture | A few items have no texture in the game files; the tool shows text instead (`icons-missing.txt`). |
 | Hover pictures do not show | Build them first ([section 13](#13-reference-pictures)); close and reopen the window if it was open while you built them. |
 | Recipe change does not show | The bench was already open (reopen it), or the mod was updated without restarting the game. Look for `[RecipeTweaks]` lines in `UE4SS.log`. |
-| Move is missing from the Q wheel, or F7 does nothing | The mod is not installed, or the game was not restarted after installing. Click **Build move...** again, restart the game, and read `BuildMove.log`. |
+| Move is missing from the Q wheel, or F7 does nothing | The mod is not installed, or the game was not restarted after installing. Click **Build move** again, restart the game, and read `BuildMove.log`. |
 | Text in the windows is cut off, or looks slightly soft on a high-resolution screen | The tool draws its windows at 100% size and lets Windows scale them (so nothing can be clipped at 125% / 150% display scaling); because Windows enlarges the picture, text can look a little soft. Make sure you run the current version (1.2.1 or newer). |
 | World reset did not bring back an item or a container's loot in a brand-new world | The shipped map of untouched objects has 98-99% of ores, 99% of breakables and 94-98% of world items (a few objects get a different random id in every world); container loot needs a backup. Open the tool early in a new world (it saves a starting snapshot the first time), and see [section 11](#11-reference-world-reset). |
 | World reset says there is nothing to put back | Nothing qualifies with these tick boxes and radius, or the world has no backups (destroyed ores and picked-up items need earlier backups). Preview lists what is left alone and why. |
@@ -503,7 +503,7 @@ Read the output: each builder prints a one-line summary (items, recipes, quests.
 | Text is cut off or a window looks wrong at my screen size | The main window shows scroll bars when it is too small for its content; maximize it (Player tools opens maximized). If something is still cut off, send a screenshot in an issue with your display scaling. |
 | A red DANGER line shows under Backpack slots (or in the Overview) | An item sits in a slot beyond the size the game will give your backpack, usually because the BackpackSlots mod is off or not loading. **Do not play.** Press **Apply in game** to switch the mod on (or fix `mods.txt`), or restore the `_BACKPACKSIZE_` backup. See [12b](#12b-reference-backpack-size-in-game-mod). |
 | *Apply in game* says NOT APPLIED | The size must be a multiple of 5 between 5 and 100, and big enough for the highest slot that holds an item. Move the items down in the game first. |
-| My stacked first aid kits became single kits | The StackSizes mod was not running when the game saved, and the game trims stacks to one. Restore the `_STACKSIZES_` backup, start the game with the mod on (check the **Stack sizes...** window and the Overview). See [12c](#12c-reference-stack-sizes-in-game-mod). |
+| My stacked first aid kits became single kits | The StackSizes mod was not running when the game saved, and the game trims stacks to one. Restore the `_STACKSIZES_` backup, start the game with the mod on (check the **Stack sizes** window and the Overview). See [12c](#12c-reference-stack-sizes-in-game-mod). |
 | The Overview warns the game was updated | The data is for an older build. See [section 17](#17-after-a-game-update). |
 
 **Is it safe?** It only edits what each feature names, backs up first, re-reads and verifies the result, and puts your original back if anything is off. It is not a cheat for multiplayer and does not work there.

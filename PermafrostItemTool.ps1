@@ -20,6 +20,7 @@ try {
   . (Join-Path $PSScriptRoot 'WorldPicker.ps1')
   . (Join-Path $PSScriptRoot 'OverviewUI.ps1')
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
+  . (Join-Path $PSScriptRoot 'HelpUI.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   $script:BusySkip = [bool]($SelfTest -or $Headless)
@@ -61,7 +62,7 @@ try {
   $btnBrowse = New-Ctl System.Windows.Forms.Button 852 10 80 26 'Browse...'; $btnBrowse.Anchor = 'Top,Right'
   $btnReload = New-Ctl System.Windows.Forms.Button 938 10 80 26 'Reload'; $btnReload.Anchor = 'Top,Right'
   $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help / how it works'; $btnHelp.Anchor = 'Top,Right'
-  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data...'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools...'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks...'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset...'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move...'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures...'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview...'; $btnStk = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Stack sizes...'
+  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview'; $btnStk = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Stack sizes'
   # first-run bar: shown under the save row while no pictures exist (Update-PicsBar), so the player does not have to find the top button
   $script:PicsBarOn = $false; $pnlPics = New-Object System.Windows.Forms.Panel; $pnlPics.Visible = $false; $form.Controls.Add($pnlPics)
   $lblPics = New-Object System.Windows.Forms.Label; $lblPics.AutoSize = $false; $lblPics.BackColor = [System.Drawing.Color]::Transparent; $lblPics.TextAlign = 'MiddleLeft'; $lblPics.Text = 'Item pictures are not built yet. Build them from your installed game: read-only, about 20 seconds, one time.'; $pnlPics.Controls.Add($lblPics)
@@ -274,12 +275,12 @@ try {
   }
   $script:QueueAdder = ${function:Queue-ById}
   $script:OnSaveChanged = { param($m) Log $m; Reload-Inventory }
-  function Open-Player { Invoke-Busy 'Opening Player tools...' { Reload-Inventory; Show-PlayerTools $form } $form; Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form; Update-GameState }
-  function Open-Data { $script:GD = @{}; Invoke-Busy 'Loading the game data...' { Show-GameData $form } $form; Update-GameState }
+  function Open-Player { Invoke-Busy 'Opening Player tools' { Reload-Inventory; Show-PlayerTools $form } $form; Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form; Update-GameState }
+  function Open-Data { $script:GD = @{}; Invoke-Busy 'Loading the game data' { Show-GameData $form } $form; Update-GameState }
   function Open-Tweaks { Invoke-Busy 'Loading the recipes...' { Show-RecipeTweaks $form } $form }
   function Open-World { Invoke-Busy 'Reading your worlds...' { Show-WorldReset $form } $form; Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form; Update-GameState }
 
-  function Show-TextDialog([string]$title, [string]$text) {
+  function Show-TextDialog([string]$title, [string]$text, [switch]$Help) {
     # read-only text window with a Find bar (like Acrobat): matches are highlighted while you type, the arrows / Enter / F3 jump to the next or previous one.
     # Redrawing is switched off while highlights change (otherwise the whole box flickers on every key) and the search waits ~150 ms after the last key.
     if (-not ('RtbRedraw' -as [type])) { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class RtbRedraw { [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int m, IntPtr w, IntPtr l); public static void Set(IntPtr h, bool on) { SendMessage(h, 0x000B, on ? new IntPtr(1) : IntPtr.Zero, IntPtr.Zero); } }' }
@@ -296,6 +297,31 @@ try {
     $d.Controls.Add($tb); $d.Controls.Add($top); $d.Controls.Add($bp); $d.AcceptButton = $null; $d.CancelButton = $ok
     Apply-Theme $d; Set-AppIcon $d
     $th = $script:Th; $tb.BackColor = $th.Field; $tb.ForeColor = $th.Text   # a RichTextBox is not themed by Apply-Theme
+    $doc = $null
+    if ($Help) {   # the Help window: a banner on top, a list of sections on the left, designed text
+      $d.Size = New-Object System.Drawing.Size(1120, 780)
+      $ban = New-Object System.Windows.Forms.Panel; $ban.Dock = 'Top'; $ban.Height = 80; $ban.BackColor = $th.Header
+      $bl = New-Object System.Windows.Forms.Panel; $bl.Dock = 'Bottom'; $bl.Height = 3; $bl.BackColor = $th.Accent; $ban.Controls.Add($bl)
+      $bt = New-Object System.Windows.Forms.Label; $bt.Text = 'How it works'; $bt.Font = New-Object System.Drawing.Font('Segoe UI', 24, [System.Drawing.FontStyle]::Bold); $bt.ForeColor = $th.Accent; $bt.BackColor = $th.Header; $bt.AutoSize = $true; $bt.Location = New-Object System.Drawing.Point(16, 4); $ban.Controls.Add($bt)
+      $bs = New-Object System.Windows.Forms.Label; $bs.Text = 'Permafrost Item Tool  -  for single-player saves only.   Ctrl+F searches this page; the list on the left jumps to a section.'; $bs.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $bs.ForeColor = $th.Muted; $bs.BackColor = $th.Header; $bs.AutoSize = $true; $bs.Location = New-Object System.Drawing.Point(20, 52); $ban.Controls.Add($bs)
+      $lst = New-Object System.Windows.Forms.ListBox; $lst.Dock = 'Left'; $lst.Width = 220; $lst.BorderStyle = 'None'; $lst.BackColor = $th.Panel; $lst.ForeColor = $th.Text; $lst.IntegralHeight = $false
+      $lst.DrawMode = 'OwnerDrawFixed'; $lst.ItemHeight = 32; $lst.Font = New-Object System.Drawing.Font('Segoe UI', 10.5)
+      $lst.Add_DrawItem({ param($s, $e)
+        if ($e.Index -lt 0) { return }
+        $sel = (($e.State -band [System.Windows.Forms.DrawItemState]::Selected) -ne 0)
+        $br = New-Object System.Drawing.SolidBrush($(if ($sel) { $th.Select } else { $th.Panel })); $e.Graphics.FillRectangle($br, $e.Bounds); $br.Dispose()
+        if ($sel) { $ab = New-Object System.Drawing.SolidBrush($th.Accent); $e.Graphics.FillRectangle($ab, $e.Bounds.X, $e.Bounds.Y, 4, $e.Bounds.Height); $ab.Dispose() }
+        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, [string]$s.Items[$e.Index], $s.Font, (New-Object System.Drawing.Point(($e.Bounds.X + 16), ($e.Bounds.Y + 6))), $th.Text) })
+      $jump = { param([int]$ix)
+        if ($ix -lt 0 -or $ix -ge $doc.Sections.Count) { return }
+        [RtbRedraw]::Set($tb.Handle, $false)
+        try { $tb.Select($tb.TextLength, 0); $tb.ScrollToCaret(); $tb.Select([int]$doc.Sections[$ix].Pos, 0); $tb.ScrollToCaret() } finally { [RtbRedraw]::Set($tb.Handle, $true); $tb.Invalidate() } }
+      $lst.Add_SelectedIndexChanged({ & $jump $lst.SelectedIndex }); $lst.Add_MouseUp({ param($s, $e) $ix = $lst.IndexFromPoint($e.Location); if ($ix -ge 0) { & $jump $ix } })
+      $d.Controls.Clear(); $d.Controls.Add($tb); $d.Controls.Add($lst); $d.Controls.Add($top); $d.Controls.Add($ban); $d.Controls.Add($bp)
+      [void]$d.Handle   # the text box needs its window before it can take formatting
+      $tb.ReadOnly = $false; try { $doc = HP-Render $tb $text $th } finally { $tb.ReadOnly = $true }
+      foreach ($sc in $doc.Sections) { [void]$lst.Items.Add([string]$sc.Title) }
+    }
     $st = @{ Hits = (New-Object System.Collections.Generic.List[int]); Len = 0; Cur = -1; Painted = (New-Object System.Collections.Generic.List[int]); PaintedLen = 0 }
     $paint = {
       param([int]$pos, [int]$len, [bool]$current)
@@ -304,7 +330,7 @@ try {
     }
     $unpaint = {
       param([int]$pos, [int]$len)
-      $tb.Select($pos, $len); $tb.SelectionBackColor = $th.Field; $tb.SelectionColor = $th.Text
+      if ($doc) { HP-Restore $tb $doc $pos $len $th } else { $tb.Select($pos, $len); $tb.SelectionBackColor = $th.Field; $tb.SelectionColor = $th.Text }
     }
     $show = {
       # make match number $st.Cur stand out, scroll to it, update the counter (caller has redraw switched off)
@@ -407,14 +433,14 @@ try {
 PERMAFROST ITEM TOOL - HOW IT WORKS
 ===================================
 What it is
-A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar and sets your backpack size. Extra windows, opened from the row of buttons under the Save file row, cover the rest: 'Player tools...' (vitals, skills, recipes, teleport, quest progress), 'World reset...' (put used-up trees, ores, items and loot back), 'Game data...' (search everything found in the game files, reward pools, quests, recipes, bundles), 'Pictures...' (build the item pictures from your own game), 'Recipe tweaks...' (change crafting inside the game), 'Build move...' (move placed buildings inside the game), 'Stack sizes...' (stack first aid kits inside the game) and this Help. 'Overview...' (top of the window) is the read-only report. See THE EXTRA WINDOWS below. Press Ctrl+F in this window to search it.
+A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar and sets your backpack size. Extra windows, opened from the row of buttons under the Save file row, cover the rest: 'Player tools' (vitals, skills, recipes, teleport, quest progress), 'World reset' (put used-up trees, ores, items and loot back), 'Game data' (search everything found in the game files, reward pools, quests, recipes, bundles), 'Pictures' (build the item pictures from your own game), 'Recipe tweaks' (change crafting inside the game), 'Build move' (move placed buildings inside the game), 'Stack sizes' (stack first aid kits inside the game) and this Help. 'Overview' (top of the window) is the read-only report. See THE EXTRA WINDOWS below. Press Ctrl+F in this window to search it.
 
 Before you start (every time)
 1. In the game: save, then quit completely. The tool refuses to apply while the game is running.
 2. Keep Steam Cloud OFF for Permafrost while editing (see "Steam Cloud" below).
 
 THE WINDOW
-The window opens maximized and resizes with you; if it is ever smaller than its content needs (a small screen or a big Windows text size), scroll bars appear instead of cutting anything off. Press F11 for true full screen (Esc or F11 again to leave it). From the top: the banner (Overview... and the colour Theme box), the Save file row, a row of buttons for the extra windows, the status lines, then the catalog, the selected item, the queue, the current inventory and the log.
+The window opens maximized and resizes with you; if it is ever smaller than its content needs (a small screen or a big Windows text size), scroll bars appear instead of cutting anything off. Press F11 for true full screen (Esc or F11 again to leave it). From the top: the banner (Overview and the colour Theme box), the Save file row, a row of buttons for the extra windows, the status lines, then the catalog, the selected item, the queue, the current inventory and the log.
 
 - Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save. The world you pick is remembered.
 - Game status line (under the buttons, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled. The lines below it show the world, play time, when it was last saved and your worn backpack ("Worn: ScavengerBackpack - using 35 slots"); a red DANGER line appears there when kits or backpack items are at risk (see Backpack slots and STACK SIZES).
@@ -422,8 +448,8 @@ The window opens maximized and resizes with you; if it is ever smaller than its 
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
-- Overview... (banner, top): a read-only report of your save - world and play time, character, skills, inventory (with the backpack size in use), recipes known, quests, buildings, explored area, companion, the state of the in-game mods and your settings for them, backups - with a Copy report button. Nothing in it changes the save.
-- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures...' (in the row of buttons) or 'Build pictures now' (the bar under the status lines) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
+- Overview (banner, top): a read-only report of your save - world and play time, character, skills, inventory (with the backpack size in use), recipes known, quests, buildings, explored area, companion, the state of the in-game mods and your settings for them, backups - with a Copy report button. Nothing in it changes the save.
+- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures' (in the row of buttons) or 'Build pictures now' (the bar under the status lines) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
 
 Item catalog (left)
 All 380 items found in the game's files. Type in the search box or pick a category. Click a column header to sort. Columns (everything comes from the game's own data unless it says otherwise):
@@ -484,21 +510,21 @@ If a step FAILS, the message says whether your save was left untouched or the or
 THE EXTRA WINDOWS
 These windows use the same save file as the main window (World reset has its own World box). The ones that change your save (Player tools, World reset) go through the same safety steps: game must be closed, confirmation first, automatic backup, result re-checked. Recipe tweaks, Build move, Stack sizes and the Backpack slots box change the game (in memory, through small UE4SS mods) and never touch your save; Pictures only reads the game's files.
 
-PLAYER TOOLS...
+PLAYER TOOLS
 - Vitals and skills - Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save). Levels above anything in your save (highest 29) are flagged as untested.
 - Recipes - All recipes found in the game files (item recipes and building recipes), marked learned / not learned. Tick the ones you want and press 'Learn ticked recipes'. Hold the mouse over a recipe to see its picture and details (building recipes: build cost, requirements, description; item recipes: ingredients, what it makes, where and how long). Pictures come from the icons folder (built by Build-RecipeIcons.ps1); the few recipes with no picture in the game files show text only.
 - Teleport - Moves you to your bed, the crash site, or any workbench/campfire/etc. you built. You load above the spot (150 cm by default; the 'Drop height' box changes it, use about 500 if a spot is inside rock or a hillside) and drop onto it. The game's own named locations have no coordinates in the exported data, so they cannot be listed; instead open the in-game map, read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them in the 'Coordinates' boxes under the list and press 'Teleport to coordinates'. Works on any world: pick it in the main window first. If the game spawns you at the start instead, the spot was not accepted (it happened a few times with spots in mid-air or inside rock): try again with a higher drop height or a spot you stood on yourself.
 - Quest progress - READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters, rewards already claimed, journal. Quests are not edited.
 - Save info - Summary of the save: world, play time, position, skills, vitals, everything you built.
 
-RECIPE TWEAKS...
+RECIPE TWEAKS
 Change crafting inside the game: ingredient amounts, how many a craft makes, crafting time. Pick a recipe and edit its numbers, or use the boxes on the right and 'Multiply the recipes shown' (filter with Search / Station first, e.g. 'ammo' and 'Amount made x 5'). That button only changes the numbers in this window.
 
 'Save to game' writes the values for the in-game mod. 'Install / update mod' puts the mod into your UE4SS Mods folder (mods.txt is backed up first).
 
 With the game running, saved values apply by themselves within a few seconds (reopen the bench to see them; F8 re-applies by hand). Nothing in your save file changes; to undo, press 'Reset ALL recipes' and Save, or switch the mod off ('RecipeTweaks : 0' in Mods\mods.txt). Every change the mod makes is listed in ue4ss\UE4SS.log under [RecipeTweaks].
 
-WORLD RESET...
+WORLD RESET
 Puts back things you have used up in the world so you can harvest them again; the game never respawns them by itself. Close the game first.
 - World - pick which world (.pfs save) to work on. The box lists every save in your SaveGame folder and starts on the one chosen in the main window. Under it you see the hours played, when it was last saved and how many backups of that world exist.
 - What to put back - trees you have chopped down; boulders and ores (rock, coal, flint, iron, copper, sulfur, gold, moon rock); items that lay in the world (scrap, oil, plastic, food, rock shards, scavengable bushes...) that you picked up; loot in containers (cars, cabinets, crates, corpses, trash cans...); bushes and other generated plants / rocks you have harvested; and, if you tick it, other breakables (pallets, rubble, trash piles, furniture). 'Leave containers alone that still hold items' keeps containers you only half emptied.
@@ -508,7 +534,7 @@ Puts back things you have used up in the world so you can harvest them again; th
 How it works: felled trees are removed from the save's record, so they stand again. Partly mined boulders go back to full health. Boulders you broke and items you picked up are put back from your OLD BACKUPS (the tool makes a backup before every change, so keep them), from the saves of your OTHER worlds on the same map (World#1, World#3...): the same object has the same id in every world, so what another world still has untouched can be put back here (ores, breakables and items only; container loot is rolled per world, so containers only use this world's own backups) and, as the LAST source, from a SHIPPED MAP OF UNTOUCHED OBJECTS that comes with the tool (catalog\pristine-world.bin: every boulder, ore, breakable and world item as the game places it, recorded by flying over the whole map in a world nobody had played). So even a world with no backups at all gets its mined boulders, ores and breakables back, and the items you picked up (an item is only restored from it when your save lists it as used up, because items spawn at random per world). Tested on worlds that were not used to build it, it has 98-99% of the ores, 99% of the breakables and 94-98% of the world items; the rest are objects that get a different random id in every world, which no map can know. The tool also saves a STARTING SNAPSHOT the first time it opens a world that has no backup: it matters most for container loot and for those random-id objects, so open the tool early in a new world, before you start mining and looting. A fresh world that you teleport around is therefore a clean source for any area you care about. Looted containers get their original loot back from a backup, or the loot of another unopened container with the same loot table when no backup saw theirs unopened; if none is left in your world, a real roll from a shipped pool of container loot (about 1,100 real rolls over 33 loot groups). Quest items and keys are never re-rolled. The save also keeps one list of used-up objects (it grows with everything you destroy or collect); the game drops a restored object again if it is still on that list, so the reset takes every object it puts back off the list too (this is what made restored moon rock and other ores vanish before; confirmed in the game 2026-10-19).
 Bushes and other generated plants / rocks are not world records at all: every harvested one is a single entry (its position) in a list kept on the game's PCG actors in the save, and the reset removes the entries inside your radius, so they grow back (verified in the game with one bush, 2026-10-19; the other kinds in those lists - 12 lists in a 100 h world - were not identified one by one, so try a small radius first). Solar panels are never recorded unopened in any save, so their loot is rolled from the game's own table (one pick: wire, components, electrical parts, rarely metal junk). Known game issue (2026-10-19, version 0.44.3, reproduced with every mod off and in a brand-new world): solar panels show no 'Press F' prompt at all, so restored panel loot cannot be opened for now; bodies, suitcases, crates and the rest work. Containers with no loot sample at all are left alone. To undo a reset use 'Restore a backup...' in the main window.
 
-BUILD MOVE...
+BUILD MOVE
 Lets you pick up a building you placed and put it somewhere else, inside the game, without rebuilding it. The button installs a small in-game mod (a UE4SS mod; Mods\mods.txt is backed up first). A mod only loads when the game starts, so restart the game after installing or updating it. The tool does not edit your save for this: the game saves the new position itself (checked: the moved positions were in the save file).
 - Move from the wheel - look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press Q and choose Move. Move is the slot that used to show a padlock, between Deconstruction and Call dog. The part then follows your crosshair.
 - Left click - puts it down where it is. Choosing Move again, or pressing F7, also puts it down. F7 does the same as the wheel's Move without opening the wheel.
@@ -517,7 +543,7 @@ Lets you pick up a building you placed and put it somewhere else, inside the gam
 - Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
 - Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
 
-STACK SIZES... (button row)
+STACK SIZES (button row)
 Makes first aid kits STACK, in every inventory (backpack, hotbar, containers). Kits normally take one slot each because they carry a durability (the 'condition'); a stack of durable items shares ONE condition and wastes kits, so this setting also turns their durability off: every use consumes one whole kit, like a bandage (partial use goes away). It works through a small in-game mod (StackSizes, for UE4SS - see the README) that the tool offers to install; your save is never touched by the mod.
 - Make first aid kits stackable and single use - the on/off switch. Kits per slot - how many fit in one slot (stacks of 5 and 10 were tried in the game; the biggest allowed is 20).
 - Apply - makes a backup of your save, installs or updates the mod if needed and saves the setting. The game applies it every time it starts, before your save loads.
@@ -527,7 +553,7 @@ Makes first aid kits STACK, in every inventory (backpack, hotbar, containers). K
 FINDING TEXT IN THIS WINDOW
 This window (and the Preview window) has a Find bar on top. Type a word and every match lights up, with a counter such as '3 of 44'. The up and down arrows, Enter / Shift+Enter and F3 / Shift+F3 jump to the next / previous match. Ctrl+F jumps to the box, Esc closes the window.
 
-GAME DATA...
+GAME DATA
 - Find anything - Type a name (KeyAnnas, Anna, Whiskey, heater, bunker...) and see every quest, reward pool, loot config, NPC, recipe or world item that mentions it. Select a row for details; the button queues its items.
 - Reward pools - What each quest reward group pays out, with exact amounts, and which recipes it teaches. Queue a group's items.
 - Quests - All 125 quests: description, every state, the tasks that lead from one state to the next (talk to, find, build, craft...), events, and a '>>' marker where YOUR save is. Use it to see what a stuck quest is waiting for. QUEST HELPER: the box 'Items this step needs' lists what your current step asks for (an item to find or hand over, ingredients for a craft task, a reward group to collect). The button below queues exactly those items.
@@ -556,7 +582,7 @@ LIMITS
 - The data describes ONE version of the game (datapack.json says which); after a game update it can be out of date until a new release or a rebuild. The Overview warns when the installed game differs.
 - An unknown item name is silently ignored by the game (the item just does not appear).
 - Quest items are added but do not mark quest progress.
-- Stackable first aid kits exist only while the StackSizes mod is on: without it the game trims every stack to one kit when it saves (see STACK SIZES...).
+- Stackable first aid kits exist only while the StackSizes mod is on: without it the game trims every stack to one kit when it saves (see STACK SIZES).
 - A bigger backpack exists only while the BackpackSlots mod is on. If the mod stops loading (UE4SS reinstalled or updated, a game update, mods.txt changed) the backpack goes back to the game's own size and the game DELETES the items in the extra slots at its next save. Before playing after any such change, check the box under Backpack slots (no red DANGER line) and keep your backups.
 - World reset cannot know the few objects that get a different random id in every world (about 1-2% of ores, up to 6% of items), and without a backup it refills container loot with a real roll of the same loot group, not the original contents.
 - Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
@@ -568,7 +594,7 @@ WHERE THINGS ARE
 - Your save: <your save file>
 '@
     $h = $h.Replace('<tool folder>', $PSScriptRoot).Replace('<your save file>', $script:SavePath)
-    Show-TextDialog 'Help - how the Permafrost Item Tool works' $h
+    Show-TextDialog 'Help - how the Permafrost Item Tool works' $h -Help
   }
 
   function Do-Restore {
@@ -656,7 +682,7 @@ WHERE THINGS ARE
   function Update-StackWarning {
     if (-not $script:NoteText) { $script:NoteText = $lblNote.Text }
     $d = $null; try { $d = ST-DangerText (ST-FindKitStacks $script:SavePath -SkipContainers) } catch { }
-    if ($d) { $lblNote.ForeColor = [System.Drawing.Color]::Tomato; $lblNote.Text = 'DANGER: stacked first aid kits and the Stack sizes mod is off - the game deletes them on save (Stack sizes... button)' }
+    if ($d) { $lblNote.ForeColor = [System.Drawing.Color]::Tomato; $lblNote.Text = 'DANGER: stacked first aid kits and the Stack sizes mod is off - the game deletes them on save (Stack sizes button)' }
     else { $lblNote.ForeColor = $script:Th.Muted; $lblNote.Text = $script:NoteText }
   }
   function Update-BackpackBox {
@@ -834,7 +860,7 @@ WHERE THINGS ARE
   $btnApply.Add_Click({ Apply-Queue })
   $btnPreview.Add_Click({ Invoke-Busy 'Working out the slots...' { Show-Preview } $form })
   $btnHelp.Add_Click({ Show-Help })
-  $btnStk.Add_Click({ try { Invoke-Busy 'Looking for first aid kits in your save...' { Show-StackSizes $form $script:SavePath } $form; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Invoke-Busy 'Reading your save...' { Show-Overview $form $script:SavePath } $form } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Invoke-Busy 'Opening Pictures...' { Show-Pictures $form $script:SavePath } $form; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnStk.Add_Click({ try { Invoke-Busy 'Looking for first aid kits in your save...' { Show-StackSizes $form $script:SavePath } $form; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Invoke-Busy 'Reading your save...' { Show-Overview $form $script:SavePath } $form } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Invoke-Busy 'Opening Pictures' { Show-Pictures $form $script:SavePath } $form; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Apply-BackpackSize })
   $btnReload.Add_Click({ Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form })
   $btnBrowse.Add_Click({ $pick = Invoke-Busy 'Looking for your worlds...' { Show-WorldPicker $form $txtSave.Text } $form; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
@@ -1053,6 +1079,18 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $tfx.Text = ''; & $wait; $r += "cleared -> [$($lcx.Text)]"
       $script:DialogTestResult = $r; $dlg.Close() }
     try { Show-TextDialog 'find test' ((1..40 | ForEach-Object { "line $_ alpha beta gamma" + $(if ($_ % 10 -eq 0) { ' Alpha end' } else { '' }) }) -join "`r`n"); $out += ('find bar: ' + ($script:DialogTestResult -join ' | ')) } catch { $out += "find bar TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)" }
+    # the Help window: contents list, designed text, colours survive a Find
+    $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
+      $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents()
+      $wait = { $e0 = (Get-Date).AddMilliseconds(450); while ((Get-Date) -lt $e0) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 } }; $r = @()
+      $lstx = @($dlg.Controls | Where-Object { $_ -is [System.Windows.Forms.ListBox] })[0]; $r += "contents list: $($lstx.Items.Count) sections ($($lstx.Items[0]) ... $($lstx.Items[$lstx.Items.Count - 1]))"
+      $tx = $tbx.Text; $ix = $tx.IndexOf('THE WINDOW'); $tbx.Select($ix, 3); $c0 = $tbx.SelectionColor.ToArgb(); $r += "section title colour = accent: " + ($c0 -eq $script:Th.Accent.ToArgb())
+      $tfx.Text = 'backpack'; & $wait; $r += "find 'backpack' -> [$($lcx.Text)]"; $tfx.Text = ''; & $wait
+      $tbx.Select($ix, 3); $r += "colour back after the find: " + ($tbx.SelectionColor.ToArgb() -eq $c0)
+      $lstx.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(); $r += "jump to section 4 ok"
+      if ($env:PF_SHOTS) { $tbx.Select(0, 0); $tbx.ScrollToCaret(); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $dlg (Join-Path $env:PF_SHOTS "help_$($script:ThName).png") }
+      $script:DialogTestResult = $r; $dlg.Close() }
+    try { Show-Help; $out += ('help window: ' + ($script:DialogTestResult -join ' | ')); if (($script:DialogTestResult -join ' ') -match 'False') { $errs.Add('help window test failed') } } catch { $out += "help window TEST ERROR: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)"; $errs.Add('help window test error') }
     $script:DialogTestHook = $null
     $script:GD.Tabs.SelectedIndex = 1; [System.Windows.Forms.Application]::DoEvents(); $script:GD.Pools.LV.Items[0].Selected = $true; GD-QueueRow $script:GD.Pools; $out += "pool queue -> queue has $($script:Queue.Count)"
     $dataWin.Close()

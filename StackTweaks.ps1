@@ -1,4 +1,4 @@
-# StackTweaks.ps1 - the "Stack sizes..." window (banner button): first aid kits that STACK and are SINGLE USE.
+# StackTweaks.ps1 - the "Stack sizes" window (banner button): first aid kits that STACK and are SINGLE USE.
 # Kits normally take one slot each because they carry a durability (the "condition"): a stack would share ONE condition and waste kits. With this setting the
 # StackSizes UE4SS mod (StackSizesMod\main.lua) marks the kits stackable AND turns their durability off, so every use consumes one whole kit, like a bandage.
 # The limit belongs to the item, so it works in every inventory (hotbar, backpack, containers). Nothing in your save is touched by the mod.

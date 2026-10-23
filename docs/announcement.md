@@ -17,7 +17,7 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 * **Backpack size:** the **Backpack slots** box makes the backpack you wear bigger (any multiple of 5 up to 100), through a small UE4SS mod. Your save is never touched, but the game deletes items that have no slot, so the tool refuses unsafe sizes, makes a backup and shows a red warning if the mod is not running.
 * **Stack sizes:** first aid kits stack (10 per slot by default) in the backpack, hotbar and containers; each use consumes one whole kit. Same kind of mod, same safeguards.
 
-**Pictures:** the item and recipe pictures are the game's artwork, so they are not in the download. One button (**Pictures...**) builds them from your own installed game in about 20 seconds; it needs a small free decompression library once and asks before downloading it.
+**Pictures:** the item and recipe pictures are the game's artwork, so they are not in the download. One button (**Pictures**) builds them from your own installed game in about 20 seconds; it needs a small free decompression library once and asks before downloading it.
 
 **Needs:** Windows and PowerShell 7 (the launcher offers to install it). UE4SS is only needed for the in-game mods (Recipe tweaks, Build move, Backpack size, Stack sizes).
 
@@ -29,21 +29,21 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 
 1. Download the latest ZIP from the [Releases page](https://github.com/treefitty5/permafrost-item-tool/releases/latest) and unzip it somewhere you own (not in the game folder).
 2. **Close the game**, then double-click `Run Permafrost Item Tool.cmd`. If PowerShell 7 is missing, say **Y** when the launcher offers to install it.
-3. It opens your most recent world. **Browse...** lists all your worlds; **Overview...** shows everything it can read from the save.
+3. It opens your most recent world. **Browse...** lists all your worlds; **Overview** shows everything it can read from the save.
 
 If Windows says "protected your PC", click **More info → Run anyway**: it's plain scripts you can read in Notepad. No installer, no .exe. The [README](../README.md) has every detail.
 
 ## Recipe tweaks (in game)
 
-Needs UE4SS (README section 16). In the tool: **Recipe tweaks... → Install / update mod** (once, then restart the game). Edit ingredient amounts, amount crafted or time, and press **Save to game**. Changes apply by themselves within a few seconds while you play: close and reopen the bench to see them. **Reset ALL recipes** and Save puts everything back. Your save file is never changed, so this works with the game running.
+Needs UE4SS (README section 16). In the tool: **Recipe tweaks → Install / update mod** (once, then restart the game). Edit ingredient amounts, amount crafted or time, and press **Save to game**. Changes apply by themselves within a few seconds while you play: close and reopen the bench to see them. **Reset ALL recipes** and Save puts everything back. Your save file is never changed, so this works with the game running.
 
 ## World reset
 
-In the tool: **World reset...** (game closed). Pick the world, tick what to put back (trees, boulders and ores, items, container loot, bushes, optionally other breakables), optionally limit it to N metres around you (try 150 first), then **Reset the world now...**. It previews, asks you to confirm, backs up your save and verifies the result. Destroyed ores and picked-up items are restored from your earlier backups and from your other worlds on the same map, so keep the `Backups` folder.
+In the tool: **World reset** (game closed). Pick the world, tick what to put back (trees, boulders and ores, items, container loot, bushes, optionally other breakables), optionally limit it to N metres around you (try 150 first), then **Reset the world now...**. It previews, asks you to confirm, backs up your save and verifies the result. Destroyed ores and picked-up items are restored from your earlier backups and from your other worlds on the same map, so keep the `Backups` folder.
 
 ## Build move (in game)
 
-Needs UE4SS. In the tool: **Build move... → Install** (once, then restart the game). In the game look at a placed part, press **Q** and choose **Move**; it follows your crosshair and a **left click** puts it down. The same object is moved (health and contents stay, no materials used). There is no collision check on purpose: you can stack chests and barrels and put storage on walls.
+Needs UE4SS. In the tool: **Build move → Install** (once, then restart the game). In the game look at a placed part, press **Q** and choose **Move**; it follows your crosshair and a **left click** puts it down. The same object is moved (health and contents stay, no materials used). There is no collision check on purpose: you can stack chests and barrels and put storage on walls.
 
 ## After a game update
 

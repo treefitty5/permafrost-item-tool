@@ -3,7 +3,7 @@
 # Run it after the FModel export (README 9.2). It takes about a minute.
 #   pwsh -NoProfile -File .\Build-Everything.ps1
 # What it runs, in order:  Build-Catalog (item list)  ->  Rebuild-All (recipes, loot, quests, building parts, ...)  ->  Build-Finalize (makes it the shippable data pack)
-# The pictures are not made here: the "Pictures..." button in the tool reads them straight from the installed game.
+# The pictures are not made here: the "Pictures" button in the tool reads them straight from the installed game.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Paths.ps1')
 $here = $PSScriptRoot
