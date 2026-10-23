@@ -6,7 +6,7 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 
 ![Overview window](screenshot-overview.png)
 
-* **Overview:** a read-only report of your save: play time, vitals, skills, inventory, recipes known, quests, buildings, explored area, companion, backups. Nothing in it changes the save.
+* **Overview:** a read-only report of your save: play time, vitals, skills, inventory, recipes known, quests, buildings, explored area, companion, the state of the in-game mods, backups. Nothing in it changes the save.
 * **Item catalog:** every item with its in-game name, description, stack size, condition, damage, frost protection, value, ammo and where to find it, with drop chances.
 * **Add items** to your save (backpack or hotbar) with stack and backpack-space checks. A backup is made before every change, and one click restores it.
 * **Player tools:** vitals, skills and skill points, known recipes, teleport (places or exact coordinates), read-only quest view.
@@ -14,10 +14,12 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 * **Recipe tweaks:** change ingredient amounts, how many you craft and crafting time, live in game through a small UE4SS mod. Your save is never touched.
 * **World reset:** put chopped trees, mined boulders and ores, picked-up items, harvested bushes and looted containers back (the game never respawns them), per world, with a backup first.
 * **Build move:** pick up a placed building from the Q wheel and put it down elsewhere, live in game. Storage can be stacked and put on walls.
+* **Backpack size:** the **Backpack slots** box makes the backpack you wear bigger (any multiple of 5 up to 100), through a small UE4SS mod. Your save is never touched, but the game deletes items that have no slot, so the tool refuses unsafe sizes, makes a backup and shows a red warning if the mod is not running.
+* **Stack sizes:** first aid kits stack (10 per slot by default) in the backpack, hotbar and containers; each use consumes one whole kit. Same kind of mod, same safeguards.
 
 **Pictures:** the item and recipe pictures are the game's artwork, so they are not in the download. One button (**Pictures...**) builds them from your own installed game in about 20 seconds; it needs a small free decompression library once and asks before downloading it.
 
-**Needs:** Windows and PowerShell 7 (the launcher offers to install it). UE4SS is only needed for the two in-game mods (Recipe tweaks, Build move).
+**Needs:** Windows and PowerShell 7 (the launcher offers to install it). UE4SS is only needed for the in-game mods (Recipe tweaks, Build move, Backpack size, Stack sizes).
 
 **How it was made:** I built this together with Claude, Anthropic's AI assistant. I set the goals and tested everything in game on my own save; the AI wrote the code and decoded the data. The source is fully open here, so you can read what it does before running it.
 
@@ -33,7 +35,7 @@ If Windows says "protected your PC", click **More info → Run anyway**: it's pl
 
 ## Recipe tweaks (in game)
 
-Needs UE4SS (README section 4). In the tool: **Recipe tweaks... → Install / update mod** (once, then restart the game). Edit ingredient amounts, amount crafted or time, and press **Save to game**. Changes apply by themselves within a few seconds while you play: close and reopen the bench to see them. **Reset ALL recipes** and Save puts everything back. Your save file is never changed, so this works with the game running.
+Needs UE4SS (README section 16). In the tool: **Recipe tweaks... → Install / update mod** (once, then restart the game). Edit ingredient amounts, amount crafted or time, and press **Save to game**. Changes apply by themselves within a few seconds while you play: close and reopen the bench to see them. **Reset ALL recipes** and Save puts everything back. Your save file is never changed, so this works with the game running.
 
 ## World reset
 
@@ -45,7 +47,7 @@ Needs UE4SS. In the tool: **Build move... → Install** (once, then restart the 
 
 ## After a game update
 
-The tool ships data for one game version (the Overview warns when the installed build differs). After a patch, check for a new release; if there is none yet you can rebuild the data from your own game files (README section 9, about 30 minutes the first time).
+The tool ships data for one game version (the Overview warns when the installed build differs). After a patch, check for a new release; if there is none yet you can rebuild the data from your own game files (README section 18, about 30 minutes the first time).
 
 ## Safety
 

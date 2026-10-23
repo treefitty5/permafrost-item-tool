@@ -47,7 +47,7 @@ function PF-SaveFolders {
 
 # the save file the window starts with: config.json, else the most recently written .pfs found
 function PF-SavePath {
-  $c = PF-GetConfig; if ($c.SavePath) { return $c.SavePath }
+  $c = PF-GetConfig; if ($c.SavePath -and (Test-Path -LiteralPath $c.SavePath)) { return $c.SavePath }   # a remembered world that was deleted / moved away falls back to the newest one
   $best = $null
   foreach ($d in (PF-SaveFolders)) { if (Test-Path -LiteralPath $d) { foreach ($s in (Get-ChildItem -LiteralPath $d -Filter '*.pfs' -File)) { if (-not $best -or $s.LastWriteTime -gt $best.LastWriteTime) { $best = $s } } } }
   if ($best) { return $best.FullName }

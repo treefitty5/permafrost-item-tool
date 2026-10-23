@@ -1,5 +1,5 @@
 # OverviewUI.ps1 - the "Overview" window: a read-only report of everything the tool can see in the selected save
-# (world, character, skills, inventory, recipes, quests, buildings, explored area, companion, backups). Never writes to the save.
+# (world, character, skills, inventory, recipes, quests, buildings, explored area, companion, in-game mods and settings, backups). Never writes to the save.
 # Needs SaveCore.ps1, PlayerCore.ps1, WorldCore.ps1, Theme.ps1 and PlayerTools.ps1 (helpers) loaded.
 $script:OV = @{}
 
@@ -53,8 +53,11 @@ function Get-SaveOverview([string]$savePath) {
     '  Hotbar:'
     foreach ($r in $hot) { '    slot {0}: {1}   {2}' -f $r.Slot, (Nm $r.Item), $r.Detail }
     if ($bp.Count) {
-      $bpName = ($bp[0].Where -replace '^Backpack \(|\)$', ''); $cap = ''; try { $c = Get-BackpackGameSlots $bpName; if ($c) { $cap = " of $c" } } catch { }
+      $bpName = ($bp[0].Where -replace '^Backpack \(|\)$', ''); $cap = ''; $ovf = $null
+      try { $eq = Parse-Equipment (Read-Save $savePath).Equip   # the size the tool counts: your Backpack slots setting (while its mod is on), else the game's own
+        if ($eq) { $cap = " of $((Get-BackpackMaxSlot $eq) + 1) ($(Get-BackpackSource $eq))"; $ovf = BT-Overflow $eq } } catch { }
       ''; "  Backpack ($bpName): $($bp.Count) slot(s) used$cap"
+      if ($ovf) { "  DANGER: an item sits in slot $($ovf.Highest + 1), beyond the $($ovf.Slots) slots the game will give this backpack - the game deletes such items when it saves."; "          Switch the in-game backpack mod on (Apply in game) or restore a backup before you play." }
       $tot = @{}; foreach ($r in $bp) { $n = 1; $m = [regex]::Match([string]$r.Detail, '^x(\d+)'); if ($m.Success) { $n = [int]$m.Groups[1].Value }; $tot[$r.Item] = [int]$tot[$r.Item] + $n }
       foreach ($k in ($tot.Keys | Sort-Object { -$tot[$_] }, { Nm $_ })) { '    {0,6} x  {1}' -f $tot[$k], (Nm $k) }
     }
@@ -87,9 +90,27 @@ function Get-SaveOverview([string]$savePath) {
     if ($m.Success) { $o = $m.Value; $st = [regex]::Match($o, 'State>([^\?]*)').Groups[1].Value; $bond = [regex]::Match($o, 'Bond>([^\?]*)').Groups[1].Value; $ci = [regex]::Match($o, 'CompanionInventory>([^\?]*)').Groups[1].Value
       '  State: {0}    bonded: {1}    items carried: {2}' -f $st, $bond, ([regex]::Matches($ci, '@\d+=')).Count } else { '  No companion found in this save.' }
   }
+  Sec 'In-game mods and settings' {
+    '  (these change the running game, never your save file)'
+    $ms = $null; try { $ms = RT-ModStatus } catch { }
+    if ($ms -and $ms.Text -notmatch 'Mods folder not found') {
+      '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + $ms.Text
+      $bm = $null; try { $bm = BM-Status } catch { }; if ($bm) { '  Build move:       ' + $bm.Text }
+      $bt = $null; try { $bt = BT-ModStatus } catch { }
+      if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
+        '  Backpack size:    ' + $bt.Text + $(if ($set.Count) { '  Your sizes: ' + ($set -join ', ') + '.' } else { '  No size set (the game''s own sizes are used).' }) }
+      $stt = $null; try { $stt = ST-ModStatus } catch { }
+      if ($stt) { $sk = Get-StackTweaks
+        '  Stack sizes:      ' + $stt.Text + '  Setting: ' + $(if ($sk.Enabled) { "first aid kits stack, $($sk.Size) per slot, single use." } else { 'off (kits do not stack).' })
+        try { $fs = ST-FindKitStacks $savePath
+          if ($fs.Stacks -gt 0) { "                    Your save holds $($fs.Stacks) stack(s) of kits ($($fs.Player) in your inventory, $($fs.Containers) in containers); the biggest holds $($fs.Max)."
+            $dg = ST-DangerText $fs; if ($dg) { '                    ' + $dg } } } catch { } }
+    } else { '  UE4SS (the free script loader the mods need) was not found next to your save, so none of the in-game mods can be installed from here.' }
+  }
   Sec 'Backups of this world' {
     $leaf = [IO.Path]::GetFileName($savePath); $bk = @(Get-ChildItem (Get-BackupDir) -Filter "*_$leaf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' })
     "  $($bk.Count) backup(s) in $(Get-BackupDir)" + $(if ($bk.Count) { "   (newest: $(($bk | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime.ToString('g')))" } else { '' })
+    $sn = @($bk | Where-Object { $_.Name -match '_BASELINE_' }); if ($sn.Count) { "  Starting snapshot: yes ($($sn[0].Name)) - World reset's best source for container loot" } else { '  Starting snapshot: none (the tool only makes one for a world that has no backup the first time it opens it)' }
   }
   return $L.ToArray()
 }
@@ -103,7 +124,7 @@ function OV-Fill {
 function New-OverviewForm([string]$savePath) {
   Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
   $script:OV = @{ Path = $savePath }; $u = $script:OV
-  $f = New-Object System.Windows.Forms.Form; $f.Text = 'Overview  -  everything the tool can read from your save'; $f.Size = New-Object System.Drawing.Size(860, 760); $f.MinimumSize = New-Object System.Drawing.Size(640, 480)
+  $f = New-Object System.Windows.Forms.Form; $f.Text = 'Overview  -  a read-only report of your save'; $f.Size = New-Object System.Drawing.Size(860, 760); $f.MinimumSize = New-Object System.Drawing.Size(640, 480)
   $f.StartPosition = 'CenterParent'; $f.Font = New-Object System.Drawing.Font('Segoe UI', 9); $u.Form = $f
   $u.Out = New-Object System.Windows.Forms.TextBox; $u.Out.Multiline = $true; $u.Out.ReadOnly = $true; $u.Out.ScrollBars = 'Vertical'; $u.Out.WordWrap = $false; $u.Out.Font = New-Object System.Drawing.Font('Consolas', 9.5)
   $u.Out.Location = '12,12'; $u.Out.Size = '820,640'; $u.Out.Anchor = 'Top,Left,Right,Bottom'; $f.Controls.Add($u.Out)

@@ -25,12 +25,11 @@ try {
   if ($SelfTest) { [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException) }
   # All windows are laid out in 96-DPI pixels. PowerShell 7 starts system-DPI-aware, so at 125% / 150% display scaling the FONTS grow but the boxes and buttons do not
   # (text gets clipped: "World rese", "Add to s"...). Ask Windows to draw our windows DPI-unaware instead: it scales each window as a whole, so the layout is the same at every scaling.
-  # Only when the window still fits: the main window needs about 1100 x 826 of its own pixels (it keeps a 12 px margin at the bottom, so 820 is enough), and Windows' scaled-down screen has (physical size / scaling) of them
-  # (1920x1080 at 150% leaves only 1280x720). On such a screen the windows stay DPI-aware (the old behaviour) so nothing is cut off at the bottom.
+  # On a small or highly scaled screen Windows' scaled-down desktop has fewer pixels than the layout needs (1920x1080 at 150% = 1280x720): the main window then scrolls (AutoScroll) instead of being cut off.
   try {
     if (-not ('PfDpiAwareness' -as [type])) { Add-Type -Namespace '' -Name PfDpiAwareness -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr SetThreadDpiAwarenessContext(System.IntPtr c); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern int GetDpiForSystem();' }
     $dpiScale = [PfDpiAwareness]::GetDpiForSystem() / 96.0; $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-    $script:DpiUnaware = ($dpiScale -le 1.0) -or (($wa.Width / $dpiScale) -ge 1100 -and ($wa.Height / $dpiScale) -ge 820)
+    $script:DpiUnaware = $true
     if ($script:DpiUnaware) { [void][PfDpiAwareness]::SetThreadDpiAwarenessContext([IntPtr](-1)) }   # DPI_AWARENESS_CONTEXT_UNAWARE; needs Windows 10 1607+, ignored otherwise
   } catch { }
   [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -49,7 +48,8 @@ try {
   # ---------- form ----------
   $form = New-Object System.Windows.Forms.Form
   $form.Text = 'Permafrost Item Tool  (single-player saves only)'
-  $form.Size = New-Object System.Drawing.Size(1180, 886); $form.MinimumSize = New-Object System.Drawing.Size(1100, 826)
+  $form.AutoScroll = $true   # when the window is smaller than the layout needs (small laptop, high scaling) a scrollbar appears instead of the bottom being cut off
+  $waStart = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $form.Size = New-Object System.Drawing.Size([math]::Min(1180, $waStart.Width), [math]::Min(940, $waStart.Height)); $form.MinimumSize = New-Object System.Drawing.Size(640, 420)
   $form.StartPosition = 'CenterScreen'; $form.Font = New-Object System.Drawing.Font('Segoe UI', 9); Set-AppIcon $form
 
   function New-Ctl($type, $x, $y, $w, $h, $text = '') { $c = New-Object $type; $c.Location = New-Object System.Drawing.Point($x, $y); $c.Size = New-Object System.Drawing.Size($w, $h); if ($text) { $c.Text = $text }; $form.Controls.Add($c); return $c }
@@ -70,11 +70,11 @@ try {
   $pnlPics.Add_Paint({ param($s, $e) $c = $script:Th.Accent; $b = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(46, $c.R, $c.G, $c.B)); $e.Graphics.FillRectangle($b, 0, 0, $s.Width, $s.Height); $b.Dispose(); $p = New-Object System.Drawing.Pen($c); $e.Graphics.DrawRectangle($p, 0, 0, $s.Width - 1, $s.Height - 1); $p.Dispose() })
   $lblGame = New-Ctl System.Windows.Forms.Label 12 44 1140 22; $lblGame.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $lblGame.Anchor = 'Top,Left,Right'
   $lblInfo = New-Ctl System.Windows.Forms.Label 12 66 1140 20; $lblInfo.Anchor = 'Top,Left,Right'
-  $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'
+  $lblNote = New-Ctl System.Windows.Forms.Label 12 86 1140 20 'Before applying: close the game, and keep Steam Cloud off for Permafrost while testing. A backup is made automatically before every change.'; $lblNote.ForeColor = $script:Th.Muted; $lblNote.Anchor = 'Top,Left,Right'; foreach ($el in @($lblGame, $lblInfo, $lblNote)) { $el.AutoEllipsis = $true }
   $lblBp = New-Ctl System.Windows.Forms.Label 700 66 104 20 'Backpack slots:'
   $numBp = New-Ctl System.Windows.Forms.NumericUpDown 810 64 70 24; $numBp.Minimum = 5; $numBp.Maximum = 100; $numBp.Increment = 5; $numBp.Value = 25
   $btnBp = New-Ctl System.Windows.Forms.Button 868 62 104 26 'Apply in game'
-  $lblBpHint = New-Ctl System.Windows.Forms.Label 700 88 380 18; $lblBpHint.TextAlign = 'MiddleRight'; $lblBpHint.ForeColor = $script:Th.Muted
+  $lblBpHint = New-Ctl System.Windows.Forms.Label 700 88 380 18; $lblBpHint.TextAlign = 'MiddleRight'; $lblBpHint.AutoEllipsis = $true; $lblBpHint.ForeColor = $script:Th.Muted
 
   # catalog panel
   $gbCat = New-Ctl ThemedGroup 12 112 560 396 'Item catalog'; $gbCat.Anchor = 'Top,Left,Bottom'
@@ -406,23 +406,23 @@ try {
 PERMAFROST ITEM TOOL - HOW IT WORKS
 ===================================
 What it is
-A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar. Extra windows (top right) cover the rest: 'Player tools...' (vitals, skills, recipes, teleport, quest progress), 'Game data...' (search everything found in the game files, reward pools, quests, recipes, bundles), 'Recipe tweaks...' (change crafting inside the game), 'World reset...' (put used-up trees, ores, items and loot back) and 'Build move...' (move placed buildings inside the game). See THE EXTRA WINDOWS below. Press Ctrl+F in this window to search it.
+A tool for a SINGLE-PLAYER Permafrost save. The main window adds items to your backpack/hotbar and sets your backpack size. Extra windows, opened from the row of buttons under the Save file row, cover the rest: 'Player tools...' (vitals, skills, recipes, teleport, quest progress), 'World reset...' (put used-up trees, ores, items and loot back), 'Game data...' (search everything found in the game files, reward pools, quests, recipes, bundles), 'Pictures...' (build the item pictures from your own game), 'Recipe tweaks...' (change crafting inside the game), 'Build move...' (move placed buildings inside the game), 'Stack sizes...' (stack first aid kits inside the game) and this Help. 'Overview...' (top of the window) is the read-only report. See THE EXTRA WINDOWS below. Press Ctrl+F in this window to search it.
 
 Before you start (every time)
 1. In the game: save, then quit completely. The tool refuses to apply while the game is running.
 2. Keep Steam Cloud OFF for Permafrost while editing (see "Steam Cloud" below).
 
 THE WINDOW
-The window opens maximized and resizes with you. Press F11 for true full screen (Esc or F11 again to leave it).
+The window opens maximized and resizes with you; if it is ever smaller than its content needs (a small screen or a big Windows text size), scroll bars appear instead of cutting anything off. Press F11 for true full screen (Esc or F11 again to leave it). From the top: the banner (Overview... and the colour Theme box), the Save file row, a row of buttons for the extra windows, the status lines, then the catalog, the selected item, the queue, the current inventory and the log.
 
-- Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save.
-- Game status line (top, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled.
-- Backpack slots (top right): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want (a multiple of 5: the screen is a grid with 5 columns) and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). The tool makes a backup of your save first. IMPORTANT: the game DELETES every item that has no slot the next time it saves (tested: after one save with the mod off, the items in the extra slots were gone). So the tool refuses a size that would leave an item outside the backpack, and shows a red DANGER line under the box if an item already sits above the size the game will use (for example because the mod is off or not loading). If you see it, do NOT play: switch the mod on (Apply in game) or restore a backup. Add items counts your size as soon as the mod is installed and on.
+- Save file / Browse / Reload (top): Shows which .pfs save is edited. Browse lists every world found on this PC (hours played, last saved) so you can pick one, or lets you pick a .pfs file yourself. Reload re-reads the save. The world you pick is remembered.
+- Game status line (under the buttons, green/red): Green = game closed, safe. Red = game running, Apply and Restore are disabled. The lines below it show the world, play time, when it was last saved and your worn backpack ("Worn: ScavengerBackpack - using 35 slots"); a red DANGER line appears there when kits or backpack items are at risk (see Backpack slots and STACK SIZES).
+- Backpack slots (right end of the Save file row, the line under it says where the number comes from): How many slots your worn backpack has (the label says where the number comes from). To make your backpack BIGGER (or smaller), type the number you want (a multiple of 5: the screen is a grid with 5 columns) and press 'Apply in game'. The first time the tool offers to install a small in-game mod (BackpackSlots, for UE4SS - see the README); after that the game applies your size every time it starts, before your save loads, so you just start the game. If the game is already running, take the backpack off and put it back on (drag it to the hotbar and back). The tool makes a backup of your save first. IMPORTANT: the game DELETES every item that has no slot the next time it saves (tested: after one save with the mod off, the items in the extra slots were gone). So the tool refuses a size that would leave an item outside the backpack, and shows a red DANGER line under the box if an item already sits above the size the game will use (for example because the mod is off or not loading). If you see it, do NOT play: switch the mod on (Apply in game) or restore a backup. Add items counts your size as soon as the mod is installed and on.
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
-- Overview (top right): a read-only report of your save - world and play time, character, skills, inventory, recipes known, quests, buildings, explored area, companion, backups - with a Copy button. Nothing in it changes the save.
-- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures...' (top right) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
+- Overview... (banner, top): a read-only report of your save - world and play time, character, skills, inventory (with the backpack size in use), recipes known, quests, buildings, explored area, companion, the state of the in-game mods and your settings for them, backups - with a Copy report button. Nothing in it changes the save.
+- Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures...' (in the row of buttons) or 'Build pictures now' (the bar under the status lines) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
 
 Item catalog (left)
 All 380 items found in the game's files. Type in the search box or pick a category. Click a column header to sort. Columns (everything comes from the game's own data unless it says otherwise):
@@ -475,13 +475,13 @@ WARNINGS YOU MAY SEE
 - Raised stack size - bigger than anything seen in your saves; the game may cap or mishandle it.
 - Condition too high - above the usual value; may exceed the item's real maximum.
 - Quest item - adding it does NOT complete or advance any quest step.
-- Not enough room - free some backpack/hotbar space in the game first.
+- Not enough room - free some backpack/hotbar space in the game first, add less, or make the backpack bigger with the Backpack slots box.
 - Game is running - save and close the game, then try again.
 
 If a step FAILS, the message says whether your save was left untouched or the original was put back.
 
 THE EXTRA WINDOWS
-These windows use the same save file as the main window (World reset has its own World box). The ones that change your save (Player tools, World reset) go through the same safety steps: game must be closed, confirmation first, automatic backup, result re-checked. Recipe tweaks and Build move change the game while it runs and never touch your save.
+These windows use the same save file as the main window (World reset has its own World box). The ones that change your save (Player tools, World reset) go through the same safety steps: game must be closed, confirmation first, automatic backup, result re-checked. Recipe tweaks, Build move, Stack sizes and the Backpack slots box change the game (in memory, through small UE4SS mods) and never touch your save; Pictures only reads the game's files.
 
 PLAYER TOOLS...
 - Vitals and skills - Current and maximum health / stamina / energy / hunger / body warmth, unspent skill points, and the level of each of the 16 skills (or all at once). The list shows each skill's maximum level and benefit per level from the game data, and levels above the cap are stopped. Nothing is written until you press 'Apply changes to save'; only the values you changed are written. XP needed per level = 10 x level^1.5 (matches your save). Levels above anything in your save (highest 29) are flagged as untested.
@@ -516,7 +516,7 @@ Lets you pick up a building you placed and put it somewhere else, inside the gam
 - Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
 - Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
 
-STACK SIZES... (banner button, next to Overview)
+STACK SIZES... (button row)
 Makes first aid kits STACK, in every inventory (backpack, hotbar, containers). Kits normally take one slot each because they carry a durability (the 'condition'); a stack of durable items shares ONE condition and wastes kits, so this setting also turns their durability off: every use consumes one whole kit, like a bandage (partial use goes away). It works through a small in-game mod (StackSizes, for UE4SS - see the README) that the tool offers to install; your save is never touched by the mod.
 - Make first aid kits stackable and single use - the on/off switch. Kits per slot - how many fit in one slot (stacks of 5 and 10 were tried in the game; the biggest allowed is 20).
 - Apply - makes a backup of your save, installs or updates the mod if needed and saves the setting. The game applies it every time it starts, before your save loads.
@@ -580,26 +580,30 @@ WHERE THINGS ARE
 
   # ---------- layout that follows the window size (so maximized / full screen looks right) ----------
   function Do-Layout {
-    $W = $form.ClientSize.Width; $H = $form.ClientSize.Height
-    if ($W -lt 900 -or $H -lt 600) { return }
+    $script:MinLayoutW = 1076
+    $W = [math]::Max($form.ClientSize.Width, $script:MinLayoutW); $H = $form.ClientSize.Height
+    if ($form.ClientSize.Width -lt 200 -or $form.ClientSize.Height -lt 200) { return }
     foreach ($c in @($gbCat,$gbSel,$gbQ,$gbInv,$gbLog,$txtSave,$btnBrowse,$btnReload,$btnHelp,$lblGame,$lblInfo,$lblNote,$lvCat,$lvInv,$txtLog,$lbQ,$txtSearch,$cmbCat,$btnRestore,$btnOpenBk,$btnRemove,$btnClear,$btnPreview,$btnApply,$btnAdd,$tip)) { $c.Anchor = 'Top,Left' }
-    $off = 66; $m = 12; $gap = 12; $top = 112 + $off + $(if ($script:PicsBarOn) { 38 } else { 0 })
-    $pnlPics.SetBounds($m, 108 + $off, $W - 2 * $m, 32); $bw1 = 150; $bw2 = 90; $bw3 = 130; $by = 3
+    # header, top to bottom: banner (title + Overview + Theme) / Save file row (path + Browse + Reload ... Backpack slots box) / backpack status line under that box / ONE row of 8 equal buttons across the full width / 3 status lines
+    $B = 66; $m = 12; $gap = 12; $ySave = $B + 6; $yHint = $B + 34; $yB1 = $B + 54; $yStat = $B + 88
+    $yPics = $B + 150; $top = $B + 154 + $(if ($script:PicsBarOn) { 38 } else { 0 })
+    $pnlPics.SetBounds($m, $yPics, $W - 2 * $m, 32); $bw1 = 150; $bw2 = 90; $bw3 = 130; $by = 3
     $btnPicsNever.SetBounds($pnlPics.Width - 6 - $bw3, $by, $bw3, 26); $btnPicsLater.SetBounds($btnPicsNever.Left - 6 - $bw2, $by, $bw2, 26); $btnPicsGo.SetBounds($btnPicsLater.Left - 6 - $bw1, $by, $bw1, 26); $lblPics.SetBounds(10, 0, [math]::Max(120, $btnPicsGo.Left - 16), 32)
-    $lblGame.Top = 44 + $off; $lblInfo.Top = 66 + $off; $lblNote.Top = 86 + $off
-    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20); $btnPics.SetBounds($lblTheme.Left - 14 - 100, 19, 100, 26); $btnOv.SetBounds($btnPics.Left - 8 - 100, 19, 100, 26); $btnStk.SetBounds($btnOv.Left - 8 - 110, 19, 110, 26)
-    $btnHelp.SetBounds($W - $m - 132, 10 + $off, 132, 26)
-    $btnData.SetBounds($btnHelp.Left - 6 - 110, 10 + $off, 110, 26); $btnPlayer.SetBounds($btnData.Left - 6 - 110, 10 + $off, 110, 26)
-    $btnTweaks.SetBounds($btnPlayer.Left - 6 - 120, 10 + $off, 120, 26); $btnWorld.SetBounds($btnTweaks.Left - 6 - 110, 10 + $off, 110, 26); $btnMove.SetBounds($btnWorld.Left - 6 - 110, 10 + $off, 110, 26); $btnReload.SetBounds($btnMove.Left - 6 - 80, 10 + $off, 80, 26)
-    $btnBrowse.SetBounds($btnReload.Left - 6 - 80, 10 + $off, 80, 26)
-    $txtSave.SetBounds(84, 11 + $off, $btnBrowse.Left - 8 - 84, 24)
-    $lblSave.Top = 14 + $off
-    foreach ($l in @($lblGame, $lblInfo, $lblNote)) { $l.Width = $W - 2 * $m }
+    $hintW = [math]::Min(560, $W - $m - 480); $hintL = $W - $m - $hintW
+    $lblGame.SetBounds($m, $yStat, $W - 2 * $m, 20); $lblInfo.SetBounds($m, $yStat + 22, $W - 2 * $m, 18); $lblNote.SetBounds($m, $yStat + 40, $W - 2 * $m, 18)
+    $cmbTheme.SetBounds($W - 12 - 140, 20, 140, 24); $lblTheme.SetBounds($cmbTheme.Left - 56, 23, 52, 20); $btnOv.SetBounds($lblTheme.Left - 14 - 110, 19, 110, 26)
+    # Save file row: path box (up to 640 px) + Browse + Reload right after it, and the Backpack slots box at the right end of the same row
+    $tw = [math]::Max(300, [math]::Min(640, $W - 570))
+    $txtSave.SetBounds(84, $ySave + 1, $tw, 24); $btnBrowse.SetBounds($txtSave.Right + 8, $ySave, 80, 26); $btnReload.SetBounds($btnBrowse.Right + 6, $ySave, 80, 26); $lblSave.Top = $ySave + 4
+    # the other eight buttons in ONE row, equal width, spread across the whole window. First what works from your save and the game data, then the three in-game mods (need UE4SS), Help last
+    $gg = 6; $gw = [int][math]::Floor(($W - 2 * $m - 7 * $gg) / 8); $grid = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp)
+    for ($c = 0; $c -lt 8; $c++) { $grid[$c].SetBounds($m + $c * ($gw + $gg), $yB1, $gw, 26) }
     $leftW = [int](($W - 3 * $m) * 0.46); $rightX = $m + $leftW + $m; $rightW = $W - $rightX - $m
+    $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })) + $gap + 150 + $m)
     $avail = $H - $top - $m
-    $minTopH = 372 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
-    $topH = [math]::Max($minTopH, [int](($avail - $gap) * 0.55)); $botH = $avail - $topH - $gap
-    if ($botH -lt 200) { $botH = 200; $topH = [math]::Max($minTopH, $avail - $gap - $botH) }
+    $minTopH = 346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
+    $topH = [math]::Max($minTopH, [int](($avail - $gap) * 0.66)); $botH = $avail - $topH - $gap
+    $botMin = 150; if ($botH -lt $botMin) { $botH = $botMin; $topH = [math]::Max($minTopH, $avail - $gap - $botH) }
     # catalog (top-left)
     $gbCat.SetBounds($m, $top, $leftW, $topH)
     $cmbCat.SetBounds($leftW - 10 - 190, 22, 190, 24)
@@ -621,9 +625,11 @@ WHERE THINGS ARE
     $gbLog.SetBounds($rightX, $y2, $rightW, $botH); $txtLog.SetBounds(10, 22, $rightW - 20, $botH - 66)
     $btnRestore.Top = $botH - 38; $btnOpenBk.Top = $botH - 38
     # backpack size box (top-right) and the info line beside it
-    $btnBp.SetBounds($W - $m - 104, 66 + $off, 104, 24); $numBp.SetBounds($btnBp.Left - 6 - 70, 66 + $off, 70, 24); $lblBp.SetBounds($numBp.Left - 4 - 104, 69 + $off, 104, 20)
-    $lblInfo.Width = $lblBp.Left - 8 - $m
-    $lblBpHint.SetBounds($W - $m - 420, 90 + $off, 420, 18); $lblNote.Width = $W - 2 * $m - 430
+    $btnBp.SetBounds($W - $m - 104, $ySave, 104, 26); $numBp.SetBounds($btnBp.Left - 6 - 70, $ySave + 1, 70, 24); $lblBp.SetBounds($numBp.Left - 4 - 104, $ySave + 4, 104, 20)
+    $lblBpHint.SetBounds($hintL, $yHint, $hintW, 18)   # its own line right under the Backpack slots box (right-aligned with it), above the buttons; ends in "..." if it ever does not fit
+    # nothing below the header may be cut off: when the window is smaller than this, the form scrolls
+    $needH = $top + $minTopH + $gap + $botMin + $m; $script:NeedLayoutH = $needH
+    $asm = New-Object System.Drawing.Size($script:MinLayoutW, $needH); if ($form.AutoScrollMinSize -ne $asm) { $form.AutoScrollMinSize = $asm }
   }
 
   # ---------- banner (game key art + logo) and theme picker ----------
@@ -632,7 +638,7 @@ WHERE THINGS ARE
   $banner.Add_Paint({ param($s, $e) Paint-Banner $e.Graphics $s.Width $s.Height 'single-player saves only   |   items - skills - recipes - teleport' })
   $banner.Add_Resize({ $banner.Invalidate() })
   $lblTheme = New-Object System.Windows.Forms.Label; $lblTheme.Text = 'Theme'; $lblTheme.TextAlign = 'MiddleRight'; $lblTheme.BackColor = [System.Drawing.Color]::Transparent; $lblTheme.ForeColor = (Get-BannerFore); $banner.Controls.Add($lblTheme)
-  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme); $banner.Controls.Add($btnPics); $banner.Controls.Add($btnOv); $banner.Controls.Add($btnStk)
+  $cmbTheme = New-Object System.Windows.Forms.ComboBox; $cmbTheme.DropDownStyle = 'DropDownList'; foreach ($n in $script:Palettes.Keys) { [void]$cmbTheme.Items.Add($n) }; $cmbTheme.SelectedItem = $script:ThName; $banner.Controls.Add($cmbTheme); $banner.Controls.Add($btnOv)
   $form.Controls.Add($banner)
   function Switch-Theme([string]$name) { Set-Theme $name; Save-ThemeName $name; Apply-Theme $form; $lblTheme.ForeColor = (Get-BannerFore); $banner.Invalidate(); Update-GameState; Refresh-Catalog; Do-Layout; $form.Invalidate($true) }
   $cmbTheme.Add_SelectedIndexChanged({ if ([string]$cmbTheme.SelectedItem -ne $script:ThName) { Switch-Theme ([string]$cmbTheme.SelectedItem) } })
@@ -847,13 +853,18 @@ WHERE THINGS ARE
     [System.Windows.Forms.Application]::add_ThreadException({ param($s, $e) $errs.Add($e.Exception.Message + ' @ ' + $e.Exception.StackTrace) })
     $form.Opacity = 0; $form.ShowInTaskbar = $false; $form.StartPosition = 'Manual'; $form.Location = New-Object System.Drawing.Point(-4000, -4000); $form.Show()
     $out = @()
-    foreach ($sz in @(@(1100, 760), @(1400, 900), @(1920, 1040))) {
+    foreach ($sz in @(@(1100, 700), @(1100, 760), @(1180, 847), @(1400, 900), @(1920, 1040), @(2400, 1300))) {
       $form.ClientSize = New-Object System.Drawing.Size($sz[0], $sz[1]); [System.Windows.Forms.Application]::DoEvents()
       $bs = @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Top -lt 40 }); $bad = 0
       foreach ($a in $bs) { foreach ($b in $bs) { if ($a -ne $b -and $a.Bounds.IntersectsWith($b.Bounds)) { $bad++ } } }
-      $out += ("size {0}x{1}: top buttons {2}, overlaps {3}, save box {4}..{5}, rightmost button edge {6}" -f $sz[0], $sz[1], $bs.Count, $bad, $txtSave.Left, $txtSave.Right, ($bs | ForEach-Object { $_.Right } | Measure-Object -Maximum).Maximum)
+      $hdr = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp, $btnBrowse, $btnReload, $txtSave, $lblSave, $lblBp, $numBp, $btnBp, $lblBpHint, $lblGame, $lblInfo, $lblNote, $pnlPics); $hov = 0
+      for ($ia = 0; $ia -lt $hdr.Count; $ia++) { for ($ib = $ia + 1; $ib -lt $hdr.Count; $ib++) { if ($hdr[$ia].Visible -and $hdr[$ib].Visible -and $hdr[$ia].Bounds.IntersectsWith($hdr[$ib].Bounds)) { $hov++ } } }
+      $bar = [math]::Max(0, $gbLog.Bottom + 12 - [math]::Max($form.ClientSize.Height, $form.AutoScrollMinSize.Height))
+      $split = [int](100 * $gbCat.Height / ($gbCat.Height + $gbInv.Height)); $out += ("size {0}x{1}: catalog {13}% / inventory {14}%; header overlaps {2}, save box {3}..{4}; lower panels end at {5}, the layout needs {6} of {7} (scrolls {8}); content past the scroll area {9}; status widths {10}/{11}/{12}" -f $sz[0], $sz[1], $hov, $txtSave.Left, $txtSave.Right, $gbLog.Bottom, $form.AutoScrollMinSize.Height, $form.ClientSize.Height, $(if ($form.ClientSize.Height -lt $form.AutoScrollMinSize.Height) { 'yes' } else { 'no' }), $bar, $lblGame.Width, $lblInfo.Width, $lblNote.Width, $split, (100 - $split))
+      if ($hov -gt 0 -or $bar -gt 0) { $errs.Add("layout problem at $($sz[0])x$($sz[1]): header overlaps $hov, content past the scroll area $bar") }
     }
     if ($env:PF_SHOTS) {
+      foreach ($shotSz in @(@(1100, 700), @(1400, 900), @(1700, 1000))) { $form.ClientSize = New-Object System.Drawing.Size($shotSz[0], $shotSz[1]); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS ("layout_{0}x{1}.png" -f $shotSz[0], $shotSz[1])) }
       $form.ClientSize = New-Object System.Drawing.Size(1400, 900); [System.Windows.Forms.Application]::DoEvents()
       foreach ($tn in @($script:Palettes.Keys)) {
         Switch-Theme $tn; $cmbTheme.SelectedItem = $tn; $txtSearch.Text = 'Weapon_'; [System.Windows.Forms.Application]::DoEvents()
