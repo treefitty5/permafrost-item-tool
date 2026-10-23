@@ -890,6 +890,31 @@ WHERE THINGS ARE
       $split = [int](100 * $gbCat.Height / ($gbCat.Height + $gbInv.Height)); $out += ("size {0}x{1}: catalog {13}% / inventory {14}%; header overlaps {2}, save box {3}..{4}; lower panels end at {5}, the layout needs {6} of {7} (scrolls {8}); content past the scroll area {9}; status widths {10}/{11}/{12}" -f $sz[0], $sz[1], $hov, $txtSave.Left, $txtSave.Right, $gbLog.Bottom, $form.AutoScrollMinSize.Height, $form.ClientSize.Height, $(if ($form.ClientSize.Height -lt $form.AutoScrollMinSize.Height) { 'yes' } else { 'no' }), $bar, $lblGame.Width, $lblInfo.Width, $lblNote.Width, $split, (100 - $split))
       if ($hov -gt 0 -or $bar -gt 0) { $errs.Add("layout problem at $($sz[0])x$($sz[1]): header overlaps $hov, content past the scroll area $bar") }
     }
+    if ($env:PF_DISCORD) {   # pictures for posts (Frostbite theme): the main window with a hover picture, Stack sizes, Help, Overview (top and mods section), the "please wait" box, World reset
+      $dd = $env:PF_DISCORD; Switch-Theme 'Frostbite'; $cmbTheme.SelectedItem = 'Frostbite'; $form.ClientSize = New-Object System.Drawing.Size(1400, 900); $cmbCat.SelectedItem = 'All'; $txtSearch.Text = 'Weapon_'; [System.Windows.Forms.Application]::DoEvents()
+      $lvCat.Items[3].Selected = $true; [void](Queue-ById 'Whiskey' 6); [System.Windows.Forms.Application]::DoEvents()
+      $hov = $null; for ($ix = 0; $ix -lt [math]::Min(14, $lvCat.Items.Count); $ix++) { if ($lvCat.Items[$ix].Tag -and (Get-ItemIcon $lvCat.Items[$ix].Tag.id)) { $hov = $lvCat.Items[$ix]; break } }
+      if ($hov) { $env:PF_LIVE = '1'; try { Save-WindowShot $form (Join-Path $dd '01_main_hover.png') { Show-HoverTip $lvCat ('cat:' + $hov.Tag.id) $hov.Tag.id (Get-TipLines $hov.Tag) ($hov.Bounds.X + 70) ($hov.Bounds.Y + 6) } } finally { Remove-Item Env:PF_LIVE -ErrorAction SilentlyContinue; Hide-HoverTip $lvCat } } else { Save-WindowShot $form (Join-Path $dd '01_main.png') }
+      Save-WindowShot $form (Join-Path $dd '_main_plain.png')
+      $script:TestMode = $true
+      $sf = New-StackSizesForm $script:SavePath; $sf.Opacity = 0; $sf.ShowInTaskbar = $false; $sf.StartPosition = 'Manual'; $sf.Location = New-Object System.Drawing.Point(-4000, -4000); $sf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300; [System.Windows.Forms.Application]::DoEvents()
+      Save-WindowShot $sf (Join-Path $dd '02_stack_sizes.png'); $sf.Close()
+      $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
+        $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300; [System.Windows.Forms.Application]::DoEvents()
+        Save-WindowShot $dlg (Join-Path $dd '03_help.png'); $dlg.Close() }
+      Show-Help; $script:DialogTestHook = $null
+      $ovf = @(New-OverviewForm $script:SavePath) | Where-Object { $_ -is [System.Windows.Forms.Form] } | Select-Object -First 1; $ovf.Opacity = 0; $ovf.ShowInTaskbar = $false; $ovf.StartPosition = 'Manual'; $ovf.Location = New-Object System.Drawing.Point(-4000, -4000); $ovf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 500; [System.Windows.Forms.Application]::DoEvents()
+      Save-WindowShot $ovf (Join-Path $dd '04_overview.png')
+      $o = $script:OV.Out; $o.SelectionStart = $o.TextLength; $o.SelectionLength = 0; $o.ScrollToCaret(); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $ovf (Join-Path $dd '05_overview_mods.png'); $ovf.Close()
+      $mb = [System.Drawing.Image]::FromFile((Join-Path $dd '_main_plain.png')); $cv = New-Object System.Drawing.Bitmap $mb.Width, $mb.Height; $g = [System.Drawing.Graphics]::FromImage($cv); $g.DrawImage($mb, 0, 0, $mb.Width, $mb.Height)
+      $bx = [int](($mb.Width - 360) / 2); $by = [int](($mb.Height - 92) / 2); $br = New-Object System.Drawing.SolidBrush($script:Th.Accent); $g.FillRectangle($br, $bx, $by, 360, 92); $br.Dispose(); $br = New-Object System.Drawing.SolidBrush($script:Th.Panel); $g.FillRectangle($br, $bx + 2, $by + 2, 356, 88); $br.Dispose()
+      $f1 = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold); $f2 = New-Object System.Drawing.Font('Segoe UI', 9); $fl = [System.Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [System.Windows.Forms.TextFormatFlags]::VerticalCenter
+      [System.Windows.Forms.TextRenderer]::DrawText($g, 'Reading your save...', $f1, (New-Object System.Drawing.Rectangle(($bx + 10), ($by + 14), 340, 34)), $script:Th.Text, $fl); [System.Windows.Forms.TextRenderer]::DrawText($g, 'Please wait a moment...', $f2, (New-Object System.Drawing.Rectangle(($bx + 10), ($by + 50), 340, 22)), $script:Th.Muted, $fl)
+      $g.Dispose(); $cv.Save((Join-Path $dd '06_busy_popup.png')); $cv.Dispose(); $mb.Dispose(); $f1.Dispose(); $f2.Dispose()
+      $wf = New-WorldResetForm; $wf.Opacity = 0; $wf.ShowInTaskbar = $false; $wf.StartPosition = 'Manual'; $wf.Location = New-Object System.Drawing.Point(-4000, -4000); $wf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 400; [System.Windows.Forms.Application]::DoEvents()
+      Save-WindowShot $wf (Join-Path $dd '07_world_reset.png'); $wf.Close()
+      $script:TestMode = $false; Remove-Item (Join-Path $dd '_main_plain.png') -ErrorAction SilentlyContinue; $script:Queue.Clear(); Refresh-Queue; $txtSearch.Text = ''
+    }
     if ($env:PF_SHOTS) {
       foreach ($shotSz in @(@(1100, 700), @(1400, 900), @(1700, 1000))) { $form.ClientSize = New-Object System.Drawing.Size($shotSz[0], $shotSz[1]); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS ("layout_{0}x{1}.png" -f $shotSz[0], $shotSz[1])) }
       $form.ClientSize = New-Object System.Drawing.Size(1400, 900); [System.Windows.Forms.Application]::DoEvents()

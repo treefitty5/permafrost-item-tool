@@ -52,7 +52,8 @@ function HP-Render($tb, [string]$text, $th) {
     if ($l -match '^- (.*)$') {   # bullet: bold name, then the description
       $body = $Matches[1]; $name = ''; $rest = $body
       $m = [regex]::Match($body, '^((?:[^():]|\([^)]*\))+?)( - |: )(.*)$')
-      if ($m.Success -and $m.Groups[1].Value.Length -le 100 -and $m.Groups[1].Value -notmatch '[\.!?]$') { $name = $m.Groups[1].Value; $rest = $m.Groups[3].Value; $sep = $m.Groups[2].Value.Trim() }
+      if ($m.Success -and $m.Groups[1].Value.Length -le 100 -and $m.Groups[1].Value -notmatch '[\.!?]$') { $name = $m.Groups[1].Value; $rest = $m.Groups[3].Value; $sep = $m.Groups[2].Value.Trim()
+        if ($name.Length -gt 48 -and $name.IndexOf(' (') -gt 0) { $k = $name.IndexOf(' ('); $rest = $name.Substring($k) + $sep + ' ' + $rest; $name = $name.Substring(0, $k); $sep = '' } }
       & $para 18 20; & $add ([string][char]0x25CF + "`t") $th.Accent 8 $false
       if ($name) { & $inline $name $th.Accent2 10.5 $true; & $add ($sep + ' ') $th.Muted 10.5 $false }
       & $inline $rest $th.Text 10.5 $false; & $add "`n" $th.Text 10.5 $false; continue

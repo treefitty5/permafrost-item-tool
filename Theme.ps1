@@ -63,9 +63,9 @@ function Fit-LastColumn($lv) {
     $w = $lv.ClientSize.Width - $sum - 2; if ($w -gt 40) { $lv.Columns[$n - 1].Width = $w } } catch { }
 }
 if (-not ('PfWin' -as [type])) { Add-Type -Namespace '' -Name PfWin -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr hwnd, System.IntPtr hdc, uint flags); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern System.IntPtr GetDC(System.IntPtr h); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern int ReleaseDC(System.IntPtr h, System.IntPtr dc); [System.Runtime.InteropServices.DllImport("gdi32.dll")] public static extern int GetDeviceCaps(System.IntPtr dc, int i);' }
-function Save-WindowShot($f, [string]$path) {
+function Save-WindowShot($f, [string]$path, [scriptblock]$pre = $null) {
   if ($env:PF_LIVE) {   # real on-screen pixels: show the window for a moment, copy the screen, hide it again
-    $oldLoc = $f.Location; $f.Opacity = 1; $f.Location = New-Object System.Drawing.Point(0, 0); $f.TopMost = $true; $f.Activate(); for ($k = 0; $k -lt 12; $k++) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 40 }
+    $oldLoc = $f.Location; $f.Opacity = 1; $f.Location = New-Object System.Drawing.Point(0, 0); $f.TopMost = $true; $f.Activate(); for ($k = 0; $k -lt 12; $k++) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 40 }; if ($pre) { & $pre; for ($k = 0; $k -lt 10; $k++) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 50 } }
     $dc = [PfWin]::GetDC([IntPtr]::Zero); $sc = [PfWin]::GetDeviceCaps($dc, 118) / [double][PfWin]::GetDeviceCaps($dc, 8); [void][PfWin]::ReleaseDC([IntPtr]::Zero, $dc); if ($sc -lt 1) { $sc = 1 }
     $pw = [int]($f.Width * $sc); $ph = [int]($f.Height * $sc); $bmp = New-Object System.Drawing.Bitmap $pw, $ph; $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen(0, 0, 0, 0, (New-Object System.Drawing.Size($pw, $ph))); $g.Dispose(); $bmp.Save($path); $bmp.Dispose()
     $f.TopMost = $false; $f.Opacity = 0; $f.Location = $oldLoc; [System.Windows.Forms.Application]::DoEvents(); return

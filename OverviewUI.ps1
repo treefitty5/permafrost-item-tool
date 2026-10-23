@@ -94,7 +94,7 @@ function Get-SaveOverview([string]$savePath) {
     '  (these change the running game, never your save file)'
     $ms = $null; try { $ms = RT-ModStatus } catch { }
     if ($ms -and $ms.Text -notmatch 'Mods folder not found') {
-      '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + ($ms.Text -replace '\s+start-up:.*$', '')
+      '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + ($ms.Text -replace '\s+(start-up|spawned in the world):.*$', '')
       $bm = $null; try { $bm = BM-Status } catch { }; if ($bm) { '  Build move:       ' + $bm.Text }
       $bt = $null; try { $bt = BT-ModStatus } catch { }
       if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
@@ -103,7 +103,7 @@ function Get-SaveOverview([string]$savePath) {
       if ($stt) { $sk = Get-StackTweaks
         '  Stack sizes:      ' + $stt.Text + '  Setting: ' + $(if ($sk.Enabled) { "first aid kits stack, $($sk.Size) per slot, single use." } else { 'off (kits do not stack).' })
         try { $fs = ST-FindKitStacks $savePath
-          if ($fs.Stacks -gt 0) { "                    Your save holds $($fs.Stacks) stack(s) of kits ($($fs.Player) in your inventory, $($fs.Containers) in containers); the biggest holds $($fs.Max)."
+          if ($fs.Stacks -gt 0) { "                    Kit stacks in your save: $($fs.Stacks)  (biggest $($fs.Max); $($fs.Player) in your inventory, $($fs.Containers) in containers)"
             $dg = ST-DangerText $fs; if ($dg) { '                    ' + $dg } } } catch { } }
     } else { '  UE4SS (the free script loader the mods need) was not found next to your save, so none of the in-game mods can be installed from here.' }
   }
