@@ -22,6 +22,7 @@ try {
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
+  $script:BusySkip = [bool]($SelfTest -or $Headless)
   if ($SelfTest) { [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException) }
   # All windows are laid out in 96-DPI pixels. PowerShell 7 starts system-DPI-aware, so at 125% / 150% display scaling the FONTS grow but the boxes and buttons do not
   # (text gets clipped: "World rese", "Add to s"...). Ask Windows to draw our windows DPI-unaware instead: it scales each window as a whole, so the layout is the same at every scaling.
@@ -273,10 +274,10 @@ try {
   }
   $script:QueueAdder = ${function:Queue-ById}
   $script:OnSaveChanged = { param($m) Log $m; Reload-Inventory }
-  function Open-Player { Reload-Inventory; Show-PlayerTools $form; Reload-Inventory; Update-GameState }
-  function Open-Data { $script:GD = @{}; Show-GameData $form; Update-GameState }
-  function Open-Tweaks { Show-RecipeTweaks $form }
-  function Open-World { Show-WorldReset $form; Reload-Inventory; Update-GameState }
+  function Open-Player { Invoke-Busy 'Opening Player tools...' { Reload-Inventory; Show-PlayerTools $form } $form; Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form; Update-GameState }
+  function Open-Data { $script:GD = @{}; Invoke-Busy 'Loading the game data...' { Show-GameData $form } $form; Update-GameState }
+  function Open-Tweaks { Invoke-Busy 'Loading the recipes...' { Show-RecipeTweaks $form } $form }
+  function Open-World { Invoke-Busy 'Reading your worlds...' { Show-WorldReset $form } $form; Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form; Update-GameState }
 
   function Show-TextDialog([string]$title, [string]$text) {
     # read-only text window with a Find bar (like Acrobat): matches are highlighted while you type, the arrows / Enter / F3 jump to the next or previous one.
@@ -831,12 +832,12 @@ WHERE THINGS ARE
   $btnRemove.Add_Click({ if ($lbQ.SelectedIndex -ge 0) { $script:Queue.RemoveAt($lbQ.SelectedIndex); Refresh-Queue } })
   $btnClear.Add_Click({ $script:Queue.Clear(); Refresh-Queue })
   $btnApply.Add_Click({ Apply-Queue })
-  $btnPreview.Add_Click({ Show-Preview })
+  $btnPreview.Add_Click({ Invoke-Busy 'Working out the slots...' { Show-Preview } $form })
   $btnHelp.Add_Click({ Show-Help })
-  $btnStk.Add_Click({ try { Show-StackSizes $form $script:SavePath; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Show-Overview $form $script:SavePath } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Show-Pictures $form $script:SavePath; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnStk.Add_Click({ try { Invoke-Busy 'Looking for first aid kits in your save...' { Show-StackSizes $form $script:SavePath } $form; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Invoke-Busy 'Reading your save...' { Show-Overview $form $script:SavePath } $form } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Invoke-Busy 'Opening Pictures...' { Show-Pictures $form $script:SavePath } $form; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Apply-BackpackSize })
-  $btnReload.Add_Click({ Reload-Inventory })
-  $btnBrowse.Add_Click({ $pick = Show-WorldPicker $form $txtSave.Text; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
+  $btnReload.Add_Click({ Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form })
+  $btnBrowse.Add_Click({ $pick = Invoke-Busy 'Looking for your worlds...' { Show-WorldPicker $form $txtSave.Text } $form; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
   $btnRestore.Add_Click({ Do-Restore })
   $btnOpenBk.Add_Click({ Start-Process explorer.exe (Get-BackupDir) })
   $form.Add_Resize({ Do-Layout })
