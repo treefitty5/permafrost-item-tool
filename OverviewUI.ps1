@@ -38,7 +38,7 @@ function Get-SaveOverview([string]$savePath) {
     "  Last saved:       $($pd.Updated)"
     $gb = Get-InstalledGameBuild $savePath; $dp = $null; try { $dpp = Join-Path $PSScriptRoot 'datapack.json'; if (Test-Path -LiteralPath $dpp) { $dp = Get-Content -LiteralPath $dpp -Raw | ConvertFrom-Json } } catch { }
     if ($gb) { "  Installed game:   Steam build $gb" }
-    if ($dp) { "  Data in this tool: made for Steam build $($dp.steamBuild) ($($dp.items) items)" + $(if ($gb -and [string]$dp.steamBuild -ne $gb) { "   <-- the game was updated since; new items/recipes may be missing here" } else { '' }) }
+    if ($dp) { "  Data in this tool: made for Steam build $($dp.steamBuild) ($($dp.items) items)"; if ($gb -and [string]$dp.steamBuild -ne $gb) { "                     ^ the game was updated since; new items/recipes may be missing here" } }
   }
   Sec 'Character' {
     foreach ($v in $pd.Vitals) { '  {0,-16}  {1:0.#} / {2:0.#}' -f $v.Label, $v.Value, $v.Max }
@@ -94,7 +94,7 @@ function Get-SaveOverview([string]$savePath) {
     '  (these change the running game, never your save file)'
     $ms = $null; try { $ms = RT-ModStatus } catch { }
     if ($ms -and $ms.Text -notmatch 'Mods folder not found') {
-      '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + $ms.Text
+      '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + ($ms.Text -replace '\s+start-up:.*$', '')
       $bm = $null; try { $bm = BM-Status } catch { }; if ($bm) { '  Build move:       ' + $bm.Text }
       $bt = $null; try { $bt = BT-ModStatus } catch { }
       if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
@@ -109,7 +109,7 @@ function Get-SaveOverview([string]$savePath) {
   }
   Sec 'Backups of this world' {
     $leaf = [IO.Path]::GetFileName($savePath); $bk = @(Get-ChildItem (Get-BackupDir) -Filter "*_$leaf" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' })
-    "  $($bk.Count) backup(s) in $(Get-BackupDir)" + $(if ($bk.Count) { "   (newest: $(($bk | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime.ToString('g')))" } else { '' })
+    "  $($bk.Count) backup(s) in the Backups folder" + $(if ($bk.Count) { "   (newest: $(($bk | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime.ToString('g')))" } else { '' })
     $sn = @($bk | Where-Object { $_.Name -match '_BASELINE_' }); if ($sn.Count) { "  Starting snapshot: yes ($($sn[0].Name)) - World reset's best source for container loot" } else { '  Starting snapshot: none (the tool only makes one for a world that has no backup the first time it opens it)' }
   }
   return $L.ToArray()
