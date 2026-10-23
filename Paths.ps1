@@ -59,6 +59,8 @@ function PF-SavePath {
 function PF-SaveFiles {
   $r = New-Object System.Collections.Generic.List[string]
   foreach ($d in (PF-SaveFolders)) { if (Test-Path -LiteralPath $d) { foreach ($s in (Get-ChildItem -LiteralPath $d -Filter '*.pfs' -File)) { $r.Add($s.FullName) } } }
+  # data rebuilds only: PF_EXTRA_SAVES = a folder with more .pfs files (old copies of worlds) whose item names should count as "seen in saves"
+  if ($env:PF_EXTRA_SAVES -and (Test-Path -LiteralPath $env:PF_EXTRA_SAVES)) { foreach ($s in (Get-ChildItem -LiteralPath $env:PF_EXTRA_SAVES -Filter '*.pfs' -File)) { $r.Add($s.FullName) } }
   return $r.ToArray()
 }
 

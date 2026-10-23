@@ -15,7 +15,7 @@
 "BP_MasterTrap","Core","BuildingParts/Core","51","","AM_DefaultPickup_low;BP_MasterBuildPart;BP_MasterInventory;BP_SkinningLock;DA_Build_TrapBow;ST_UI;BP_MasterInventory_GEN_VARIABLE;BP_SkinningLock_GEN_VARIABLE"
 "BP_MasterWindowShutter","Core","BuildingParts/Core","5","","BP_MasterBuildPart"
 "BP_MasterWorkbench","Core","BuildingParts/Core","15.8","","BP_Widget_CraftingModular;DA_Skill_Crafting"
-"BP_MasterWorkstation","Core","BuildingParts/Core","52.6","","BP_MasterBuildPart;ST_UI"
+"BP_MasterWorkstation","Core","BuildingParts/Core","52.2","","BP_MasterBuildPart;ST_UI"
 "BP_MasterWorkstationUpgrade","Core","BuildingParts/Core","9.8","",""
 "BP_PermaMasterDoor","Core","BuildingParts/Core","23.9","","BP_MasterBuildPart"
 "DA_BuildingSystemConfig","Data","BuildingParts/Data","5.7","","BP_BuildGrid_Beam;BP_BuildGrid_Door;BP_BuildGrid_Floor;BP_BuildGrid_Foundation;BP_BuildGrid_Roof;BP_BuildGrid_Roofpick;BP_BuildGrid_RoofpickSmall;BP_BuildGrid_RoofpickWall;BP_BuildGrid_RoofpickWallSmall;BP_BuildGrid_SmallFloor;BP_BuildGrid_SmallRoof;BP_BuildGrid_SmallTriangleWall;BP_BuildGrid_SmallWall;BP_BuildGrid_Stairs;BP_BuildGrid_TriangleWall;BP_BuildGrid_Wall;BP_BuildGrid_WindowShutter"

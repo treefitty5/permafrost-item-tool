@@ -112,7 +112,7 @@
 "GA_Player_Sprint","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/Locomotion","6.5","",""
 "GA_Player_Traversal","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/Locomotion","11.2","",""
 "GE_Cooldown_Slide","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/Locomotion","1","",""
-"GA_Passive_Achievements","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/PassiveAbilities","17","","DA_ACH_ALLY;DA_ACH_OVERHEATED;DA_ACH_PARTYTIME;DA_ACH_STATIONSPECIALIST;DA_ACH_UNLUCKYTRIO;DA_LearnBuilding_DisassemblyStation;DA_LearnBuilding_Tailoring_bench;DA_LearnBuilding_Weapons_bench"
+"GA_Passive_Achievements","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/PassiveAbilities","18.5","","DA_ACH_ALLY;DA_ACH_HEADSUP;DA_ACH_OVERHEATED;DA_ACH_PARTYTIME;DA_ACH_STATIONSPECIALIST;DA_ACH_UNLUCKYTRIO;DA_LearnBuilding_DisassemblyStation;DA_LearnBuilding_Tailoring_bench;DA_LearnBuilding_Trophy_Dummy;DA_LearnBuilding_Weapons_bench"
 "GA_Passive_CheckStat_AlcoholUnits","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/PassiveAbilities","8.6","",""
 "GA_Passive_CheckStat_Energy","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/PassiveAbilities","11.7","",""
 "GA_Passive_CheckStat_Health","GameplayAbilities","GAS/GameplayAbilities/MainCharacter/PassiveAbilities","10.2","",""

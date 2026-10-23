@@ -250,7 +250,7 @@ If a step fails, the message says whether your save was left untouched or the or
 |---|---|
 | **Find anything** | Type a name (`KeyAnnas`, `Anna`, `Whiskey`, `heater`, `bunker`...) and see every quest, reward pool, loot config, NPC, recipe or world item that mentions it. The button queues its items. |
 | **Reward pools** | What each quest reward group pays out, with exact amounts and which recipes it teaches. Queue a group's items. |
-| **Quests** | All 125 quests: description, every state, the tasks that lead from one state to the next (talk to, find, build, craft...), events, and a `>>` marker where **your** save is. **Quest helper:** *Items this step needs* lists what your current step asks for (an item to find or hand over, ingredients for a craft task, a reward group to collect); the button below queues exactly those items. |
+| **Quests** | All 126 quests: description, every state, the tasks that lead from one state to the next (talk to, find, build, craft...), events, and a `>>` marker where **your** save is. **Quest helper:** *Items this step needs* lists what your current step asks for (an item to find or hand over, ingredients for a craft task, a reward group to collect); the button below queues exactly those items. |
 | **Recipes** | Crafting recipes (ingredients, amounts, what they make, time, station) and learning recipes (what they teach, how they are learned, cost, which rewards hand them out), with *learned* status from your save. **Craft list:** pick a crafting recipe, set the number of crafts, press the button, and all ingredients are queued. |
 | **Loot tables** | Every loot list: items with spawn weight and amount range, guaranteed loot, which containers / NPCs use it. |
 | **Building parts** | Cost, health, refund, repair cost and requirements of everything you can build. |
@@ -473,6 +473,8 @@ pwsh -NoProfile -File .\Build-Everything.ps1
 ```
 
 It finds the game folder (through Steam's library list) and FModel's export folder, rebuilds `items.json` and every table in `catalog\`, and finishes with `Build-Finalize.ps1`, which turns the result into the shippable data pack (removes anything that came from your own saves, trims one index, blanks NPC journals, and records the game build). The story-text tables (`catalog\text.csv`, `catalog\lore.csv`) are also built; they stay on your computer (git ignores them) and fill the *Recordings and notes* tab and the in-game text table.
+
+The *verified* status of an item means its exact name was seen in a real save, so the build reads the saves it finds in your `SaveGame` folder. If you have old copies of worlds (for example your `Backups` folder) whose items should count too, set the environment variable `PF_EXTRA_SAVES` to that folder before running the build.
 
 Read the output: each builder prints a one-line summary (items, recipes, quests...). Numbers far below the previous run, or a line saying *problems:* with a number above 0, mean something in the game's data changed shape: open an issue and include that output. If FModel now shows errors, or the JSON files contain only values without names, the update changed the game's classes: make a new mappings file (18.1) and set it in FModel again.
 

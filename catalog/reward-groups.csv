@@ -31,6 +31,7 @@
 "LoganBoyce_Solar","Quest_1","ScavengerBackpack x1","ScavengerBackpack","1","ScavengerPants; ScavengerJacket; ScavengerHat; ScavengerGloves; ScavengerBoots; ScavengerBackpack","DA_LearningRecipe_ScavengerPants;DA_LearningRecipe_ScavengerJacket;DA_LearningRecipe_ScavengerHat;DA_LearningRecipe_ScavengerGloves;DA_LearningRecipe_ScavengerBoots;DA_LearningRecipe_ScavengerBackpack","0"
 "LoganBoyce_Solar","Quest_2_LaddersWoods","Whiskey x3","Whiskey","3","MiniatureTower","DA_LearnBuilding_MiniatureTower","0"
 "LoganBoyce_Solar","AfterTransmission","ElectricHeater x1; ScavengerBackpack x1","ElectricHeater;ScavengerBackpack","1;1","ElectricHeater; DisassemblyStation; ScavengerBackpack; ScavengerBoots; ScavengerGloves; ScavengerHat; ScavengerJacket; ScavengerPants","DA_LearningRecipe_ElectricHeater;DA_LearnBuilding_DisassemblyStation;DA_LearningRecipe_ScavengerBackpack;DA_LearningRecipe_ScavengerBoots;DA_LearningRecipe_ScavengerGloves;DA_LearningRecipe_ScavengerHat;DA_LearningRecipe_ScavengerJacket;DA_LearningRecipe_ScavengerPants","0"
+"LostWife","Quest_1_LostWife_Head","Plastic x8; Hide x6; Bucks x100","Plastic;Hide;Bucks","8;6;100","Trophy_Dummy","DA_LearnBuilding_Trophy_Dummy","0"
 "NewHome_Robyn_","Quest_1_TribalJacket_","","","","TribalJacket","DA_LearningRecipe_TribalJacket","0"
 "NewHome_Robyn_Village","Quest_1_TribalJacket_Robyn","","","","TribalJacket","DA_LearningRecipe_TribalJacket","0"
 "NewHome_Robyn_Village","Quest_1_Alt","StoneHatchet x1","StoneHatchet","1","","","0"
