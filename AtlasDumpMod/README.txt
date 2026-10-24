@@ -26,3 +26,9 @@ Lessons (each one cost a crash or a bad run)
   * A line trace "to the ground" from high up hit a flat plane at z 24387 everywhere: take the ground height from known object positions.
   * Some objects (cars, trash cans, loose items, trees) only exist in some worlds (random per world) and are not in the flight: the shipped map
     fills the gaps with records from older saves of other worlds (only where no object of that class already stands within 3 m).
+Second flight (2026-10-24): route-v8-75m.lua
+  297 stops, 75 m apart, over the revealed map of a played world (its FogOfWarRevealer_Voxels = 50 m squares, plus a one-square border) and a few extra stops
+  for known objects farther out. Made by Build-Route-v8.ps1 (needs a played world's save and the first flight's log for ground heights; heights from the
+  player's own clothing attachments and other flight artefacts are filtered out). Flown in a NEW throwaway world; the game gave that world the slot name of
+  an existing world and overwrote it, so BACK UP the played world's save and its DifficultySettings\<world>.diff before creating a new world.
+  The vitals keeper now refills every second. Result: pristine-world.bin 2675 -> 2761 records (487 -> 491 cells), loot-pool.json 1148 -> 1568 rolls.

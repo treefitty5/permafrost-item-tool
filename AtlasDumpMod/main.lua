@@ -201,7 +201,7 @@ local function fly()
 
   local function step()
     tk = tk + 1
-    if tk % 2 == 0 then topUp() end
+    topUp()                                                              -- every tick (1 s): a hit from landing in rock or a building must not outpace the refill
     if cooldown then cooldown = cooldown - 1; return cooldown > 0 end    -- false ends the chain
     if phase == "next" then
       if abort then finish("aborted"); return true end

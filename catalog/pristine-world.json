@@ -1,8 +1,8 @@
 {
   "Level": "PF_Worldmap_v2",
-  "Records": 2675,
-  "FromFlight": 2514,
-  "FromOtherSaves": 161,
-  "Cells": 487,
+  "Records": 2761,
+  "FromFlight": 2565,
+  "FromOtherSaves": 196,
+  "Cells": 491,
   "Note": "untouched ore / breakable / world-item records of the playable map; used by World reset when a world has no backup of an object"
 }
