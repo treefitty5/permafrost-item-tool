@@ -157,31 +157,43 @@ function Paint-Banner($g, [int]$W, [int]$H, [string]$subtitle) {
 # A small "please wait" window for things that take a moment before they show anything (opening a window that reads the save, searching for worlds...).
 # The window is shown first, then $action runs (the program is busy meanwhile, so the box just stays up); it goes away by itself as soon as another window
 # appears on screen, or when $action ends. The result of $action is returned. Not shown during the self-test.
+# $action can call Set-BusyStatus 'what it is doing now' (the second line, with the seconds so far); $lock = true also blocks the owner window meanwhile.
 $script:BusySkip = $false
-function Invoke-Busy([string]$message, [scriptblock]$action, $owner = $null) {
+$script:BusyStatus = $null
+function Set-BusyStatus([string]$text) { if ($script:BusyStatus) { & $script:BusyStatus $text } }
+function Invoke-Busy([string]$message, [scriptblock]$action, $owner = $null, [bool]$lock = $false) {
   if ($script:BusySkip) { return (& $action) }
-  $b = $null; $tm = $null; $old = [System.Windows.Forms.Cursor]::Current
+  $b = $null; $tm = $null; $old = [System.Windows.Forms.Cursor]::Current; $prevStatus = $script:BusyStatus; $locked = $false
   try {
     try {
-      $b = New-Object System.Windows.Forms.Form; $b.FormBorderStyle = 'None'; $b.StartPosition = 'Manual'; $b.ShowInTaskbar = $false; $b.Size = New-Object System.Drawing.Size(360, 92)
+      $b = New-Object System.Windows.Forms.Form; $b.FormBorderStyle = 'None'; $b.StartPosition = 'Manual'; $b.ShowInTaskbar = $false; $b.Size = New-Object System.Drawing.Size(420, 92)
       $b.BackColor = $script:Th.Accent; $b.Padding = New-Object System.Windows.Forms.Padding(2)
       $pn = New-Object System.Windows.Forms.Panel; $pn.Dock = 'Fill'; $pn.BackColor = $script:Th.Panel; $b.Controls.Add($pn)
       $l1 = New-Object System.Windows.Forms.Label; $l1.Text = $message; $l1.Font = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold); $l1.ForeColor = $script:Th.Text; $l1.BackColor = $script:Th.Panel
-      $l1.AutoSize = $false; $l1.AutoEllipsis = $true; $l1.TextAlign = 'MiddleCenter'; $l1.SetBounds(10, 14, 336, 34); $pn.Controls.Add($l1)
+      $l1.AutoSize = $false; $l1.AutoEllipsis = $true; $l1.TextAlign = 'MiddleCenter'; $l1.SetBounds(10, 14, 396, 34); $pn.Controls.Add($l1)
       $l2 = New-Object System.Windows.Forms.Label; $l2.Text = 'Please wait a moment...'; $l2.Font = New-Object System.Drawing.Font('Segoe UI', 9); $l2.ForeColor = $script:Th.Muted; $l2.BackColor = $script:Th.Panel
-      $l2.AutoSize = $false; $l2.TextAlign = 'MiddleCenter'; $l2.SetBounds(10, 50, 336, 22); $pn.Controls.Add($l2)
+      $l2.AutoSize = $false; $l2.AutoEllipsis = $true; $l2.TextAlign = 'MiddleCenter'; $l2.SetBounds(10, 50, 396, 22); $pn.Controls.Add($l2)
       $r = $(if ($owner -and $owner.Visible) { $owner.Bounds } else { [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea })
       $b.Location = New-Object System.Drawing.Point([int]($r.Left + ($r.Width - $b.Width) / 2), [int]($r.Top + ($r.Height - $b.Height) / 2))
       $b.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+      if ($lock -and $owner) { $owner.Enabled = $false; $locked = $true }
       if ($owner) { $b.Show($owner) } else { $b.Show() }
       $b.Refresh(); [System.Windows.Forms.Application]::DoEvents()
+      # windows that were already on screen do not count as "another window appeared"
+      $known = @(foreach ($vf in @([System.Windows.Forms.Application]::OpenForms)) { if ($vf.Visible) { $vf } })
       $tm = New-Object System.Windows.Forms.Timer; $tm.Interval = 120
-      $tm.Add_Tick({ try { foreach ($f in @([System.Windows.Forms.Application]::OpenForms)) { if ($f -ne $b -and $f -ne $owner -and $f.Visible) { $b.Hide(); $tm.Stop(); break } } } catch { } }.GetNewClosure())
+      $tm.Add_Tick({ try { foreach ($vf in @([System.Windows.Forms.Application]::OpenForms)) { if ($vf -ne $b -and $known -notcontains $vf -and $vf.Visible) { $b.Hide(); $tm.Stop(); break } } } catch { } }.GetNewClosure())
       $tm.Start()
+      $t0 = [DateTime]::UtcNow; $last = $t0
+      $script:BusyStatus = { param($text)
+        try { $now = [DateTime]::UtcNow; if (($now - $last).TotalMilliseconds -lt 80) { return }; $last = $now
+          $l2.Text = ($text + '   (' + [int]($now - $t0).TotalSeconds + ' s)'); $l2.Refresh(); [System.Windows.Forms.Application]::DoEvents() } catch { } }.GetNewClosure()
     } catch { }
     return (& $action)
   } finally {
+    $script:BusyStatus = $prevStatus
     try { if ($tm) { $tm.Stop(); $tm.Dispose() } } catch { }
+    try { if ($locked) { $owner.Enabled = $true } } catch { }
     try { if ($b) { $b.Close(); $b.Dispose() } } catch { }
     try { [System.Windows.Forms.Cursor]::Current = $old } catch { }
   }

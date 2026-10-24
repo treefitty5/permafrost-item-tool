@@ -63,11 +63,25 @@ function Test-NearPos($pos, $center, [double]$radius) {
 function Get-RecHealth($r) { $h = $r.Get('Scavengeable_CurrentHealth'); if ($null -eq $h -or $h -eq '') { return $null }; $v = 0.0; if ([double]::TryParse($h, [Globalization.NumberStyles]::Float, $script:ResetInv, [ref]$v)) { return $v }; return $null }
 function Format-Health([double]$v) { $t = $v.ToString('0.0###', $script:ResetInv); return $t }
 
+# "Please wait" status line: the UI (Invoke-Busy in Theme.ps1) shows what the slow steps are doing; without a window this does nothing
+function Report-Progress([string]$text) { if ($script:BusyStatus) { & $script:BusyStatus $text } }
+# the level name sits in the save header; reading it with a plain text search is much faster than a regex over the whole file
+function Get-LevelName([string]$t) {
+  $i = $t.IndexOf('LevelName>', [StringComparison]::Ordinal); if ($i -lt 0) { return '' }
+  $i += 10; $e = $t.IndexOf('?', $i, [StringComparison]::Ordinal); if ($e -lt 0) { $e = $t.Length }
+  return $t.Substring($i, $e - $i)
+}
+
 # plain-text copies of an actor: "[BEGIN_OBJECT_SAVE?Guid>HEX?...?END_OBJECT_SAVE?" and "[BEGIN_RUNTIME_DATA_SAVE?RuntimeDataPayload###>HEX?...?[END_RUNTIME_DATA_SAVE?"
 function Get-CopyGuids([string]$s) {
   $set = @{}
-  foreach ($m in [regex]::Matches($s, '\[BEGIN_OBJECT_SAVE\?Guid>([0-9A-F]{32})\?')) { $set[$m.Groups[1].Value] = 'object' }
-  foreach ($m in [regex]::Matches($s, '\[BEGIN_RUNTIME_DATA_SAVE\?RuntimeDataPayload###>([0-9A-F]{32})\?')) { $set[$m.Groups[1].Value] = 'runtime' }
+  # plain text searches (the regex version took 0.45 s per save); a guid is 32 upper-case hex digits followed by '?'
+  foreach ($pair in @(@('[BEGIN_OBJECT_SAVE?Guid>', 'object'), @('[BEGIN_RUNTIME_DATA_SAVE?RuntimeDataPayload###>', 'runtime'))) {
+    $tag = $pair[0]; $i = $s.IndexOf($tag, [StringComparison]::Ordinal)
+    while ($i -ge 0) {
+      $g = $i + $tag.Length
+      if ($g + 33 -le $s.Length -and $s[$g + 32] -eq '?') { $h = $s.Substring($g, 32); if ($h -cmatch '^[0-9A-F]{32}$') { $set[$h] = $pair[1] } }
+      $i = $s.IndexOf($tag, $g, [StringComparison]::Ordinal) } }
   return $set
 }
 # The save keeps ONE list of "[rGUID>HEX?" entries (HEX = the actor's text-form guid, 3756 entries in a 100 h world, one more for every thing
@@ -117,7 +131,7 @@ function Remove-Copies([string]$s, $guids) {
 
 function Get-WorldHistory([string]$savePath) {
   $leaf = [IO.Path]::GetFileName($savePath); $list = New-Object System.Collections.Generic.List[object]
-  $dir = Get-BackupDir
+  $dir = Get-BackupDir; Report-Progress 'Reading the shipped map of untouched objects...'
   # 0) the shipped map of untouched objects (catalog\pristine-world.bin, made by Build-Pristine.ps1 from a flight over the whole map): the OLDEST source, so any backup
   #    or other world wins over it. Only objects whose id is on this save's used-up list are ever restored from it (see Build-ResetPlan).
   try {
@@ -125,7 +139,7 @@ function Get-WorldHistory([string]$savePath) {
     if ((Test-Path $pb) -and (Test-Path $pj)) {
       $pm = Get-Content $pj -Raw | ConvertFrom-Json
       $myT = $script:L1.GetString([IO.File]::ReadAllBytes($savePath))
-      if ([regex]::Match($myT, 'LevelName>([^?]*)').Groups[1].Value -eq $pm.Level) {
+      if ((Get-LevelName $myT) -eq $pm.Level) {
         $ms = New-Object IO.MemoryStream (, [IO.File]::ReadAllBytes($pb)); $gz = New-Object IO.Compression.GZipStream($ms, [IO.Compression.CompressionMode]::Decompress)
         $out = New-Object IO.MemoryStream; $gz.CopyTo($out); $gz.Close()
         $list.Add([pscustomobject]@{ Name = 'shipped map of untouched objects'; Cells = [WorldBlob]::Parse($out.ToArray()); Copies = @{}; Other = $true; Pristine = $true }) } }
@@ -133,17 +147,24 @@ function Get-WorldHistory([string]$savePath) {
   # 1) other worlds on the same map (their saves and the tool's backups of them): the same object has the same id in every world, so what one
   #    world still has untouched can be put back into another. They come FIRST (oldest), so this world's own backups win; containers ignore them
   #    (loot is rolled per world).
+  $others = @(); $myLevel = ''
   try {
-    $myText = $script:L1.GetString([IO.File]::ReadAllBytes($savePath)); $myLevel = [regex]::Match($myText, 'LevelName>([^?]*)').Groups[1].Value
+    $myText = $script:L1.GetString([IO.File]::ReadAllBytes($savePath)); $myLevel = Get-LevelName $myText
     $folder = Split-Path $savePath -Parent; $others = @()
     foreach ($o in (Get-ChildItem -LiteralPath $folder -Filter '*.pfs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $leaf })) {
       $others += $o; foreach ($b in (Get-ChildItem $dir -Filter "*_$($o.Name)" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '_NEW_' } | Sort-Object Name)) { $others += $b } }
+  } catch { }
+  $own = @(Get-ChildItem $dir -Filter "*_$leaf" | Where-Object { $_.Name -notmatch '_NEW_' } | Sort-Object Name)
+  $total = @($others).Count + $own.Count; $done = 0
+  try {
     foreach ($f in $others) {
-      try { $t = $script:L1.GetString([IO.File]::ReadAllBytes($f.FullName)); if ([regex]::Match($t, 'LevelName>([^?]*)').Groups[1].Value -ne $myLevel) { continue }
+      $done++; Report-Progress "Reading earlier copies of your worlds: $done of $total"
+      try { $t = $script:L1.GetString([IO.File]::ReadAllBytes($f.FullName)); if ((Get-LevelName $t) -ne $myLevel) { continue }
         $w = Read-WorldCells $t; $list.Add([pscustomobject]@{ Name = $f.Name; Cells = $w.Cells; Copies = (Get-CopyGuids $t); Other = $true }) } catch { } }
   } catch { }
   # 2) this world's own backups
-  foreach ($f in (Get-ChildItem $dir -Filter "*_$leaf" | Where-Object { $_.Name -notmatch '_NEW_' } | Sort-Object Name)) {
+  foreach ($f in $own) {
+    $done++; Report-Progress "Reading earlier copies of your worlds: $done of $total"
     try { $t = $script:L1.GetString([IO.File]::ReadAllBytes($f.FullName)); $w = Read-WorldCells $t
       $list.Add([pscustomobject]@{ Name = $f.Name; Cells = $w.Cells; Copies = (Get-CopyGuids $t); Other = $false }) } catch { }
   }
@@ -155,12 +176,15 @@ function Get-RecKey($r) { return $r.ClsPath + '|' + $r.Transform }
 # ---------- planning ----------
 # opt: Trees, Ores, Breakables, Items, Containers (bool), RadiusM (0 = whole world), KeepFilled (containers that still hold items stay as they are), Seed
 function Build-ResetPlan([string]$savePath, $opt) {
+  Report-Progress 'Reading your world...'
   $s = $script:L1.GetString([IO.File]::ReadAllBytes($savePath)); $w = Read-WorldCells $s; $cells = $w.Cells
   $nodes = Get-NodeTable; $prot = Get-ProtectedIds; $center = Get-PlayerPos $s; $radius = [double]$opt.RadiusM * 100
   $hist = Get-WorldHistory $savePath
+  Report-Progress 'Comparing with the earlier copies...'
   # classes whose own file has no MaxHealth inherit the engine default: use the health every untouched (EIS_Active) actor of that class has in the saves
   $seen = @{}
-  foreach ($set in (@(, $cells) + @($hist | ForEach-Object { , $_.Cells }))) { foreach ($c in $set) { foreach ($r in $c.Recs) {
+  $setNo = 0
+  foreach ($set in (@(, $cells) + @($hist | ForEach-Object { , $_.Cells }))) { $setNo++; Report-Progress "Comparing with the earlier copies: $setNo of $($hist.Count + 1)"; foreach ($c in $set) { foreach ($r in $c.Recs) {
     if ($r.Cls -notmatch '^BP_D_' -or $nodes.ContainsKey($r.Cls) -or $r.State -ne 'EIS_Active') { continue }
     $h = $r.Get('Scavengeable_CurrentHealth'); if (-not $h) { continue }
     if (-not $seen.ContainsKey($r.Cls)) { $seen[$r.Cls] = @{} }; $seen[$r.Cls][$h] = 1 + [int]$seen[$r.Cls][$h] } } }
@@ -209,7 +233,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
   $wantRestore = $opt.Ores -or $opt.Breakables -or $opt.Items
   $usedUp = New-Object 'System.Collections.Generic.HashSet[string]'; foreach ($m in [regex]::Matches($s, '\[rGUID>([0-9A-F]{32})\?')) { [void]$usedUp.Add($m.Groups[1].Value) }
   if ($wantRestore) {
-    for ($hi = $hist.Count - 1; $hi -ge 0; $hi--) { $hs = $hist[$hi]
+    for ($hi = $hist.Count - 1; $hi -ge 0; $hi--) { $hs = $hist[$hi]; Report-Progress "Looking for destroyed objects: copy $($hist.Count - $hi) of $($hist.Count)"
       foreach ($hc in $hs.Cells) { if (-not $cellByName.ContainsKey($hc.Name)) { continue }
         foreach ($r in $hc.Recs) {
           $kind = Get-ResetKind $r.Cls $r.ClsPath
@@ -228,6 +252,7 @@ function Build-ResetPlan([string]$savePath, $opt) {
 
   # 3) containers
   if ($opt.Containers) {
+    Report-Progress 'Working out the container loot...'
     # original loot per container (oldest backup that saw it unopened) and pools of real rolls per container type
     $orig = @{}; $pool = @{}; $cfgOf = @{}
     # containers that use the same loot table (catalog\loot-links.csv) share one pool of real rolls
@@ -364,15 +389,19 @@ function Test-ResetSave([string]$origText, $plan, $built) {
   return $problems
 }
 
-function Install-WorldReset([string]$savePath, $opt, [switch]$SkipGameCheck) {
+# $Plan: the plan the Preview already made (reading all the earlier copies takes about a minute); it is only used when the save file is still exactly the one it was made from
+function Install-WorldReset([string]$savePath, $opt, [switch]$SkipGameCheck, $Plan = $null) {
   if ((-not $SkipGameCheck) -and (Test-GameRunning)) { throw 'The game is running. Save and close it first.' }
   if (-not (Test-Path $savePath)) { throw "Save not found: $savePath" }
   $orig = $script:L1.GetString([IO.File]::ReadAllBytes($savePath))
-  $plan = Build-ResetPlan $savePath $opt
+  if ($Plan -and $Plan.Text -ceq $orig) { $plan = $Plan } else { $plan = Build-ResetPlan $savePath $opt }
   if ($plan.Items.Count -eq 0 -and $plan.Plants.Count -eq 0) { throw 'nothing to reset with these settings' }
+  Report-Progress 'Putting the objects back...'
   $built = Build-ResetSave $plan $opt
+  Report-Progress 'Checking the result before anything is written...'
   $problems = Test-ResetSave $orig $plan $built
   if ($problems.Count) { throw ('Verification failed, nothing was written: ' + (($problems | Select-Object -First 5) -join '; ')) }
+  Report-Progress 'Making a backup and writing the save...'
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'; $name = [IO.Path]::GetFileName($savePath)
   $backup = Join-Path (Get-BackupDir) "$stamp`_$name"
   Copy-Item $savePath $backup -Force

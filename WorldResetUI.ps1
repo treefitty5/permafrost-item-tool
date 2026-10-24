@@ -29,27 +29,27 @@ function WR-Preview {
   $u = $script:WR; $u.Msg.Text = ''
   try {
     if (-not ($u.ChkTrees.Checked -or $u.ChkOres.Checked -or $u.ChkBreak.Checked -or $u.ChkItems.Checked -or $u.ChkCont.Checked -or $u.ChkPlants.Checked)) { $u.Out.Text = 'Tick at least one thing to put back.'; return }
-    $form = $u.Form; $old = $form.Cursor; $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor; [System.Windows.Forms.Application]::DoEvents()
-    $plan = Build-ResetPlan (WR-SavePath) (WR-Options)
+    $u.Plan = $null; $path = WR-SavePath; $opt = WR-Options
+    $plan = Invoke-Busy 'Working out what to put back' { Build-ResetPlan $path $opt } $u.Form $true
     $u.Plan = $plan; $u.Out.Text = ((Get-ResetSummary $plan) -join "`r`n")
-    $form.Cursor = $old
-  } catch { $u.Out.Text = "Could not read the save: $($_.Exception.Message)"; try { $u.Form.Cursor = [System.Windows.Forms.Cursors]::Default } catch { } }
+  } catch { $u.Out.Text = "Could not read the save: $($_.Exception.Message)" }
 }
 
 function WR-DoReset {
   $u = $script:WR
   try {
     if ((-not $script:TestMode) -and (Test-GameRunning)) { Msg 'The game is running. Save and close Permafrost first (a running game would overwrite the change).' 'World reset' 'OK' 'Warning' | Out-Null; return }
-    WR-Preview; if (-not $u.Plan -or ($u.Plan.Items.Count -eq 0 -and $u.Plan.Plants.Count -eq 0)) { if ($u.Plan) { Msg 'Nothing to put back with these settings - nothing was changed.' 'World reset' 'OK' 'Information' | Out-Null }; return }
+    if (-not $u.Plan) { WR-Preview }   # a Preview that was done with the same settings is reused: reading all the earlier copies takes about a minute
+    if (-not $u.Plan -or ($u.Plan.Items.Count -eq 0 -and $u.Plan.Plants.Count -eq 0)) { if ($u.Plan) { Msg 'Nothing to put back with these settings - nothing was changed.' 'World reset' 'OK' 'Information' | Out-Null }; return }
     $a = Msg ("About to change this world:`n" + (WR-SavePath) + "`n`n" + ($u.Out.Text) + "`n`nA backup is made first and the result is checked before it replaces the save. Steam Cloud should be OFF for Permafrost.`n`nContinue?") 'World reset' 'OKCancel' 'Question' 'Button2'
     if ($a -ne 'OK') { return }
-    $u.Form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor; [System.Windows.Forms.Application]::DoEvents()
-    $res = Install-WorldReset (WR-SavePath) (WR-Options) -SkipGameCheck:$script:TestMode
-    $u.Form.Cursor = [System.Windows.Forms.Cursors]::Default
+    $path = WR-SavePath; $opt = WR-Options; $plan = $u.Plan; $skip = [bool]$script:TestMode
+    $u.Plan = $null   # the plan is edited while it is applied: never reuse it, even when this fails
+    $res = Invoke-Busy 'Resetting your world' { Install-WorldReset $path $opt -SkipGameCheck:$skip -Plan $plan } $u.Form $true
     $u.Msg.Text = "Done. Backup: $([IO.Path]::GetFileName($res.Backup)). Start the game and load the world."
-    $u.Out.Text = ((@('Reset done:') + $res.Summary) -join "`r`n"); $u.Plan = $null
-    if ($script:OnSaveChanged) { & $script:OnSaveChanged "World reset applied (backup $([IO.Path]::GetFileName($res.Backup)))." }
-  } catch { try { $u.Form.Cursor = [System.Windows.Forms.Cursors]::Default } catch { }; Msg "Nothing was changed: $($_.Exception.Message)" 'World reset' 'OK' 'Error' | Out-Null; $u.Msg.Text = "Failed: $($_.Exception.Message)" }
+    $u.Out.Text = ((@('Reset done:') + $res.Summary) -join "`r`n")
+    if ($script:OnSaveChanged) { $backupName = [IO.Path]::GetFileName($res.Backup); Invoke-Busy 'Re-reading your save' { & $script:OnSaveChanged "World reset applied (backup $backupName)." } $u.Form $true | Out-Null }
+  } catch { $u.Plan = $null; Msg "Nothing was changed: $($_.Exception.Message)" 'World reset' 'OK' 'Error' | Out-Null; $u.Msg.Text = "Failed: $($_.Exception.Message)" }
 }
 
 function New-WorldResetForm {

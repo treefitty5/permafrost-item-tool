@@ -69,9 +69,9 @@ function Set-BlobValue([byte[]]$blob, [string]$key, [string]$newText) {
 }
 
 function Get-BlobSection([string]$s, [string]$name) {
-  $tag = "$name###>"; $ti = $s.IndexOf($tag)
-  if ($ti -lt 0 -or $s.IndexOf($tag, $ti + 1) -ge 0) { throw "$tag not found exactly once" }
-  $bs = $ti + $tag.Length; $be = $s.IndexOf('?', $bs)
+  $tag = "$name###>"; $ti = $s.IndexOf($tag, [StringComparison]::Ordinal)
+  if ($ti -lt 0 -or $s.IndexOf($tag, $ti + 1, [StringComparison]::Ordinal) -ge 0) { throw "$tag not found exactly once" }
+  $bs = $ti + $tag.Length; $be = $s.IndexOf('?', $bs, [StringComparison]::Ordinal)
   return @{ Start = $bs; End = $be; Bytes = (Decode-B64U $s.Substring($bs, $be - $bs)) }
 }
 
