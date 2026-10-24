@@ -7,7 +7,7 @@ $script:HotbarMaxSlot = 7
 $script:DefaultBackpackMaxSlot = 24     # slots 0..24 are known valid for the Utility backpack
 
 # ---------- helpers ----------
-function Test-GameRunning { [bool](Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^Permafrost' }) }
+function Test-GameRunning { [bool](Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^Permafrost(-Win64-Shipping)?$' }) }   # the game and its launcher stub only: companion tools such as 'PermafrostLiveMap' are not the game
 
 function Decode-B64U([string]$s) { $t = $s.Replace('-','+').Replace('_','/'); while ($t.Length % 4) { $t += '=' }; [Convert]::FromBase64String($t) }
 function Encode-B64U([byte[]]$b) { [Convert]::ToBase64String($b).Replace('+','-').Replace('/','_') }
