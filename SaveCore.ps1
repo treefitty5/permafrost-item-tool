@@ -76,9 +76,11 @@ function Get-BlobSection([string]$s, [string]$name) {
 }
 
 function Get-PlainRange([string]$s, [string]$key) {
-  $m = [regex]::Matches($s, '\?' + [regex]::Escape($key) + '>')
-  if ($m.Count -ne 1) { throw "plain-text key '$key' found $($m.Count) times (expected 1)" }
-  $a = $m[0].Index + $key.Length + 2; $b = $s.IndexOf('?', $a)
+  # plain text searches (a regex over the whole 5 MB save cost about 0.2 s per call)
+  $tag = '?' + $key + '>'; $first = $s.IndexOf($tag, [StringComparison]::Ordinal); $count = 0; $at = $first
+  while ($at -ge 0) { $count++; $at = $s.IndexOf($tag, $at + 1, [StringComparison]::Ordinal) }
+  if ($count -ne 1) { throw "plain-text key '$key' found $count times (expected 1)" }
+  $a = $first + $key.Length + 2; $b = $s.IndexOf('?', $a)
   return @{ Start = $a; End = $b; Text = $s.Substring($a, $b - $a) }
 }
 
@@ -186,9 +188,13 @@ function Read-Save([string]$path) {
   $s = $script:L1.GetString([IO.File]::ReadAllBytes($path))
   $eq = Get-PlainRange $s 'Equipment'; $hot = Get-PlainRange $s 'BaseInvSlots'
   return @{ Text = $s; Equip = $eq.Text; Hot = $hot.Text
-            Playtime = [regex]::Match($s, 'TotalPlayTime>([\d\.]+)').Groups[1].Value
-            Slot = [regex]::Match($s, 'SlotName>([^\?]+)').Groups[1].Value
-            Updated = [regex]::Match($s, 'LastUpdatedAt>([^\?]+)').Groups[1].Value }
+            Playtime = (Get-HeaderValue $s 'TotalPlayTime>' '[\d\.]+'); Slot = (Get-HeaderValue $s 'SlotName>' '[^\?]+'); Updated = (Get-HeaderValue $s 'LastUpdatedAt>' '[^\?]+') }
+}
+# the value after the first "tag" in the save: found with a plain text search, then matched in a short piece (a regex over the whole save cost about 0.2 s each); falls back to the full regex
+function Get-HeaderValue([string]$s, [string]$tag, [string]$valueRx) {
+  $i = $s.IndexOf($tag, [StringComparison]::Ordinal)
+  if ($i -ge 0) { $piece = $s.Substring($i, [math]::Min(120, $s.Length - $i)); $m = [regex]::Match($piece, [regex]::Escape($tag) + '(' + $valueRx + ')'); if ($m.Success) { return $m.Groups[1].Value } }
+  return [regex]::Match($s, [regex]::Escape($tag) + '(' + $valueRx + ')').Groups[1].Value
 }
 
 # turns the stored text "&5&0.0" / "&1&345.0&8" into something readable

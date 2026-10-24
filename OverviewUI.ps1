@@ -100,11 +100,11 @@ function Get-SaveOverview([string]$savePath) {
       if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
         '  Backpack size:    ' + $bt.Text + $(if ($set.Count) { '  Your sizes: ' + ($set -join ', ') + '.' } else { '  No size set (the game''s own sizes are used).' }) }
       $stt = $null; try { $stt = ST-ModStatus } catch { }
-      if ($stt) { $sk = Get-StackTweaks
-        '  Stack sizes:      ' + $stt.Text + '  Setting: ' + $(if ($sk.Enabled) { "first aid kits stack, $($sk.Size) per slot, single use." } else { 'off (kits do not stack).' })
-        try { $fs = ST-FindKitStacks $savePath
-          if ($fs.Stacks -gt 0) { "                    Kit stacks in your save: $($fs.Stacks)  (biggest $($fs.Max); $($fs.Player) in your inventory, $($fs.Containers) in containers)"
-            $dg = ST-DangerText $fs; if ($dg) { '                    ' + $dg } } } catch { } }
+      if ($stt) { $sc = Get-StackConfig; $sm = ST-SummaryText $sc
+        '  Stack sizes:      ' + $stt.Text + '  Setting: ' + $(if ($sm) { $sm + ' (per slot).' } else { 'off (every item keeps the game''s own stack size).' })
+        try { $fs = ST-FindStacks $savePath
+          if ($fs.Stacks -gt 0) { "                    Stacks bigger than the game allows in your save: $($fs.Stacks)  ($($fs.Extra) items too many; $($fs.Player) in your inventory, $($fs.Containers) in containers)"
+            $dg = ST-DangerText $fs $sc; if ($dg) { '                    ' + $dg } } } catch { } }
     } else { '  UE4SS (the free script loader the mods need) was not found next to your save, so none of the in-game mods can be installed from here.' }
   }
   Sec 'Backups of this world' {
