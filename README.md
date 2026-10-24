@@ -2,7 +2,7 @@
 
 <img src="assets/app-icon.png" width="96" align="right" alt="icon">
 
-A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, stack your first aid kits, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
+A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, stack your first aid kits, medicine and bandages, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
 
 ![Overview window: everything the tool can read from your save](docs/screenshot-overview.png)
 
@@ -59,7 +59,7 @@ Optional but recommended: a bar under the status lines offers **Build pictures n
 * **Keep Steam Cloud off for Permafrost while you edit** (see [section 14](#14-backups-restoring-and-steam-cloud)). Otherwise Steam can put the old save back.
 * **Every change is backed up automatically** (`Backups` folder inside the tool folder) and **checked before it replaces your save**. If a check fails, the tool puts the original back and tells you.
 * **Nothing is written until you press an Apply / Save button.** Previews, the Overview, the Game data browser and the catalog never change your save.
-* **Recipe tweaks, Build move, the backpack size and the kit stacking work inside the running game** and never touch your save file.
+* **Recipe tweaks, Build move, the backpack size and the stack sizes work inside the running game** and never touch your save file.
 * The tool only edits what each feature names (inventory entries, player values, learned recipes, position, world records). It refuses to write if its own checks fail rather than guessing.
 * **Keep a copy of your save yourself** before big changes: the `.pfs` files live in `...\steamapps\common\Permafrost\Permafrost\SaveGame`.
 
@@ -100,7 +100,7 @@ The window opens maximized and follows your window size; the item catalog gets a
 | **Banner** (top) | The **Overview** button (the read-only report) and the **Theme** box (three colour themes, remembered). |
 | **Save file row** | The `.pfs` save being edited. **Browse...** lists all worlds, **Reload** re-reads the save. At the right end: the **Backpack slots** box with **Apply in game**, and under it a line saying which backpack you wear ("Worn: ScavengerBackpack - using 35 slots"), where that number comes from, and a red DANGER text if items are at risk. |
 | **Row of buttons** | One row, always in this order: **Player tools**, **World reset**, **Game data**, **Pictures**, **Recipe tweaks**, **Build move**, **Stack sizes**, **Help / how it works**. |
-| **Status lines** | Green/red game status, the world, play time and last-saved time, and a red DANGER line if stacked first aid kits are at risk. |
+| **Status lines** | Green/red game status, the world, play time and last-saved time, and a red DANGER line if stacked kits or medicine are at risk. |
 | **Pictures bar** | Shown only while there are no item pictures: **Build pictures now**, **Not now**, **Don't ask again**. |
 | **Item catalog** (left) | Every item in the game, searchable and sortable. |
 | **Selected item** (right) | Details and the quantity / condition boxes for the item you clicked. |
@@ -139,8 +139,8 @@ Close the game → search the catalog (by name or id) → click the item → set
 **...make my backpack bigger?**
 Type a bigger number (a multiple of 5) in **Backpack slots** (right end of the Save file row) and press **Apply in game**, then start the game: your backpack already has the new size when you load in. It needs the small BackpackSlots in-game mod (the tool offers to install it) and never touches your save. Read the [safety notes](#12b-reference-backpack-size-in-game-mod) first: the game deletes items that have no slot, so keep the mod on once you use the extra rows.
 
-**...stack my first aid kits?**
-Click **Stack sizes** (in the row of buttons), tick the box, pick how many kits per slot (10 by default) and press **Apply**. Kits then stack everywhere (backpack, hotbar, containers) and every use consumes one whole kit. It needs the small StackSizes in-game mod (the tool offers to install it). Read the [safety notes](#12c-reference-stack-sizes-in-game-mod) first: with the mod off, the game deletes the extra kits of every stack when it saves.
+**...stack my first aid kits, medicine or bandages?**
+Click **Stack sizes** (in the row of buttons), tick the items you want, pick how many fit per slot for each (kits 10, medicine 20, bandages 10 to start with) and press **Apply**. They then stack everywhere (backpack, hotbar, containers); stacked kits become single use, so every use consumes one whole kit. It needs the small StackSizes in-game mod (the tool offers to install it). Read the [safety notes](#12c-reference-stack-sizes-in-game-mod) first: with the mod off, the game deletes the extra items of every stack when it saves.
 
 **...move a building I placed?**
 **Build move** ([section 12](#12-reference-build-move-in-game-mod)). Needs UE4SS. In the game: look at it, press **Q**, choose **Move**.
@@ -221,7 +221,7 @@ If a step fails, the message says whether your save was left untouched or the or
 * **Buildings you placed** - how many parts, grouped by type.
 * **Explored world** - map areas loaded at least once, objects saved in them, containers found (opened / still unopened), objects used up.
 * **Companion (dog)** - state, bond and carried items.
-* **In-game mods and settings** - whether the Recipe tweaks, Build move, BackpackSlots and StackSizes mods are installed and on, the backpack sizes you set, the Stack sizes setting and how many stacks of kits your save holds (with a DANGER line if the mod is not on).
+* **In-game mods and settings** - whether the Recipe tweaks, Build move, BackpackSlots and StackSizes mods are installed and on, the backpack sizes you set, your Stack sizes settings and the biggest stack of each item your save holds (with a DANGER line if the mod is not on).
 * **Backups of this world** - how many, the newest, and whether the starting snapshot exists.
 
 **Refresh** re-reads the save; **Copy report** copies the text.
@@ -258,6 +258,8 @@ If a step fails, the message says whether your save was left untouched or the or
 | **Game rules** | Pick a table: gameplay effects (what food, medicine, wounds and cold do), status effects, difficulty presets (with a *Difficulty compare* table; "(default)" means the preset does not store that setting), animals, NPCs, skills, attributes, plants, destructibles, random encounters, fast travel, achievements, world locations. |
 | **All tables** | Every table built from the game files (loot, containers, NPCs, animals, locations, building parts...). |
 | **Bundles** | One-click groups: all quest items, a full stack of every ammo, ammo for the weapons you carry now, or everything one reward pool can give. They go into the Queue; you still Preview / Apply as usual. |
+
+**The Queue button** (bottom of every tab, *Queue the item(s) of the selected row*) only adds items to the Queue in the main window; your save is not changed until you press **Preview / Apply** there. Each click adds again, so two clicks double the amounts. What it adds depends on the tab: *Quests* = the items the quest's current step needs (craft tasks give the ingredients), *Recipes* = the ingredients (the number box is the number of crafts), *Reward pools* = the group's items at their listed amounts, any other tab = each item of the row, the number box of each. Hold the mouse over the button for the same explanation.
 
 The **Hide story text (spoilers)** box at the top hides quest descriptions, recordings, dialogue and NPC journals until you untick it (the same box is in Player tools > Quest progress). Task lists, items and numbers stay visible.
 
@@ -334,17 +336,25 @@ Each backpack keeps its own setting, so a different backpack you wear later uses
 
 ## 12c. Reference: Stack sizes (in-game mod)
 
-Permafrost's first aid kits (`CarMedkit`, `MedkitIFAK`, `MedkitMFAK`, `MedkitAFAK`) take a whole slot each, because they carry a durability (the "condition"). The **Stack sizes** window (one of the buttons under the Save file row) makes them stack.
+The **Stack sizes** window (one of the buttons under the Save file row) lets you choose, **item by item**, how many fit in one slot. The list has three groups:
 
-What it does and why: the stack limit belongs to the *item*, so one setting makes the kits stack in every inventory (backpack, hotbar, containers). But a stack of items that have a durability shares **one** condition, and in a test the game removed only one kit when that condition reached 0 and left the others at 0% (unusable). So the setting also turns the kits' durability **off**: every use consumes exactly one kit, like a bandage. The trade-off: partial use goes away, and a small wound costs a whole kit.
+| Group | Items | Game's own size | Suggested size |
+|---|---|---|---|
+| First aid kits | Medkit AFAK, Medkit MFAK, Medkit IFAK, Car Medkit | 1 | 10 |
+| Medicine | Panacea / Surgical Spirit / Painkillers | 1 / 10 / 5 | 20 |
+| Bandages | Bandage, Makeshift Bandage, Military Bandage | 5 | 10 |
 
-1. Tick **Make first aid kits stackable and single use**, choose **Kits per slot** (10 by default; 5 and 10 were tried in the game; the largest allowed is 20) and press **Apply**.
+Every item has a tick box, a note with the game's own size and a number box for your size (from the game's own size, at least 2, up to 20). **Tick all**, **Untick all** and **Set ticked to N** change many at once. A list of every consumable (stack size, and whether the game gives it a stack setting at all) is in [`docs/consumables-stack-report.md`](docs/consumables-stack-report.md) (and `.csv`).
+
+What it does and why: the stack limit belongs to the *item*, so one setting makes it stack in every inventory (backpack, hotbar, containers). First aid kits are special: they carry a durability (the "condition"), and a stack of items with a durability shares **one** condition. In a test the game removed only one kit when that condition reached 0 and left the others at 0% (unusable). So a ticked kit is also made **single use**: every use consumes exactly one kit, like a bandage. The trade-off: partial use goes away, and a small wound costs a whole kit. Kit sizes above 10 ask for a confirmation. Medicine and bandages have no durability, so only their stack size changes.
+
+1. Tick the items you want, set the size of each and press **Apply**.
 2. The first time, the tool offers to install a small UE4SS mod (**StackSizes**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)) into the game's `Mods` folder. It only changes numbers inside the running game and never touches your save.
-3. **Start the game.** The mod applies the setting from the moment the game starts, before your save loads.
+3. **Start the game.** The mod applies the settings from the moment the game starts, before your save loads (the data is changed about 10 to 25 seconds after you launch it).
 
-> **Important: with the mod off, the game deletes the extra kits.** Tested: a slot holding 4 kits came back as 1 kit after one save with the mod switched off, permanently. While the mod runs nothing is lost. So the tool (1) makes a backup of your save every time you press **Apply**, (2) shows how many stacks of kits your save holds (inventory **and** containers), (3) **refuses** to switch the setting off, or to lower the size below your biggest stack, while stacks exist (use those kits up first), and (4) shows a red **DANGER** line in the main window if stacks sit in your inventory and the mod is not on. If you see it, do not play: press **Apply** again to switch the mod on, or restore the backup. After a game or UE4SS update, check the window before you play.
+> **Important: with the mod off, the game deletes the extra items.** Tested with kits: a slot holding 4 kits came back as 1 kit after one save with the mod switched off, permanently; the game trims every stack above its own limit. While the mod runs nothing is lost. So the tool (1) makes a backup of your save every time you press **Apply**, (2) shows the biggest stack of each item your save holds (inventory **and** containers), (3) **refuses** to untick an item, or to lower its size below your biggest stack, while such stacks exist (use those items up first), and (4) shows a red **DANGER** line in the main window if stacks sit in your inventory and the mod is not on. If you see it, do not play: press **Apply** again to switch the mod on, or restore the backup. After a game or UE4SS update, check the window before you play.
 
-Tested in the game: stacks of 5 and 10 in the hotbar, in the backpack and in a container; each use takes one kit; kits that had run down to 0% became usable again. The **Add items** window still adds kits one per slot; merge them in the game.
+Tested in the game: kit stacks of 5 and 10 in the hotbar, in the backpack and in a container (each use takes one kit; kits that had run down to 0% became usable again), and Panacea, Surgical Spirit and Painkillers at 20 (use, split, hotbar, backpack and container). Military Bandage was seen working at 5; the three bandages at 10 have not been tried in the game yet. The **Add items** window still adds these items one stack at a time at the game's own size; merge them in the game.
 
 ## 13. Reference: Pictures
 
@@ -382,7 +392,7 @@ The bar has **Not now** (hide it until the next start) and **Don't ask again** (
 | `theme.json` | Your colour theme. |
 | `spoiler.json` | Whether story text is hidden. |
 | `backpack-tweaks.json` | Backpack sizes you set with **Apply in game** (also written to the mod's `tweaks.lua`). |
-| `stack-tweaks.json` | The Stack sizes setting (kits stackable on/off and the size; also written to the mod's `tweaks.lua`). |
+| `stack-tweaks.json` | The Stack sizes settings (per item: on/off and the size; also written to the mod's `tweaks.lua`). |
 | `backpacks.json` | Only an older version used it (slot numbers typed with "Remember"); safe to delete. |
 | `recipe-tweaks.json` | What the Recipe tweaks window last saved. |
 | `pictures.json` | Exists only if you pressed *Don't ask again*. |
@@ -553,7 +563,7 @@ PowerShell traps seen in this code base (worth knowing before you edit): a funct
 * `Paths.ps1` - finds your game folder and save (and FModel's export for the advanced rebuild); reads `config.json`.
 * `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README).
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all and then `Build-Finalize.ps1`; `Rebuild-All.ps1` runs the JSON-based ones. `Make-Release.ps1` builds the release ZIP.
-* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `StackSizesMod\main.lua` - the in-game kit stacking mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
+* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `StackSizesMod\main.lua` - the in-game stack sizes mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `docs\` - screenshots and the announcement text.
 
 To check what the tool will do to your save, read `SaveCore.ps1`: it only touches the inventory entries, and it refuses to write if its checks fail.

@@ -100,6 +100,17 @@ function GD-RewardsFor([string]$asset) {
 }
 function GD-RowItems($r) { if (-not $r) { return @() }; return @($r.Items -split ';' | Where-Object { $_ -and (GD-CatItem $_) }) }
 
+# ---------- hover text for the Queue button: what it does on this tab ----------
+function GD-QueueHelp([string]$key) {
+  $what = switch ($key) {
+    'Quests'  { "WHAT IT QUEUES HERE`r`nThe items the quest needs for the step you are on right now. Your step is read from your save; a quest you have not started uses its first step.`r`n`r`nOnly item tasks count: find, give, recycle, use, cook, craft and 'collect reward'. A craft task queues the recipe's ingredients instead of the finished item. A reward task queues the items of that reward group.`r`n`r`nQuantity multiplies every amount. If the step has no item tasks, you get a message saying so." }
+    'Recipes' { "WHAT IT QUEUES HERE`r`nThe ingredients of the selected recipe, not the finished item.`r`n`r`nQuantity = how many crafts you want the ingredients for (2 crafts = double the ingredients)." }
+    'Pools'   { "WHAT IT QUEUES HERE`r`nEvery item of the selected reward group, each at its listed amount.`r`n`r`nQuantity multiplies those amounts." }
+    default   { "WHAT IT QUEUES HERE`r`nEvery item the selected row refers to, Quantity of each. Rows that refer to no item the tool can add (rules, text, locations) just tell you so." }
+  }
+  return "Adds items to the Queue in the main window, so you do not have to look them up and add them one by one.`r`n`r`nIt does NOT change your save. Nothing happens to the save until you press Preview / Apply in the main window (game closed).`r`n`r`nEach click adds again, so clicking twice doubles the amounts. Check the Queue before applying.`r`n`r`n$what"
+}
+
 # ---------- a generic tab: filter box + list + detail + "queue items" row ----------
 function GD-MakeTab($tabs, [string]$key, [string]$title, [string[]]$cols, [int[]]$widths, [string]$hint) {
   $tab = New-Object System.Windows.Forms.TabPage; $tab.Text = $title; $tab.Padding = New-Object System.Windows.Forms.Padding(8); $tabs.TabPages.Add($tab)
@@ -110,7 +121,10 @@ function GD-MakeTab($tabs, [string]$key, [string]$title, [string[]]$cols, [int[]
   $bot = New-Object System.Windows.Forms.Panel; $bot.Dock = 'Bottom'; $bot.Height = 230; $tab.Controls.Add($bot)
   $q = New-Object System.Windows.Forms.Panel; $q.Dock = 'Bottom'; $q.Height = 38; $bot.Controls.Add($q)
   $g.Detail = New-Object System.Windows.Forms.TextBox; $g.Detail.Multiline = $true; $g.Detail.ReadOnly = $true; $g.Detail.ScrollBars = 'Vertical'; $g.Detail.Dock = 'Fill'; $g.Detail.Font = New-Object System.Drawing.Font('Consolas', 9.5); $g.Detail.BackColor = [System.Drawing.Color]::White; $bot.Controls.Add($g.Detail); $g.Detail.BringToFront()
-  $g.QBtn = New-Btn $q 'Queue the item(s) of the selected row' 0 5 280 28; New-Lbl $q 'Quantity (x amount)' 292 10 140 | Out-Null; $g.Qty = New-Num $q 436 7 80 1 99999 0; $g.QMsg = New-Lbl $q '' 530 10 500; $g.QMsg.ForeColor = $script:Th.Accent
+  $g.QBtn = New-Btn $q 'Queue the item(s) of the selected row' 0 5 280 28; New-Lbl $q 'Quantity (x amount)' 292 10 140 | Out-Null; $g.Qty = New-Num $q 436 7 80 1 99999 0
+  $g.QMsg = New-Lbl $q '' 530 10 500; $g.QMsg.ForeColor = $script:Th.Accent
+  if (-not $script:GD.Tip) { $tp = New-Object System.Windows.Forms.ToolTip; $tp.AutoPopDelay = 30000; $tp.InitialDelay = 300; $tp.ReshowDelay = 100; $script:GD.Tip = $tp }
+  $tipText = GD-QueueHelp $key; $script:GD.Tip.SetToolTip($g.QBtn, $tipText); $script:GD.Tip.SetToolTip($g.Qty, $tipText)
   $g.LV = New-LV $tab $cols $widths; $g.LV.Dock = 'Fill'; $g.LV.BringToFront()
   $g.Panel = $tab; return $g
 }
@@ -411,6 +425,7 @@ function New-DataForm {
   $bg.Detail = New-Object System.Windows.Forms.TextBox; $bg.Detail.Multiline = $true; $bg.Detail.ReadOnly = $true; $bg.Detail.ScrollBars = 'Vertical'; $bg.Detail.Dock = 'Fill'; $bg.Detail.Font = New-Object System.Drawing.Font('Consolas', 9.5); $bg.Detail.BackColor = [System.Drawing.Color]::White; $bot.Controls.Add($bg.Detail); $bg.Detail.BringToFront()
   $bq = New-Btn $qp 'Queue this bundle' 0 6 200 28; $bq.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $bg.Msg = New-Lbl $qp '' 214 12 900; $bg.Msg.ForeColor = $script:Th.Accent
   $bg.LV = New-LV $tab @('Bundle', 'Items', 'Contents') @(380, 60, 760); $bg.LV.Dock = 'Fill'; $bg.LV.BringToFront()
+  $script:GD.Tip.SetToolTip($bq, "Adds every item of the selected bundle to the Queue in the main window.`r`n`r`nIt does NOT change your save. Nothing happens to the save until you press Preview / Apply in the main window (game closed).`r`n`r`nEach click adds again, so clicking twice doubles the amounts.")
   $bg.LV.Add_SelectedIndexChanged({ GD-BundleSelect }); $bq.Add_Click({ GD-QueueBundle })
 
   $tabs.Add_SelectedIndexChanged({ if ($script:GD.Tabs.SelectedTab -eq $script:GD.Bundles.Panel) { if ($script:GD.Bundles.LV.Items.Count -eq 0) { GD-FillBundles } } else { GD-RefreshAll } })
