@@ -121,7 +121,7 @@ try {
     $i = $script:Selected; $v = if ($i) { Get-WeaponDamageView $i } else { $null }; if (-not $v) { return }
     $script:DmgBusy = $true; $numDmgMin.Value = [math]::Min([decimal]$v.Min, $numDmgMin.Maximum); $numDmgMax.Value = [math]::Min([decimal]$v.Max, $numDmgMax.Maximum); $script:DmgBusy = $false
     $ms = WT-ModStatus
-    $lblDmg.Text = $(if ($v.Changed) { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max); changed to $(Fmt-Dmg $v.Min $v.Max)." + $(if ($ms.Active) { ' Applies every time the game starts.' } else { " $($ms.Text)" }) } else { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max), not changed. Applies to every copy of this weapon." })
+    $lblDmg.Text = $(if ($v.Changed) { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max), now $(Fmt-Dmg $v.Min $v.Max)." + $(if ($ms.Active) { ' Set at every game start.' } else { " $($ms.Text)" }) } else { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max). Applies to every copy." })
     $btnDmgReset.Enabled = [bool]$v.Changed
   }
   function Do-SetDamage {
@@ -156,7 +156,11 @@ try {
     $lblTarget.Top = $y + 3; $cmbTarget.Top = $y
     $btnAdd.SetBounds([math]::Max(310, $w - 232), $gbSel.Height - 62, 220, 50)
     $gbDmg.Visible = [bool]$script:ShowDmg
-    if ($script:ShowDmg) { $lblPlan.Width = 288; $gbDmg.SetBounds(306, $numQty.Top + 30, [math]::Max(250, $w - 318), 116); $lblDmg.Width = $gbDmg.Width - 20 }
+    if ($script:ShowDmg) { $lblPlan.Width = 288; $gbDmg.SetBounds(306, $numQty.Top + 30, [math]::Max(250, $w - 318), 118); $gbDmg.OuterC = $gbSel.BackColor
+      # rows 28 px apart like the rows on the left: min / max level with "Condition", the buttons level with "Rounds already loaded", the status level with "Put it in"
+      $bw = $gbDmg.Width; $nw = [math]::Min(110, [int](($bw - 20 - 64 - 30) / 2)); $x2 = 76 + $nw + 30
+      $lblDmgA.SetBounds(12, 31, 62, 22); $numDmgMin.SetBounds(76, 28, $nw, 24); $lblDmgTo.SetBounds(76 + $nw + 3, 31, 26, 22); $numDmgMax.SetBounds($x2, 28, $nw, 24)
+      $btnDmgSet.SetBounds(12, 58, 120, 26); $btnDmgReset.SetBounds(138, 58, 84, 26); $lblDmg.SetBounds(12, 88, $bw - 24, 26) }
   }
 
   # queue panel
@@ -672,9 +676,9 @@ WHERE THINGS ARE
     $gg = 6; $gw = [int][math]::Floor(($W - 2 * $m - 7 * $gg) / 8); $grid = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp)
     for ($c = 0; $c -lt 8; $c++) { $grid[$c].SetBounds($m + $c * ($gw + $gg), $yB1, $gw, 26) }
     $leftW = [int](($W - 3 * $m) * 0.46); $rightX = $m + $leftW + $m; $rightW = $W - $rightX - $m
-    $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })) + $gap + 150 + $m)
+    $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 66 } else { 0 })) + $gap + 150 + $m)
     $avail = $H - $top - $m
-    $minTopH = 346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
+    $minTopH = 346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 66 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
     $topH = [math]::Max($minTopH, [int](($avail - $gap) * 0.66)); $botH = $avail - $topH - $gap
     $botMin = 150; if ($botH -lt $botMin) { $botH = $botMin; $topH = [math]::Max($minTopH, $avail - $gap - $botH) }
     # catalog (top-left)
@@ -683,7 +687,7 @@ WHERE THINGS ARE
     $txtSearch.SetBounds(10, 22, $leftW - 10 - 190 - 8 - 10, 24)
     $lvCat.SetBounds(10, 52, $leftW - 20, $topH - 62)
     # selected item (top-right)
-    $selH = 200 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })
+    $selH = 200 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 66 } else { 0 })
     $gbSel.SetBounds($rightX, $top, $rightW, $selH)
     $lblSelInfo.Width = $rightW - 24; $lblSelInfo.Height = $script:SelInfoH
     Layout-SelRows
