@@ -277,6 +277,14 @@ function Get-TeleportWarning([double]$x, [double]$y, [double]$z, [double]$drop) 
   if ($g.Count) { $gz = ($g | Measure-Object Z -Maximum).Maximum; if ($top - $gz -gt 1200) { $w.Add("You would appear $([math]::Round(($top - $gz) / 100)) m above the highest ground found here: a long fall that can kill you.") } }
   return $w.ToArray()
 }
+# is the height for this spot only an estimate (so the in-game GroundSnap mod may correct it)? Bed, start, your builds and your saved spots come with a real height, and a height you typed
+# is taken as real (it may be inside a building or a bunker); heights from the list / suggestion for a place or coordinates are estimates.
+function Test-HeightIsEstimate($t, [double]$z) {
+  if ($t.Kind -in 'Bed', 'Start', 'Your build', 'My spot') { return $false }
+  if ($t.Kind -in 'Named place', 'Fast travel' -and [math]::Abs([double]$t.Z - $z) -lt 1) { return $true }
+  foreach ($l in (Get-GroundLevels $t.X $t.Y 100)) { if ([math]::Abs([double]$l.Z - $z) -lt 1) { return $true } }
+  return $false
+}
 
 # --- your own spots (teleport-spots.json in the tool folder, private) ---
 function Get-SpotsPath { Join-Path $PSScriptRoot 'teleport-spots.json' }

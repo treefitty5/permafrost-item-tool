@@ -216,6 +216,8 @@ function PT-FillTele {
     $li = New-Object System.Windows.Forms.ListViewItem($t.Name); $li.Tag = $t; [void]$li.SubItems.Add($t.Kind); [void]$li.SubItems.Add([string]$(if ($place) { PT-Dist2D $d $t } else { Get-DistanceM $d $t })); [void]$li.SubItems.Add($hz); [void]$lv.Items.Add($li)
   }
   $lv.EndUpdate()
+  $gs = GS-ModStatus; $ui.TeleSnap.Enabled = (Test-Path -LiteralPath (RT-ModsDir))
+  $gl = GS-LastResult; $ui.TeleSnapNote.Text = $(if (GS-HasRequest) { 'Waiting for the next time you load the world.' } elseif ($gl) { "Last time in the game: $gl" } elseif (-not $ui.TeleSnap.Enabled) { 'No UE4SS Mods folder found next to your save: not available.' } else { '' }); $ui.TeleSnapNote.Visible = [bool]$ui.TeleSnapNote.Text
   $u = Get-TeleportUndo $script:SavePath; $ui.BtnUndo.Enabled = [bool]$u
   $ui.BtnUndo.Text = 'Undo last teleport'
   $sel = $ui.LvTele.SelectedItems; $ui.BtnDelSpot.Enabled = ($sel.Count -gt 0 -and $sel[0].Tag.Kind -eq 'My spot')
@@ -241,21 +243,27 @@ function PT-OnLevelPicked {
   $ui.TeleInfo.Text = "Height chosen: Z $([int]$z). You appear $([math]::Round([double]$ui.TeleDrop.Value / 100.0, 1)) m above it (Z $([int]($z + [double]$ui.TeleDrop.Value))) and drop onto the ground when the game loads."
 }
 # the one place that writes the move: confirm, back up (Set-SaveKeys), keep the undo information, reload
-function PT-DoMove([double]$x, [double]$y, [double]$z, [string]$label, [string]$why) {
+function PT-DoMove([double]$x, [double]$y, [double]$z, [string]$label, [string]$why, [bool]$estimated = $false) {
   $ui = $script:PT; $d = $ui.Data; $drop = [double]$ui.TeleDrop.Value; $fill = [bool]$ui.TeleVitals.Checked
+  $snap = $estimated -and [bool]$ui.TeleSnap.Checked -and $ui.TeleSnap.Enabled
   if (Test-GameRunning) { Msg "The game is running, so nothing was changed.`n`nSave and close the game first, then try again." 'Game is running' 'OK' 'Warning' | Out-Null; return $false }
   $far = [math]::Round([math]::Sqrt([math]::Pow($x - $d.Position.X, 2) + [math]::Pow($y - $d.Position.Y, 2)) / 100.0)
   $txt = "About to edit this save:`n$($script:SavePath)`n`nMove you to: $label`nX=$([int]$x)  Y=$([int]$y)  Z=$([int]$z)  ($far m away)  - $why`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that height and drop onto the ground when the game loads.`n"
   if ($fill) { $txt += "Your health, stamina, energy, hunger and warmth are filled to the maximum first.`n" }
+  if ($snap) { $gs = GS-ModStatus; $txt += "The height is an estimate, so the GroundSnap game mod will also measure the real ground when you load and put you on it" + $(if ($gs.Active -and $gs.UpToDate) { '' } else { " (it will be installed into the game's UE4SS Mods folder now)" }) + ".`n" }
+  elseif ($estimated -and -not [bool]$ui.TeleSnap.Checked) { $txt += "GroundSnap is switched off for this teleport: the estimated height is used as it is.`n" }
   $warn = @(Get-TeleportWarning $x $y $z $drop); if ($warn.Count) { $txt += "`nWARNING:`n" + (($warn | ForEach-Object { "- $_" }) -join "`n") + "`n" }
   $txt += "`nHeights are estimates: landing too low puts you UNDER the map, too high is a long fall. 'Undo last teleport' puts you back where you were before you started teleporting, and the backup made first is in the Backups folder ('Restore a backup...' in the main window) if anything goes wrong.`nSteam Cloud should be OFF for Permafrost.`n`nContinue?"
   if ((Msg $txt 'Teleport?' 'YesNo' 'Question' 'Button2') -ne 'Yes') { PT-Status 'Cancelled - nothing changed.'; return $false }
   try {
     $r = Move-Player $script:SavePath $d $x $y $z $drop $label -FillVitals:$fill
+    $snapNote = ''
+    if ($snap) { try { [void](GS-WriteRequest $x $y $z $label); $snapNote = "`n`nGroundSnap will measure the real ground when you load and put you on it (what it did is in the Teleport tab afterwards and in GroundSnap.log in its mod folder)." } catch { GS-ClearRequest; $snapNote = "`n`nGroundSnap could not be set up ($($_.Exception.Message)); the estimated height is used as it is." } }
+    else { GS-ClearRequest }
     PT-Status ('Teleport written and verified. Backup: ' + $r.Backup)
     if ($script:OnSaveChanged) { & $script:OnSaveChanged "Player tools: teleport to $label  (backup: $($r.Backup))" }
     PT-Load
-    Msg "Done. You will load at X=$([int]$x) Y=$([int]$y) Z=$([int]($z + $drop)).`n`nBackup: $($r.Backup)`n`nStart the game and load the world. If Steam asks about a cloud conflict, keep the LOCAL (newer) files. Not happy with the landing? Come back here and press 'Undo last teleport' (game closed)." 'Success' 'OK' 'Information' | Out-Null
+    Msg "Done. You will load at X=$([int]$x) Y=$([int]$y) Z=$([int]($z + $drop)).$snapNote`n`nBackup: $($r.Backup)`n`nStart the game and load the world. If Steam asks about a cloud conflict, keep the LOCAL (newer) files. Not happy with the landing? Come back here and press 'Undo last teleport' (game closed)." 'Success' 'OK' 'Information' | Out-Null
     return $true
   } catch {
     PT-Status ('FAILED: ' + $_.Exception.Message)
@@ -268,13 +276,13 @@ function PT-Teleport {
   $t = $ui.LvTele.SelectedItems[0].Tag; $th = Get-TargetHeight $t
   $z = if ($null -ne $ui.TeleLevelZ) { [double]$ui.TeleLevelZ } else { $th.Z }
   if ($null -eq $z) { Msg "There is no height data for this spot. Type a Z in the coordinates box (the in-game map shows your own X / Y / Z at its lower left) and use 'Teleport to coordinates'." 'No height' 'OK' 'Information' | Out-Null; return }
-  [void](PT-DoMove $t.X $t.Y $z $t.Name $(if ($null -ne $ui.TeleLevelZ -and [math]::Abs($ui.TeleLevelZ - $th.Z) -gt 1) { 'the height you picked' } else { $th.Why }))
+  [void](PT-DoMove $t.X $t.Y $z $t.Name $(if ($null -ne $ui.TeleLevelZ -and [math]::Abs($ui.TeleLevelZ - $th.Z) -gt 1) { 'the height you picked' } else { $th.Why }) (Test-HeightIsEstimate $t $z))
 }
 # teleport to the coordinates in the boxes (typed, read off the in-game map, or filled in by the map window); Z 0 = use the suggested height
 function PT-TeleportXYZ {
   $ui = $script:PT; $x = [double]$ui.TeleX.Value; $y = [double]$ui.TeleY.Value; $z = [double]$ui.TeleZ.Value; $why = 'the height you typed'
   if ($z -eq 0) { $th = Get-TargetHeight ([pscustomobject]@{ Name = 'coordinates'; Kind = 'Coordinates'; X = $x; Y = $y; Z = 0 }); if ($null -eq $th.Z) { Msg "Type a Z as well: there is no height data near these coordinates." 'No height' 'OK' 'Information' | Out-Null; return }; $z = [double]$th.Z; $why = $th.Why }
-  [void](PT-DoMove $x $y $z 'the coordinates you typed' $why)
+  [void](PT-DoMove $x $y $z 'the coordinates you typed' $why (Test-HeightIsEstimate ([pscustomobject]@{ Name = 'coordinates'; Kind = 'Coordinates'; X = $x; Y = $y; Z = 0 }) $z))
 }
 function PT-ShowHeightsHere {
   $ui = $script:PT; [void](PT-ShowLevels ([pscustomobject]@{ Name = 'coordinates'; Kind = 'Coordinates'; X = [double]$ui.TeleX.Value; Y = [double]$ui.TeleY.Value; Z = 0 }) $false)
@@ -284,7 +292,7 @@ function PT-UndoTeleport {
   $ui = $script:PT; $u = Get-TeleportUndo $script:SavePath; if (-not $u) { Msg 'There is no teleport to undo for this save.' 'Undo' 'OK' 'Information' | Out-Null; return }
   if (Test-GameRunning) { Msg "The game is running, so nothing was changed.`n`nSave and close the game first, then try again." 'Game is running' 'OK' 'Warning' | Out-Null; return }
   if ((Msg "Put your position back to where it was before the last teleport (to: $($u.to), made $($u.at))?`n`nA backup is made first." 'Undo teleport?' 'YesNo' 'Question' 'Button2') -ne 'Yes') { return }
-  try { $r = Undo-Teleport $script:SavePath; PT-Status ('Teleport undone. Backup: ' + $r.Backup); if ($script:OnSaveChanged) { & $script:OnSaveChanged "Player tools: teleport undone  (backup: $($r.Backup))" }; PT-Load; Msg "Done. Your old position is back.`n`nBackup: $($r.Backup)" 'Undone' 'OK' 'Information' | Out-Null }
+  try { $r = Undo-Teleport $script:SavePath; GS-ClearRequest; PT-Status ('Teleport undone. Backup: ' + $r.Backup); if ($script:OnSaveChanged) { & $script:OnSaveChanged "Player tools: teleport undone  (backup: $($r.Backup))" }; PT-Load; Msg "Done. Your old position is back.`n`nBackup: $($r.Backup)" 'Undone' 'OK' 'Information' | Out-Null }
   catch { PT-Status ('FAILED: ' + $_.Exception.Message); Msg "Nothing was changed.`n`nReason: $($_.Exception.Message)" 'Failed safely' 'OK' 'Error' | Out-Null }
 }
 function PT-SaveSpot {
@@ -433,16 +441,20 @@ function New-PlayerForm {
   $bHere = & $mkBtn 'Heights here' $false; $r1.Controls.Add($bHere)
   $r2 = & $mkRow; $r2.Controls.Add((& $mkLbl 'Drop height (cm)')); $ui.TeleDrop = & $mkNum 80 50 2000; $ui.TeleDrop.Value = 400; $r2.Controls.Add($ui.TeleDrop)
   $ui.TeleVitals = New-Object System.Windows.Forms.CheckBox; $ui.TeleVitals.Text = 'Refill my vitals first (recommended)'; $ui.TeleVitals.Checked = $true; $ui.TeleVitals.AutoSize = $true; $ui.TeleVitals.Margin = New-Object System.Windows.Forms.Padding(8, 7, 0, 0); $ui.TeleVitals.ForeColor = $script:Th.Text; $r2.Controls.Add($ui.TeleVitals)
+  $r2b = & $mkRow
+  $ui.TeleSnap = New-Object System.Windows.Forms.CheckBox; $ui.TeleSnap.Text = 'Let the game fix my height when I arrive (GroundSnap mod)'; $ui.TeleSnap.Checked = $true; $ui.TeleSnap.AutoSize = $true; $ui.TeleSnap.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 0); $ui.TeleSnap.ForeColor = $script:Th.Text; $r2b.Controls.Add($ui.TeleSnap)
+  $ui.TeleSnapNote = New-Object System.Windows.Forms.Label; $ui.TeleSnapNote.AutoSize = $true; $ui.TeleSnapNote.MaximumSize = New-Object System.Drawing.Size(640, 0); $ui.TeleSnapNote.ForeColor = $script:Th.Muted; $ui.TeleSnapNote.Margin = New-Object System.Windows.Forms.Padding(22, 0, 0, 0); $r2b.Controls.Add($ui.TeleSnapNote); $r2b.SetFlowBreak($ui.TeleSnap, $true)
+  $tipSnap = New-Object System.Windows.Forms.ToolTip; $tipSnap.AutoPopDelay = 30000; $tipSnap.SetToolTip($ui.TeleSnap, "The tool only has estimates of the ground height. With this on, a small in-game mod (GroundSnap, for UE4SS) holds you in the air when you load, asks the game where the real ground is under you,`nand puts you on it - so a wrong estimate cannot put you under the map or drop you from a great height. Your save is not touched by it.`nHeights that are real (your bed, the start, your builds, your saved spots, a Z you typed) are never corrected.")
   $r3 = & $mkRow; $r3.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 8); $bTp = & $mkBtn 'Teleport to selected place' $true; $bXyz = & $mkBtn 'Teleport to coordinates' $true; $r3.Controls.Add($bTp); $r3.Controls.Add($bXyz)
   $r4 = & $mkRow; $bMap = & $mkBtn 'Open the map...' $false; $bSpot = & $mkBtn 'Save my position...' $false; $ui.BtnUndo = & $mkBtn 'Undo last teleport' $false; $ui.BtnDelSpot = & $mkBtn 'Remove my spot' $false; $ui.BtnDelSpot.Enabled = $false
   foreach ($b in $bMap, $bSpot, $ui.BtnUndo, $ui.BtnDelSpot) { $r4.Controls.Add($b) }
-  foreach ($rw in $r3, $r1, $r2, $r4) { $gt.Controls.Add($rw) }   # the two main buttons first: they stay in view in a small window
+  foreach ($rw in $r3, $r1, $r2, $r2b, $r4) { $gt.Controls.Add($rw) }   # the two main buttons first: they stay in view in a small window
   $gH = & $mkGroup 'Heights found near the selected spot'; $rt.Controls.Add($gH, 0, 1)
   $hl = New-Object System.Windows.Forms.TableLayoutPanel; $hl.Dock = 'Fill'; $hl.ColumnCount = 1; $hl.RowCount = 2; [void]$hl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
   [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 56))); [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 44))); $gH.Controls.Add($hl)
   $ui.LvLevels = New-LV $hl @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 120); $ui.LvLevels.Dock = 'Fill'; $ui.LvLevels.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
   $ui.TeleInfo = New-Object System.Windows.Forms.Label; $ui.TeleInfo.Dock = 'Fill'; $ui.TeleInfo.AutoSize = $false; $ui.TeleInfo.ForeColor = $script:Th.Muted
-  $ui.TeleInfo.Text = "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings."
+  $ui.TeleInfo.Text = "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it; with 'Let the game fix my height' ticked, a small in-game mod then measures the real ground and puts you on it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings."
   $hl.Controls.Add($ui.TeleInfo)
   $fitCols = { Fit-LastColumn $this; $lc = $this.Columns[$this.Columns.Count - 1]; $lc.Width = [math]::Max(40, $lc.Width - 24) }; $ui.LvTele.Add_Resize($fitCols); $ui.LvLevels.Add_Resize($fitCols)   # leave room for the scroll bar so no horizontal bar shows
   $ui.TeleLevelZ = $null; $ui.TeleBusy = $false
