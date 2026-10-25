@@ -1,5 +1,7 @@
 param([int]$Spacing = 7500, [int]$Dilate = 1, [string]$Out = '')
-$TR = 'C:\Users\Fabiano\Documents\PermafrostItemTool'; Set-Location $TR; $script:ToolDir = $TR
+# Build-Route-v8.ps1 - makes an AtlasDump route (route.lua): stops every -Spacing cm over the squares your save has uncovered (fog of war) plus -Dilate squares, nearest-next from the spawn.
+#   pwsh -NoProfile -File .\AtlasDumpMod\Build-Route-v8.ps1 -Out .\AtlasDumpMod\route-new.lua   (uses the save the tool finds; heights from the first flight's log in Archive\atlas-flight)
+$TR = Split-Path $PSScriptRoot -Parent; Set-Location $TR; $script:ToolDir = $TR
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 foreach ($f in 'Paths','SaveCore','Theme','PlayerCore','PlayerTools','WorldCore','WorldReset') { . "$TR\$f.ps1" }
 $sp = PF-SavePath

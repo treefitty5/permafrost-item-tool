@@ -199,30 +199,108 @@ function PT-UnlockRecipes {
 }
 
 # ---------- teleport ----------
+# the list: your bed, the crash site, your builds, the game's named places and fast-travel points (catalog\places.csv) and your own spots
+function PT-KindOrder([string]$k) { switch ($k) { 'My spot' { 0 } 'Bed' { 1 } 'Start' { 2 } 'Named place' { 3 } 'Fast travel' { 4 } default { 5 } } }
+function PT-Dist2D($d, $t) { if (-not $d.Position) { return 0 }; [math]::Round([math]::Sqrt([math]::Pow($t.X - $d.Position.X, 2) + [math]::Pow($t.Y - $d.Position.Y, 2)) / 100.0) }
 function PT-FillTele {
   $ui = $script:PT; $d = $ui.Data; if (-not $d) { return }
   if ($d.Position) { $ui.TeleNow.Text = ('You are at X {0:N0}  Y {1:N0}  Z {2:N0}  (game units; 100 = 1 metre)' -f $d.Position.X, $d.Position.Y, $d.Position.Z) } else { $ui.TeleNow.Text = 'Current position unknown' }
-  $f = $ui.TeleFilter.Text.Trim(); $lv = $ui.LvTele; $lv.BeginUpdate(); $lv.Items.Clear()
-  foreach ($t in (Get-TeleportTargets $d | Sort-Object { if ($_.Kind -eq 'Your build') { 1 } else { 0 } }, Name)) {
+  $f = $ui.TeleFilter.Text.Trim(); $show = [string]$ui.TeleKind.SelectedItem
+  $keep = { param($t) switch ($show) { 'Named places' { $t.Kind -eq 'Named place' } 'Fast travel' { $t.Kind -eq 'Fast travel' } 'My spots' { $t.Kind -eq 'My spot' } 'Bed, start and builds' { $t.Kind -in 'Bed', 'Start', 'Your build' } default { $true } } }
+  $lv = $ui.LvTele; $lv.BeginUpdate(); $lv.Items.Clear()
+  foreach ($t in (Get-TeleportTargets $d | Sort-Object { PT-KindOrder $_.Kind }, Name)) {
+    if (-not (& $keep $t)) { continue }
     if (-not (Test-Match "$($t.Name) $($t.Kind)" $f)) { continue }
-    $li = New-Object System.Windows.Forms.ListViewItem($t.Name); $li.Tag = $t; [void]$li.SubItems.Add($t.Kind); [void]$li.SubItems.Add([string](Get-DistanceM $d $t)); [void]$lv.Items.Add($li)
+    $place = $t.Kind -in 'Named place', 'Fast travel'
+    $hz = if ($place) { $th = Get-TargetHeight $t; if ($null -ne $th.Z) { [string][int]$th.Z } else { '?' } } else { [string][int]$t.Z }
+    $li = New-Object System.Windows.Forms.ListViewItem($t.Name); $li.Tag = $t; [void]$li.SubItems.Add($t.Kind); [void]$li.SubItems.Add([string]$(if ($place) { PT-Dist2D $d $t } else { Get-DistanceM $d $t })); [void]$li.SubItems.Add($hz); [void]$lv.Items.Add($li)
   }
   $lv.EndUpdate()
+  $u = Get-TeleportUndo $script:SavePath; $ui.BtnUndo.Enabled = [bool]$u
+  $ui.BtnUndo.Text = if ($u) { 'Undo last teleport' } else { 'Undo last teleport (none yet)' }
+  $sel = $ui.LvTele.SelectedItems; $ui.BtnDelSpot.Enabled = ($sel.Count -gt 0 -and $sel[0].Tag.Kind -eq 'My spot')
+}
+# the heights found near a spot, with the one that will be used marked; $ui.TeleLevelZ is the height chosen (null = none known)
+function PT-ShowLevels($t, [bool]$setBoxes = $true) {
+  $ui = $script:PT; $th = Get-TargetHeight $t; $lv = $ui.LvLevels; $ui.TeleBusy = $true
+  $lv.BeginUpdate(); $lv.Items.Clear(); $pick = $null
+  foreach ($l in $th.Levels) { $li = New-Object System.Windows.Forms.ListViewItem([string]$l.Z); $li.Tag = $l; [void]$li.SubItems.Add([string]$l.N); [void]$li.SubItems.Add([string]$l.G); [void]$li.SubItems.Add([string]$l.D); [void]$lv.Items.Add($li); if ($null -ne $th.Z -and [math]::Abs($l.Z - $th.Z) -lt 1) { $pick = $li } }
+  if ($pick) { $pick.Selected = $true; $pick.Font = New-Object System.Drawing.Font($lv.Font, [System.Drawing.FontStyle]::Bold); $pick.EnsureVisible() }
+  $lv.EndUpdate(); $ui.TeleBusy = $false; $ui.TeleLevelZ = $th.Z
+  if ($setBoxes) { Set-Num $ui.TeleX $t.X; Set-Num $ui.TeleY $t.Y; if ($null -ne $th.Z) { Set-Num $ui.TeleZ $th.Z } }
+  $ui.TeleInfo.Text = if ($null -ne $th.Z) { "Height used: Z $([int]$th.Z) - $($th.Why).`r`nYou appear $([math]::Round([double]$ui.TeleDrop.Value / 100.0, 1)) m above it and drop. Click another height in the list to use that one instead (the bold one is the suggestion). Heights come from objects the atlas flights found within 100 m: hills and buildings have several floors, so if a landing is wrong, try the next height up or down, or use Undo." } else { "No height data near this spot (the flights found no objects within 100 m).`r`nType a Z yourself (the in-game map shows your own X / Y / Z at its lower left), or pick a height from the list when one is shown." }
+  return $th
+}
+function PT-OnPlaceSelected {
+  $ui = $script:PT; if ($ui.LvTele.SelectedItems.Count -eq 0) { $ui.BtnDelSpot.Enabled = $false; return }
+  $t = $ui.LvTele.SelectedItems[0].Tag; $ui.BtnDelSpot.Enabled = ($t.Kind -eq 'My spot'); [void](PT-ShowLevels $t)
+}
+function PT-OnLevelPicked {
+  $ui = $script:PT; if ($ui.TeleBusy -or $ui.LvLevels.SelectedItems.Count -eq 0) { return }
+  $z = [double]$ui.LvLevels.SelectedItems[0].Tag.Z; $ui.TeleLevelZ = $z; Set-Num $ui.TeleZ $z
+  $ui.TeleInfo.Text = "Height chosen: Z $([int]$z). You appear $([math]::Round([double]$ui.TeleDrop.Value / 100.0, 1)) m above it (Z $([int]($z + [double]$ui.TeleDrop.Value))) and drop onto the ground when the game loads."
+}
+# the one place that writes the move: confirm, back up (Set-SaveKeys), keep the undo information, reload
+function PT-DoMove([double]$x, [double]$y, [double]$z, [string]$label, [string]$why) {
+  $ui = $script:PT; $d = $ui.Data; $drop = [double]$ui.TeleDrop.Value; $fill = [bool]$ui.TeleVitals.Checked
+  if (Test-GameRunning) { Msg "The game is running, so nothing was changed.`n`nSave and close the game first, then try again." 'Game is running' 'OK' 'Warning' | Out-Null; return $false }
+  $far = [math]::Round([math]::Sqrt([math]::Pow($x - $d.Position.X, 2) + [math]::Pow($y - $d.Position.Y, 2)) / 100.0)
+  $txt = "About to edit this save:`n$($script:SavePath)`n`nMove you to: $label`nX=$([int]$x)  Y=$([int]$y)  Z=$([int]$z)  ($far m away)  - $why`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that height and drop onto the ground when the game loads.`n"
+  if ($fill) { $txt += "Your health, stamina, energy, hunger and warmth are filled to the maximum first.`n" }
+  $txt += "`nIf you land inside something the game may put you back at the start, and a long fall can hurt or kill: 'Undo last teleport' puts your old position (and vitals) back. A backup is made first and the result is checked afterwards.`nSteam Cloud should be OFF for Permafrost.`n`nContinue?"
+  if ((Msg $txt 'Teleport?' 'YesNo' 'Question' 'Button2') -ne 'Yes') { PT-Status 'Cancelled - nothing changed.'; return $false }
+  try {
+    $r = Move-Player $script:SavePath $d $x $y $z $drop $label -FillVitals:$fill
+    PT-Status ('Teleport written and verified. Backup: ' + $r.Backup)
+    if ($script:OnSaveChanged) { & $script:OnSaveChanged "Player tools: teleport to $label  (backup: $($r.Backup))" }
+    PT-Load
+    Msg "Done. You will load at X=$([int]$x) Y=$([int]$y) Z=$([int]($z + $drop)).`n`nBackup: $($r.Backup)`n`nStart the game and load the world. If Steam asks about a cloud conflict, keep the LOCAL (newer) files. Not happy with the landing? Come back here and press 'Undo last teleport' (game closed)." 'Success' 'OK' 'Information' | Out-Null
+    return $true
+  } catch {
+    PT-Status ('FAILED: ' + $_.Exception.Message)
+    Msg "The change did not go through.`n`nReason: $($_.Exception.Message)`n`nNo harm done - your save was not modified (or was put back)." 'Failed safely' 'OK' 'Error' | Out-Null
+    return $false
+  }
 }
 function PT-Teleport {
   $ui = $script:PT; if ($ui.LvTele.SelectedItems.Count -eq 0) { Msg 'Pick a place in the list first.' 'Teleport' 'OK' 'Information' | Out-Null; return }
-  $t = $ui.LvTele.SelectedItems[0].Tag; $d = $ui.Data
-  $drop = [double]$ui.TeleDrop.Value
-  $new = "{0},{1},{2}|{3}" -f (Format-Num $t.X), (Format-Num $t.Y), (Format-Num ($t.Z + $drop)), $d.Position.Rest
-  [void](PT-Commit @{ PawnLocation = $new } ("Move you to: $($t.Name)  ($(Get-DistanceM $d $t) m away)`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that spot and drop onto it when the game loads.`nIf you ever want to come back, your old position is in the backup.") '')
+  $t = $ui.LvTele.SelectedItems[0].Tag; $th = Get-TargetHeight $t
+  $z = if ($null -ne $ui.TeleLevelZ) { [double]$ui.TeleLevelZ } else { $th.Z }
+  if ($null -eq $z) { Msg "There is no height data for this spot. Type a Z in the coordinates box (the in-game map shows your own X / Y / Z at its lower left) and use 'Teleport to coordinates'." 'No height' 'OK' 'Information' | Out-Null; return }
+  [void](PT-DoMove $t.X $t.Y $z $t.Name $(if ($null -ne $ui.TeleLevelZ -and [math]::Abs($ui.TeleLevelZ - $th.Z) -gt 1) { 'the height you picked' } else { $th.Why }))
 }
-# teleport to coordinates read off the in-game map (the X/Y/Z shown at the lower left of the map screen is YOUR position)
+# teleport to the coordinates in the boxes (typed, read off the in-game map, or filled in by the map window); Z 0 = use the suggested height
 function PT-TeleportXYZ {
-  $ui = $script:PT; $d = $ui.Data
-  $t = [pscustomobject]@{ Name = 'the coordinates you typed'; X = [double]$ui.TeleX.Value; Y = [double]$ui.TeleY.Value; Z = [double]$ui.TeleZ.Value }
-  $drop = [double]$ui.TeleDrop.Value
-  $new = "{0},{1},{2}|{3}" -f (Format-Num $t.X), (Format-Num $t.Y), (Format-Num ($t.Z + $drop)), $d.Position.Rest
-  [void](PT-Commit @{ PawnLocation = $new } ("Move you to X=$([int]$t.X)  Y=$([int]$t.Y)  Z=$([int]$t.Z)  ($(Get-DistanceM $d $t) m away)`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that height and drop onto the ground when the game loads.`nIf you ever want to come back, your old position is in the backup.") '')
+  $ui = $script:PT; $x = [double]$ui.TeleX.Value; $y = [double]$ui.TeleY.Value; $z = [double]$ui.TeleZ.Value; $why = 'the height you typed'
+  if ($z -eq 0) { $th = Get-TargetHeight ([pscustomobject]@{ Name = 'coordinates'; Kind = 'Coordinates'; X = $x; Y = $y; Z = 0 }); if ($null -eq $th.Z) { Msg "Type a Z as well: there is no height data near these coordinates." 'No height' 'OK' 'Information' | Out-Null; return }; $z = [double]$th.Z; $why = $th.Why }
+  [void](PT-DoMove $x $y $z 'the coordinates you typed' $why)
+}
+function PT-ShowHeightsHere {
+  $ui = $script:PT; [void](PT-ShowLevels ([pscustomobject]@{ Name = 'coordinates'; Kind = 'Coordinates'; X = [double]$ui.TeleX.Value; Y = [double]$ui.TeleY.Value; Z = 0 }) $false)
+  if ($null -ne $ui.TeleLevelZ) { Set-Num $ui.TeleZ $ui.TeleLevelZ }
+}
+function PT-UndoTeleport {
+  $ui = $script:PT; $u = Get-TeleportUndo $script:SavePath; if (-not $u) { Msg 'There is no teleport to undo for this save.' 'Undo' 'OK' 'Information' | Out-Null; return }
+  if (Test-GameRunning) { Msg "The game is running, so nothing was changed.`n`nSave and close the game first, then try again." 'Game is running' 'OK' 'Warning' | Out-Null; return }
+  if ((Msg "Put your position back to where it was before the last teleport (to: $($u.to), made $($u.at))?`n`nA backup is made first." 'Undo teleport?' 'YesNo' 'Question' 'Button2') -ne 'Yes') { return }
+  try { $r = Undo-Teleport $script:SavePath; PT-Status ('Teleport undone. Backup: ' + $r.Backup); if ($script:OnSaveChanged) { & $script:OnSaveChanged "Player tools: teleport undone  (backup: $($r.Backup))" }; PT-Load; Msg "Done. Your old position is back.`n`nBackup: $($r.Backup)" 'Undone' 'OK' 'Information' | Out-Null }
+  catch { PT-Status ('FAILED: ' + $_.Exception.Message); Msg "Nothing was changed.`n`nReason: $($_.Exception.Message)" 'Failed safely' 'OK' 'Error' | Out-Null }
+}
+function PT-SaveSpot {
+  $ui = $script:PT; $d = $ui.Data; if (-not $d.Position) { Msg 'Your position could not be read.' 'My spot' 'OK' 'Information' | Out-Null; return }
+  Add-Type -AssemblyName Microsoft.VisualBasic
+  $name = if ($script:TestMode) { 'Test spot' } else { [Microsoft.VisualBasic.Interaction]::InputBox("Name for the spot (your position in the save: X $([int]$d.Position.X)  Y $([int]$d.Position.Y)  Z $([int]$d.Position.Z)):", 'Save my position as a spot', '') }
+  if (-not $name -or -not $name.Trim()) { return }
+  try { Add-MySpot $name $d.Position.X $d.Position.Y ($d.Position.Z - 150); PT-Status "Saved the spot '$($name.Trim())'."; PT-FillTele } catch { Msg $_.Exception.Message 'My spot' 'OK' 'Warning' | Out-Null }
+}
+function PT-DeleteSpot {
+  $ui = $script:PT; if ($ui.LvTele.SelectedItems.Count -eq 0 -or $ui.LvTele.SelectedItems[0].Tag.Kind -ne 'My spot') { return }
+  $n = $ui.LvTele.SelectedItems[0].Tag.Name; if ((Msg "Remove the spot '$n' from your list?" 'Remove spot' 'YesNo' 'Question' 'Button2') -ne 'Yes') { return }
+  Remove-MySpot $n; PT-FillTele
+}
+function PT-OpenMap {
+  $ui = $script:PT; $p = Show-TeleportMap $script:ActiveForm $script:SavePath $ui.Data
+  if ($p) { Set-Num $ui.TeleX $p.X; Set-Num $ui.TeleY $p.Y; PT-ShowHeightsHere; $ui.LvTele.SelectedItems.Clear() }
 }
 
 # ---------- quest progress (read only) ----------
@@ -326,19 +404,26 @@ function New-PlayerForm {
 
   # --- tab 3: teleport
   $t3 = NewTab 'Teleport'
-  $ui.TeleNow = New-Lbl $t3 '' 8 8 900 22; $ui.TeleNow.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  New-Lbl $t3 'Search' 8 40 50 | Out-Null; $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Location = '60,37'; $ui.TeleFilter.Size = '240,24'; $t3.Controls.Add($ui.TeleFilter)
-  $bTp = New-Btn $t3 'Teleport to selected place' 320 33 220 32; $bTp.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)') @(380, 140, 110); $ui.LvTele.Location = '8,146'; $ui.LvTele.Size = '640,430'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
-  $nt3 = New-Lbl $t3 "How it works: it writes a new position into the save (game closed, backup first). You load above that spot (150 cm by default, change it with 'Drop height') and drop onto it. If a spot sits inside rock or a hillside, raise the drop height to about 500 (map heights from the game's data run low).`r`n`r`nCoordinates box: open the in-game map and read the X / Y / Z at its lower left (it is YOUR position, not the cursor), type them under the list and press 'Teleport to coordinates'.`r`n`r`nPlaces come from your own save: your bed, the crash site, and everything you built that isn't a plain wall/floor. Distances are straight-line.`r`n`r`nThe game's own named locations (Hunters Glade, Solar Fields, ...) have no coordinates in the exported data, so they can't be listed here. If you need one, stand there once and build/place something (e.g. a campfire) - it will show up in this list." 666 76 380 300; $nt3.Top = 146; $nt3.ForeColor = $script:Th.Muted; $nt3.Anchor = 'Top,Left,Right'
-  # keep the help text inside the tab at any window size (it was running off the right edge and clipping)
-  $ui.TeleNote = $nt3; $nt3.Anchor = 'Top,Left'
-  $t3.Add_Resize({ $n = $script:PT.TeleNote; if ($n) { $n.Width = [math]::Max(240, $this.ClientSize.Width - $n.Left - 16); $n.Height = [math]::Max(200, $this.ClientSize.Height - $n.Top - 50) } })
-  # teleport-to-coordinates row and drop height (above the list so they are always visible)
-  New-Lbl $t3 'Drop height (cm above the spot)' 8 114 200 | Out-Null; $ui.TeleDrop = New-Num $t3 212 111 70 50 2000 0; $ui.TeleDrop.Value = 150
-  New-Lbl $t3 'Coordinates (map X / Y / Z)' 8 78 190 | Out-Null; $ui.TeleX = New-Num $t3 212 75 90 -400000 400000 0; $ui.TeleY = New-Num $t3 308 75 90 -400000 400000 0; $ui.TeleZ = New-Num $t3 404 75 80 -20000 40000 0
-  $bXyz = New-Btn $t3 'Teleport to coordinates' 496 72 190 28; $bXyz.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $bXyz.Add_Click({ PT-TeleportXYZ })
-  $ui.TeleFilter.Add_TextChanged({ PT-FillTele }); $bTp.Add_Click({ PT-Teleport }); $ui.LvTele.Add_DoubleClick({ PT-Teleport })
+  $ui.TeleNow = New-Lbl $t3 '' 8 8 1100 22; $ui.TeleNow.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  New-Lbl $t3 'Search' 8 38 70 | Out-Null; $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Location = '82,35'; $ui.TeleFilter.Size = '190,24'; $t3.Controls.Add($ui.TeleFilter)
+  New-Lbl $t3 'Show' 284 38 56 | Out-Null; $ui.TeleKind = New-Object System.Windows.Forms.ComboBox; $ui.TeleKind.DropDownStyle = 'DropDownList'; $ui.TeleKind.Location = '342,35'; $ui.TeleKind.Size = '190,24'; foreach ($k in 'All', 'Named places', 'Fast travel', 'My spots', 'Bed, start and builds') { [void]$ui.TeleKind.Items.Add($k) }; $ui.TeleKind.SelectedIndex = 0; $t3.Controls.Add($ui.TeleKind)
+  $bTp = New-Btn $t3 'Teleport to selected place' 546 30 250 36; $bTp.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  $ui.BtnUndo = New-Btn $t3 'Undo last teleport (none yet)' 806 30 270 36
+  $ui.BtnDelSpot = New-Btn $t3 'Remove my spot' 1086 30 170 36; $ui.BtnDelSpot.Enabled = $false
+  New-Lbl $t3 'Coordinates (X / Y / Z)' 8 78 262 | Out-Null; $ui.TeleX = New-Num $t3 274 75 100 -400000 400000 0; $ui.TeleY = New-Num $t3 382 75 100 -400000 400000 0; $ui.TeleZ = New-Num $t3 490 75 90 -20000 40000 0
+  $bHere = New-Btn $t3 'Heights here' 596 72 150 30; $bXyz = New-Btn $t3 'Teleport to coordinates' 756 72 250 30; $bXyz.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  New-Lbl $t3 'Drop height (cm)' 8 114 262 | Out-Null; $ui.TeleDrop = New-Num $t3 274 111 90 50 2000 0; $ui.TeleDrop.Value = 150
+  $ui.TeleVitals = New-Object System.Windows.Forms.CheckBox; $ui.TeleVitals.Text = 'Refill my vitals first (recommended)'; $ui.TeleVitals.Checked = $true; $ui.TeleVitals.AutoSize = $false; $ui.TeleVitals.Size = '320,24'; $ui.TeleVitals.Location = '382,111'; $ui.TeleVitals.ForeColor = $script:Th.Text; $t3.Controls.Add($ui.TeleVitals)
+  $bMap = New-Btn $t3 'Open the map...' 716 108 180 32; $bSpot = New-Btn $t3 'Save my position as a spot...' 906 108 270 32
+  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)', 'Height (Z)') @(280, 150, 130, 120); $ui.LvTele.Location = '8,150'; $ui.LvTele.Size = '700,426'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
+  New-Lbl $t3 'Heights found near the selected spot' 724 150 440 | Out-Null
+  $ui.LvLevels = New-LV $t3 @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 120); $ui.LvLevels.Location = '724,176'; $ui.LvLevels.Size = '452,230'; $ui.LvLevels.Anchor = 'Top,Left'
+  $ui.TeleInfo = New-Lbl $t3 "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings." 724 414 452 170; $ui.TeleInfo.ForeColor = $script:Th.Muted
+  $ui.TeleLevelZ = $null; $ui.TeleBusy = $false
+  $ui.TeleFilter.Add_TextChanged({ PT-FillTele }); $ui.TeleKind.Add_SelectedIndexChanged({ PT-FillTele })
+  $bTp.Add_Click({ PT-Teleport }); $ui.LvTele.Add_DoubleClick({ PT-Teleport }); $ui.LvTele.Add_SelectedIndexChanged({ PT-OnPlaceSelected }); $ui.LvLevels.Add_SelectedIndexChanged({ PT-OnLevelPicked })
+  $bXyz.Add_Click({ PT-TeleportXYZ }); $bHere.Add_Click({ PT-ShowHeightsHere }); $ui.BtnUndo.Add_Click({ PT-UndoTeleport }); $ui.BtnDelSpot.Add_Click({ PT-DeleteSpot }); $bMap.Add_Click({ PT-OpenMap }); $bSpot.Add_Click({ PT-SaveSpot })
+  $ui.TeleDrop.Add_ValueChanged({ if ($script:PT.LvLevels.SelectedItems.Count) { PT-OnLevelPicked } })
 
   # --- tab 4: quest progress
   $t4 = NewTab 'Quest progress'

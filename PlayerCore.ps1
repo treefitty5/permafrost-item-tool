@@ -190,6 +190,8 @@ function Get-TeleportTargets($pd) {
   if ($pd.Fall) { $t.Add([pscustomobject]@{ Name = 'Crash / start location'; Kind = 'Start'; X = $pd.Fall.X; Y = $pd.Fall.Y; Z = $pd.Fall.Z }) }
   $n = @{}
   foreach ($b in $pd.Parts) { if ($b.Type -match '^(Wooden|Stone|Metal|Brick|Concrete)?(Foundation|Wall|Floor|Roof|Door|Window|Ramp|Stairs|Pillar|Fence|Gate|Ceiling|Beam|Half|Corner|Platform|Frame)') { continue }; $n[$b.Type] = 1 + [int]$n[$b.Type]; $t.Add([pscustomobject]@{ Name = "$($b.Type) #$($n[$b.Type])"; Kind = 'Your build'; X = $b.X; Y = $b.Y; Z = $b.Z }) }
+  foreach ($p in (Get-Places)) { $t.Add($p) }
+  foreach ($s in (Get-MySpots)) { $t.Add($s) }
   return $t.ToArray()
 }
 function Get-DistanceM($pd, $t) { if (-not $pd.Position) { return 0 }; [math]::Round([math]::Sqrt([math]::Pow($t.X - $pd.Position.X, 2) + [math]::Pow($t.Y - $pd.Position.Y, 2) + [math]::Pow($t.Z - $pd.Position.Z, 2)) / 100.0) }
@@ -197,4 +199,105 @@ function Set-Teleport([string]$savePath, $pd, $target, [switch]$SkipGameCheck) {
   if (-not $pd.Position) { throw 'could not read your current position' }
   $new = "{0},{1},{2}|{3}" -f (Format-Num $target.X), (Format-Num $target.Y), (Format-Num ($target.Z + 150)), $pd.Position.Rest
   return Set-SaveKeys $savePath @{ PawnLocation = $new } -SkipGameCheck:$SkipGameCheck
+}
+
+# --- the game's named places (catalog\places.csv, positions from the game's own level data: see Build-Places.ps1) ---
+$script:Tele = @{}
+function Get-Places {
+  if (-not $script:Tele.Places) {
+    $p = Join-Path $PSScriptRoot 'catalog\places.csv'; $l = @()
+    if (Test-Path -LiteralPath $p) { $l = @(Import-Csv -LiteralPath $p -Encoding UTF8 | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Kind = $_.Kind; X = [double]$_.X; Y = [double]$_.Y; Z = [double]$_.Z } }) }
+    $script:Tele.Places = $l }
+  return $script:Tele.Places
+}
+# --- heights: catalog\terrain-levels.csv (Build-Terrain.ps1) lists, for every 50 m square of the flown map, the heights at which objects were found ---
+function Get-TerrainTable {
+  if (-not $script:Tele.Terrain) {
+    $h = @{}; $p = Join-Path $PSScriptRoot 'catalog\terrain-levels.csv'
+    if (Test-Path -LiteralPath $p) { foreach ($row in (Import-Csv -LiteralPath $p)) { $k = "$($row.C),$($row.R)"; if (-not $h.ContainsKey($k)) { $h[$k] = New-Object System.Collections.Generic.List[object] }; $h[$k].Add([pscustomobject]@{ Z = [double]$row.Z; N = [int]$row.N; G = [int]$row.G }) } }
+    $script:Tele.Terrain = $h }
+  return $script:Tele.Terrain
+}
+# the heights found within $radiusM metres of a spot, nearest squares merged (heights within 2.5 m count as one), lowest first.
+# Z = height, N = objects found at that height, G = how many of those lie on the ground, D = distance of the closest square in metres
+function Get-GroundLevels([double]$x, [double]$y, [double]$radiusM = 100) {
+  $tt = Get-TerrainTable; $rad = $radiusM * 100
+  $c0 = [int][math]::Floor(($x - $rad) / 5000); $c1 = [int][math]::Floor(($x + $rad) / 5000); $r0 = [int][math]::Floor(($y - $rad) / 5000); $r1 = [int][math]::Floor(($y + $rad) / 5000)
+  $raw = New-Object System.Collections.Generic.List[object]
+  for ($ci = $c0; $ci -le $c1; $ci++) { for ($ri = $r0; $ri -le $r1; $ri++) {
+    $k = "$ci,$ri"; if (-not $tt.ContainsKey($k)) { continue }
+    $dx = $ci * 5000 + 2500 - $x; $dy = $ri * 5000 + 2500 - $y; $dm = [math]::Sqrt($dx * $dx + $dy * $dy) / 100
+    if ($dm -gt $radiusM + 36) { continue }
+    foreach ($l in $tt[$k]) { $raw.Add([pscustomobject]@{ Z = $l.Z; N = $l.N; G = $l.G; D = $dm }) } } }
+  $out = New-Object System.Collections.Generic.List[object]; $sorted = @($raw | Sort-Object Z); $i = 0
+  while ($i -lt $sorted.Count) {
+    $z0 = $sorted[$i].Z; $n = 0; $g = 0; $zsum = 0.0; $dmin = 1e9
+    while ($i -lt $sorted.Count -and $sorted[$i].Z - $z0 -le 250) { $s = $sorted[$i]; $n += $s.N; $g += $s.G; $zsum += $s.Z * $s.N; if ($s.D -lt $dmin) { $dmin = $s.D }; $i++ }
+    $out.Add([pscustomobject]@{ Z = [int][math]::Round($zsum / [math]::Max(1, $n)); N = $n; G = $g; D = [int][math]::Round($dmin) }) }
+  return $out.ToArray()
+}
+# which of those heights to offer first: among the heights that have objects lying on the ground, the one found closest to the spot (the lowest of equals);
+# else the same among the heights with a few objects. $null = no data here. Terrain is steep and has several floors, so this is a starting point: the others stay in the list.
+function Get-SuggestedLevel($levels) {
+  foreach ($pool in @(@($levels | Where-Object { $_.G -gt 0 }), @($levels | Where-Object { $_.N -ge 4 }))) {
+    if ($pool.Count) { $dmin = ($pool | Measure-Object D -Minimum).Minimum; return @($pool | Where-Object { $_.D -le $dmin + 20 } | Sort-Object Z)[0] } }   # the lowest of those found within 20 m of the closest one: a landing too low is safer than a fall
+  return $null
+}
+# the height to use for a target: spots that came with a real height (bed, start, your builds, your own spots) keep it; a named place or fast-travel point uses the
+# height found within 6 m of its own that has the most objects, else the suggested level; a bare coordinate takes the suggested level. Returns @{ Z; Why; Levels }.
+function Get-TargetHeight($t) {
+  $lv = @(Get-GroundLevels $t.X $t.Y 100)
+  if ($t.Kind -in 'Bed', 'Start', 'Your build', 'My spot') { return @{ Z = [double]$t.Z; Why = 'the height saved with it'; Levels = $lv } }
+  if ($t.Kind -in 'Named place', 'Fast travel') {
+    $near = @($lv | Where-Object { $_.N -ge 4 -and [math]::Abs($_.Z - $t.Z) -le 600 } | Sort-Object { - $_.N })
+    if ($near.Count) { return @{ Z = [double]$near[0].Z; Why = "matches the place's own height ($($near[0].N) objects found there)"; Levels = $lv } } }
+  $sg = Get-SuggestedLevel $lv
+  if ($sg) { return @{ Z = [double]$sg.Z; Why = "lowest height with objects on the ground, $($sg.D) m away"; Levels = $lv } }
+  if ($t.Kind -in 'Named place', 'Fast travel') { return @{ Z = [double]$t.Z; Why = "the place's own height (no objects found near it)"; Levels = $lv } }
+  return @{ Z = $null; Why = 'no height data here'; Levels = $lv }
+}
+
+# --- your own spots (teleport-spots.json in the tool folder, private) ---
+function Get-SpotsPath { Join-Path $PSScriptRoot 'teleport-spots.json' }
+function Get-MySpots {
+  $p = Get-SpotsPath; if (-not (Test-Path -LiteralPath $p)) { return @() }
+  try { return @((Get-Content -LiteralPath $p -Raw | ConvertFrom-Json).spots | Where-Object { $_ } | ForEach-Object { [pscustomobject]@{ Name = [string]$_.name; Kind = 'My spot'; X = [double]$_.x; Y = [double]$_.y; Z = [double]$_.z } }) } catch { return @() }
+}
+function Write-MySpots($spots) {
+  $list = @($spots | ForEach-Object { [ordered]@{ name = $_.Name; x = [math]::Round($_.X, 1); y = [math]::Round($_.Y, 1); z = [math]::Round($_.Z, 1) } })
+  $json = ([ordered]@{ version = 1; spots = $list } | ConvertTo-Json -Depth 4); [IO.File]::WriteAllText((Get-SpotsPath), $json)
+}
+function Add-MySpot([string]$name, [double]$x, [double]$y, [double]$z) {
+  $name = $name.Trim(); if (-not $name) { throw 'Give the spot a name.' }
+  $keep = @(Get-MySpots | Where-Object { $_.Name -ne $name }); $keep += [pscustomobject]@{ Name = $name; Kind = 'My spot'; X = $x; Y = $y; Z = $z }; Write-MySpots $keep
+}
+function Remove-MySpot([string]$name) { Write-MySpots @(Get-MySpots | Where-Object { $_.Name -ne $name }) }
+
+# --- teleport with undo: the position (and the vitals, when they were topped up) before the last teleport of each save are kept in teleport-undo.json ---
+function Get-UndoPath { Join-Path $PSScriptRoot 'teleport-undo.json' }
+function Read-UndoFile { $p = Get-UndoPath; if (-not (Test-Path -LiteralPath $p)) { return @{} }; try { $o = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; $h = @{}; foreach ($pr in $o.PSObject.Properties) { $h[$pr.Name] = $pr.Value }; return $h } catch { return @{} } }
+function Get-TeleportUndo([string]$savePath) { $h = Read-UndoFile; $k = [IO.Path]::GetFileName($savePath); if ($h.ContainsKey($k)) { return $h[$k] }; return $null }
+function Save-TeleportUndo([string]$savePath, $entry) { $h = Read-UndoFile; $k = [IO.Path]::GetFileName($savePath); if ($null -eq $entry) { $h.Remove($k) } else { $h[$k] = $entry }; [IO.File]::WriteAllText((Get-UndoPath), ($h | ConvertTo-Json -Depth 5)) }
+# move the player to X / Y / Z, appearing $drop cm above Z; optionally refill health, stamina, energy, hunger and warmth first. Returns Set-SaveKeys' result.
+function Move-Player([string]$savePath, $pd, [double]$x, [double]$y, [double]$z, [double]$drop, [string]$label = '', [switch]$FillVitals, [switch]$SkipGameCheck) {
+  if (-not $pd.Position) { throw 'could not read your current position' }
+  $prev = "{0},{1},{2}|{3}" -f (Format-Num $pd.Position.X), (Format-Num $pd.Position.Y), (Format-Num $pd.Position.Z), $pd.Position.Rest
+  $changes = @{ PawnLocation = ("{0},{1},{2}|{3}" -f (Format-Num $x), (Format-Num $y), (Format-Num ($z + $drop)), $pd.Position.Rest) }
+  $oldVitals = @{}
+  if ($FillVitals) { foreach ($v in $pd.Vitals) { if ($v.Max -gt 0 -and $v.Value -lt $v.Max) { $oldVitals[$v.Key] = (Format-Num $v.Value); $changes[$v.Key] = (Format-Num $v.Max) } } }
+  $res = Set-SaveKeys $savePath $changes -SkipGameCheck:$SkipGameCheck
+  Save-TeleportUndo $savePath ([ordered]@{ loc = $prev; vitals = $oldVitals; to = $label; at = (Get-Date).ToString('s') })
+  return $res
+}
+function Undo-Teleport([string]$savePath, [switch]$SkipGameCheck) {
+  $u = Get-TeleportUndo $savePath; if (-not $u) { throw 'There is no teleport to undo for this save.' }
+  $changes = @{ PawnLocation = [string]$u.loc }; if ($u.vitals) { foreach ($pr in $u.vitals.PSObject.Properties) { $changes[$pr.Name] = [string]$pr.Value } }
+  $res = Set-SaveKeys $savePath $changes -SkipGameCheck:$SkipGameCheck; Save-TeleportUndo $savePath $null; return $res
+}
+
+# --- the squares of the map you have uncovered (the game's fog of war: 50 m squares, column = floor(X / 5000) + 31, row = floor(Y / 5000) + 31) ---
+function Get-ExploredSquares([string]$savePath) {
+  $res = New-Object System.Collections.Generic.List[object]
+  try { $m = [regex]::Match((Get-SaveText $savePath), 'FogOfWarRevealer_Voxels>([0-9,;]+)'); foreach ($v in ($m.Groups[1].Value -split ';')) { if ($v -match '^(-?\d+),(-?\d+)$') { $res.Add([pscustomobject]@{ X0 = (([int]$Matches[1] - 31) * 5000); Y0 = (([int]$Matches[2] - 31) * 5000) }) } } } catch { }
+  return $res.ToArray()
 }
