@@ -247,7 +247,8 @@ function PT-DoMove([double]$x, [double]$y, [double]$z, [string]$label, [string]$
   $far = [math]::Round([math]::Sqrt([math]::Pow($x - $d.Position.X, 2) + [math]::Pow($y - $d.Position.Y, 2)) / 100.0)
   $txt = "About to edit this save:`n$($script:SavePath)`n`nMove you to: $label`nX=$([int]$x)  Y=$([int]$y)  Z=$([int]$z)  ($far m away)  - $why`nYou will appear $([math]::Round($drop / 100.0, 1)) m above that height and drop onto the ground when the game loads.`n"
   if ($fill) { $txt += "Your health, stamina, energy, hunger and warmth are filled to the maximum first.`n" }
-  $txt += "`nIf you land inside something the game may put you back at the start, and a long fall can hurt or kill: 'Undo last teleport' puts your old position (and vitals) back. A backup is made first and the result is checked afterwards.`nSteam Cloud should be OFF for Permafrost.`n`nContinue?"
+  $warn = @(Get-TeleportWarning $x $y $z $drop); if ($warn.Count) { $txt += "`nWARNING:`n" + (($warn | ForEach-Object { "- $_" }) -join "`n") + "`n" }
+  $txt += "`nHeights are estimates: landing too low puts you UNDER the map, too high is a long fall. 'Undo last teleport' puts you back where you were before you started teleporting, and the backup made first is in the Backups folder ('Restore a backup...' in the main window) if anything goes wrong.`nSteam Cloud should be OFF for Permafrost.`n`nContinue?"
   if ((Msg $txt 'Teleport?' 'YesNo' 'Question' 'Button2') -ne 'Yes') { PT-Status 'Cancelled - nothing changed.'; return $false }
   try {
     $r = Move-Player $script:SavePath $d $x $y $z $drop $label -FillVitals:$fill
@@ -430,7 +431,7 @@ function New-PlayerForm {
   $gt = New-Object System.Windows.Forms.TableLayoutPanel; $gt.Dock = 'Top'; $gt.AutoSize = $true; $gt.AutoSizeMode = 'GrowAndShrink'; $gt.ColumnCount = 1; [void]$gt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100))); $pnl = New-Object System.Windows.Forms.Panel; $pnl.Dock = 'Fill'; $pnl.AutoScroll = $true; $gG.Controls.Add($pnl); $pnl.Controls.Add($gt)
   $r1 = & $mkRow; $r1.Controls.Add((& $mkLbl 'X')); $ui.TeleX = & $mkNum 96 -400000 400000; $r1.Controls.Add($ui.TeleX); $r1.Controls.Add((& $mkLbl 'Y')); $ui.TeleY = & $mkNum 96 -400000 400000; $r1.Controls.Add($ui.TeleY); $r1.Controls.Add((& $mkLbl 'Z')); $ui.TeleZ = & $mkNum 86 -20000 40000; $r1.Controls.Add($ui.TeleZ)
   $bHere = & $mkBtn 'Heights here' $false; $r1.Controls.Add($bHere)
-  $r2 = & $mkRow; $r2.Controls.Add((& $mkLbl 'Drop height (cm)')); $ui.TeleDrop = & $mkNum 80 50 2000; $ui.TeleDrop.Value = 150; $r2.Controls.Add($ui.TeleDrop)
+  $r2 = & $mkRow; $r2.Controls.Add((& $mkLbl 'Drop height (cm)')); $ui.TeleDrop = & $mkNum 80 50 2000; $ui.TeleDrop.Value = 400; $r2.Controls.Add($ui.TeleDrop)
   $ui.TeleVitals = New-Object System.Windows.Forms.CheckBox; $ui.TeleVitals.Text = 'Refill my vitals first (recommended)'; $ui.TeleVitals.Checked = $true; $ui.TeleVitals.AutoSize = $true; $ui.TeleVitals.Margin = New-Object System.Windows.Forms.Padding(8, 7, 0, 0); $ui.TeleVitals.ForeColor = $script:Th.Text; $r2.Controls.Add($ui.TeleVitals)
   $r3 = & $mkRow; $r3.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 8); $bTp = & $mkBtn 'Teleport to selected place' $true; $bXyz = & $mkBtn 'Teleport to coordinates' $true; $r3.Controls.Add($bTp); $r3.Controls.Add($bXyz)
   $r4 = & $mkRow; $bMap = & $mkBtn 'Open the map...' $false; $bSpot = & $mkBtn 'Save my position...' $false; $ui.BtnUndo = & $mkBtn 'Undo last teleport' $false; $ui.BtnDelSpot = & $mkBtn 'Remove my spot' $false; $ui.BtnDelSpot.Enabled = $false

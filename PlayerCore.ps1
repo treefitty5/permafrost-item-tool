@@ -236,11 +236,23 @@ function Get-GroundLevels([double]$x, [double]$y, [double]$radiusM = 100) {
     $out.Add([pscustomobject]@{ Z = [int][math]::Round($zsum / [math]::Max(1, $n)); N = $n; G = $g; D = [int][math]::Round($dmin) }) }
   return $out.ToArray()
 }
-# which of those heights to offer first: among the heights that have objects lying on the ground, the one found closest to the spot (the lowest of equals);
-# else the same among the heights with a few objects. $null = no data here. Terrain is steep and has several floors, so this is a starting point: the others stay in the list.
-function Get-SuggestedLevel($levels) {
+# where the surface probably is near a spot: the nearest fast-travel point (else named place) within 200 m. Their height is the game's own, placed on the ground, so it is an anchor:
+# a height far BELOW it is never suggested (that is how a teleport once landed under the map: the deepest height with objects, 3-5 m under the surface, was suggested).
+function Get-GroundAnchor([double]$x, [double]$y, [double]$radiusM = 200) {
+  $best = $null; $bs = 1e18
+  foreach ($p in (Get-Places)) { $d = [math]::Sqrt(($p.X - $x) * ($p.X - $x) + ($p.Y - $y) * ($p.Y - $y)) / 100; if ($d -le $radiusM) { $s = $d + $(if ($p.Kind -eq 'Fast travel') { 0 } else { 40 }); if ($s -lt $bs) { $bs = $s; $best = $p } } }
+  return $best
+}
+# which of those heights to offer first: the height with the MOST objects lying on the ground (the main surface); heights more than 4 m below the anchor are left out when others remain.
+# Terrain is steep and has several floors, so this is a starting point: the others stay in the list.
+function Get-SuggestedLevel($levels, $anchorZ = $null) {
+  $first = $true
   foreach ($pool in @(@($levels | Where-Object { $_.G -gt 0 }), @($levels | Where-Object { $_.N -ge 4 }))) {
-    if ($pool.Count) { $dmin = ($pool | Measure-Object D -Minimum).Minimum; return @($pool | Where-Object { $_.D -le $dmin + 20 } | Sort-Object Z)[0] } }   # the lowest of those found within 20 m of the closest one: a landing too low is safer than a fall
+    if ($pool.Count) {
+      if ($null -ne $anchorZ) { $keep = @($pool | Where-Object { $_.Z -ge $anchorZ - 400 }); if ($keep.Count) { $pool = $keep } }
+      $useG = $first
+      return @($pool | Sort-Object @{ Expression = { if ($useG) { $_.G } else { $_.N } }; Descending = $true }, Z)[0] }
+    $first = $false }
   return $null
 }
 # the height to use for a target: spots that came with a real height (bed, start, your builds, your own spots) keep it; a named place or fast-travel point uses the
@@ -251,10 +263,19 @@ function Get-TargetHeight($t) {
   if ($t.Kind -in 'Named place', 'Fast travel') {
     $near = @($lv | Where-Object { $_.N -ge 4 -and [math]::Abs($_.Z - $t.Z) -le 600 } | Sort-Object { - $_.N })
     if ($near.Count) { return @{ Z = [double]$near[0].Z; Why = "matches the place's own height ($($near[0].N) objects found there)"; Levels = $lv } } }
-  $sg = Get-SuggestedLevel $lv
-  if ($sg) { return @{ Z = [double]$sg.Z; Why = "lowest height with objects on the ground, $($sg.D) m away"; Levels = $lv } }
+  $an = Get-GroundAnchor $t.X $t.Y; $sg = Get-SuggestedLevel $lv $(if ($an) { $an.Z } else { $null })
+  if ($sg) { return @{ Z = [double]$sg.Z; Why = "the main surface here ($($sg.G) objects on the ground)" + $(if ($an) { ", near $($an.Name)" } else { '' }); Levels = $lv } }
   if ($t.Kind -in 'Named place', 'Fast travel') { return @{ Z = [double]$t.Z; Why = "the place's own height (no objects found near it)"; Levels = $lv } }
   return @{ Z = $null; Why = 'no height data here'; Levels = $lv }
+}
+# warnings to show before a teleport: landing under the surface, or a long fall. Returns lines of text (empty = nothing to warn about).
+function Get-TeleportWarning([double]$x, [double]$y, [double]$z, [double]$drop) {
+  $w = New-Object System.Collections.Generic.List[string]; $top = $z + $drop
+  $an = Get-GroundAnchor $x $y 200
+  if ($an -and $top -lt $an.Z - 300) { $w.Add("You would appear $([math]::Round(($an.Z - $top) / 100, 1)) m BELOW $($an.Name) nearby (its height is Z $([int]$an.Z)). If that is the ground here, you land UNDER the map.") }
+  $lv = @(Get-GroundLevels $x $y 100); $g = @($lv | Where-Object { $_.G -gt 0 })
+  if ($g.Count) { $gz = ($g | Measure-Object Z -Maximum).Maximum; if ($top - $gz -gt 1200) { $w.Add("You would appear $([math]::Round(($top - $gz) / 100)) m above the highest ground found here: a long fall that can kill you.") } }
+  return $w.ToArray()
 }
 
 # --- your own spots (teleport-spots.json in the tool folder, private) ---
@@ -279,14 +300,20 @@ function Read-UndoFile { $p = Get-UndoPath; if (-not (Test-Path -LiteralPath $p)
 function Get-TeleportUndo([string]$savePath) { $h = Read-UndoFile; $k = [IO.Path]::GetFileName($savePath); if ($h.ContainsKey($k)) { return $h[$k] }; return $null }
 function Save-TeleportUndo([string]$savePath, $entry) { $h = Read-UndoFile; $k = [IO.Path]::GetFileName($savePath); if ($null -eq $entry) { $h.Remove($k) } else { $h[$k] = $entry }; [IO.File]::WriteAllText((Get-UndoPath), ($h | ConvertTo-Json -Depth 5)) }
 # move the player to X / Y / Z, appearing $drop cm above Z; optionally refill health, stamina, energy, hunger and warmth first. Returns Set-SaveKeys' result.
+# The undo entry keeps the position (and vitals) from BEFORE THE FIRST of several teleports in a row: while nothing but this tool has written the save since the last teleport
+# (the save's time stamp still matches), a further teleport keeps the original position, so Undo always goes back to where you were before you started teleporting.
 function Move-Player([string]$savePath, $pd, [double]$x, [double]$y, [double]$z, [double]$drop, [string]$label = '', [switch]$FillVitals, [switch]$SkipGameCheck) {
   if (-not $pd.Position) { throw 'could not read your current position' }
   $prev = "{0},{1},{2}|{3}" -f (Format-Num $pd.Position.X), (Format-Num $pd.Position.Y), (Format-Num $pd.Position.Z), $pd.Position.Rest
   $changes = @{ PawnLocation = ("{0},{1},{2}|{3}" -f (Format-Num $x), (Format-Num $y), (Format-Num ($z + $drop)), $pd.Position.Rest) }
-  $oldVitals = @{}
+  $oldVitals = [ordered]@{}
   if ($FillVitals) { foreach ($v in $pd.Vitals) { if ($v.Max -gt 0 -and $v.Value -lt $v.Max) { $oldVitals[$v.Key] = (Format-Num $v.Value); $changes[$v.Key] = (Format-Num $v.Max) } } }
+  $ex = Get-TeleportUndo $savePath; $before = (Get-Item -LiteralPath $savePath).LastWriteTimeUtc.Ticks
+  $chain = [bool]($ex -and ($ex.PSObject.Properties.Name -contains 'after') -and ([long]$ex.after -eq $before))
   $res = Set-SaveKeys $savePath $changes -SkipGameCheck:$SkipGameCheck
-  Save-TeleportUndo $savePath ([ordered]@{ loc = $prev; vitals = $oldVitals; to = $label; at = (Get-Date).ToString('s') })
+  $after = (Get-Item -LiteralPath $savePath).LastWriteTimeUtc.Ticks
+  if ($chain) { $prev = [string]$ex.loc; $merged = [ordered]@{}; if ($ex.vitals) { foreach ($pr in $ex.vitals.PSObject.Properties) { $merged[$pr.Name] = [string]$pr.Value } }; foreach ($k in $oldVitals.Keys) { if (-not $merged.Contains($k)) { $merged[$k] = $oldVitals[$k] } }; $oldVitals = $merged }
+  Save-TeleportUndo $savePath ([ordered]@{ loc = $prev; vitals = $oldVitals; to = $label; at = (Get-Date).ToString('s'); after = $after; steps = $(if ($chain) { 1 + [int]$ex.steps } else { 1 }) })
   return $res
 }
 function Undo-Teleport([string]$savePath, [switch]$SkipGameCheck) {
