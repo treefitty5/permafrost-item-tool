@@ -110,24 +110,56 @@ function New-TeleportMapForm([string]$savePath, $pd) {
   $m.Explored = @(Get-ExploredSquares $savePath); $m.Player = if ($pd -and $pd.Position) { @{ X = $pd.Position.X; Y = $pd.Position.Y } } else { $null }
   $f = New-Object System.Windows.Forms.Form; $f.Text = 'Teleport map  -  click a point to see its coordinates and heights'; $f.Size = New-Object System.Drawing.Size(1280, [math]::Min(860, [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height - 30)); $f.MinimumSize = New-Object System.Drawing.Size(980, 620)
   $f.StartPosition = 'CenterParent'; $f.Font = New-Object System.Drawing.Font('Segoe UI', 9); $m.Form = $f
-  $side = New-Object System.Windows.Forms.Panel; $side.Dock = 'Right'; $side.Width = 510; $side.AutoScroll = $true; $f.Controls.Add($side)
+  # the side panel is one stack of rows that touch each other (find, selected point, heights, buttons) with the legend in the lower right corner
+  $side = New-Object System.Windows.Forms.Panel; $side.Dock = 'Right'; $side.Width = 480; $side.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8); $side.AutoScroll = $true; $f.Controls.Add($side)
   $pic = New-Object System.Windows.Forms.PictureBox; $pic.Dock = 'Fill'; $pic.SizeMode = 'Normal'; $f.Controls.Add($pic); $pic.BringToFront(); $m.Pic = $pic
-  $y = 8
-  New-Lbl $side 'Find a place' 10 $y 200 | Out-Null; $m.TxtFind = New-Object System.Windows.Forms.TextBox; $m.TxtFind.Location = '10,' + ($y + 24); $m.TxtFind.Size = '330,24'; $side.Controls.Add($m.TxtFind); $bFind = New-Btn $side 'Go' 350 ($y + 22) 110 28; $y += 62
-  $m.LblSel = New-Lbl $side 'Click the map to pick a point.' 10 $y 450 24; $m.LblSel.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $y += 28
-  $m.LblNear = New-Lbl $side '' 10 $y 450 44; $y += 48
-  New-Lbl $side 'Heights found near the point (Z):' 10 $y 450 | Out-Null; $y += 24
-  $m.LvLevels = New-LV $side @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 110); $m.LvLevels.Location = "10,$y"; $m.LvLevels.Size = '450,150'; $y += 156
-  $m.LblZ = New-Lbl $side '' 10 $y 450 62; $m.LblZ.ForeColor = $script:Th.Accent; $y += 66
-  $m.BtnUse = New-Btn $side 'Use this spot in Teleport' 10 $y 450 38; $m.BtnUse.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $m.BtnUse.Enabled = $false; $y += 44
-  $m.BtnSpot = New-Btn $side 'Save as my spot...' 10 $y 450 32; $m.BtnSpot.Enabled = $false; $y += 40
-  $bFit = New-Btn $side 'Show everything' 10 $y 190 30; $bZoomIn = New-Btn $side 'Zoom +' 210 $y 120 30; $bZoomOut = New-Btn $side 'Zoom -' 340 $y 120 30; $y += 42
-  $chk = { param([string]$t, [bool]$on, [int]$x, [int]$yy) $c = New-Object System.Windows.Forms.CheckBox; $c.Text = $t; $c.Checked = $on; $c.AutoSize = $false; $c.Size = '220,24'; $c.Location = "$x,$yy"; $c.ForeColor = $script:Th.Text; $side.Controls.Add($c); $c.Add_CheckedChanged({ if ($script:TM.Pic.Image) { TM-Render } }); return $c }
-  $m.ChkExplored = & $chk 'Uncovered area' $true 10 $y; $m.ChkPlaces = & $chk 'Named places' $true 240 $y; $y += 26
-  $m.ChkOres = & $chk 'Ores' $true 10 $y; $m.ChkCont = & $chk 'Containers' $true 240 $y; $y += 26
-  $m.ChkItems = & $chk 'Loose items' $true 10 $y; $m.ChkNotes = & $chk 'Notes' $true 240 $y; $y += 26
-  $m.ChkTrees = & $chk 'Trees and bushes' $false 10 $y; $m.ChkBreak = & $chk 'Breakables' $false 240 $y; $y += 32
-  $note = New-Lbl $side "East (+X) is right, north is up, as on the game's own map. Drag to move, mouse wheel to zoom. Red ring = you (as saved). Diamonds: orange = named place, blue = fast travel, green = your spot. Dots: orange = ore, yellow = container, green = loose item, pink = note, grey = breakable, dark green = tree or bush. The dots are what the atlas flights found: where nothing is drawn nothing was found, so there are no heights there." 10 $y 450 150; $note.ForeColor = $script:Th.Muted
+  $sl = New-Object System.Windows.Forms.TableLayoutPanel; $sl.Dock = 'Fill'; $sl.MinimumSize = New-Object System.Drawing.Size(0, [int](650 * $f.DeviceDpi / 96)); $sl.ColumnCount = 1; [void]$sl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100))); $side.Controls.Add($sl)
+  $rowAuto = { [void]$sl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  $lbl = { param([string]$text) $l = New-Object System.Windows.Forms.Label; $l.Text = $text; $l.AutoSize = $true; $l.MaximumSize = New-Object System.Drawing.Size(446, 0); $l.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4); return $l }
+  # row: find a place
+  $fr = New-Object System.Windows.Forms.FlowLayoutPanel; $fr.Dock = 'Fill'; $fr.AutoSize = $true; $fr.WrapContents = $false; $fr.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6)
+  $l1 = & $lbl 'Find a place'; $l1.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0); $fr.Controls.Add($l1)
+  $m.TxtFind = New-Object System.Windows.Forms.TextBox; $m.TxtFind.Width = 230; $m.TxtFind.Margin = New-Object System.Windows.Forms.Padding(0, 5, 8, 0); $fr.Controls.Add($m.TxtFind)
+  $bFind = New-Object System.Windows.Forms.Button; $bFind.Text = 'Go'; $bFind.Width = 90; $bFind.Height = 30; $bFind.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 0); $fr.Controls.Add($bFind)
+  & $rowAuto; $sl.Controls.Add($fr)
+  $m.LblSel = & $lbl 'Click the map to pick a point.'; $m.LblSel.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); & $rowAuto; $sl.Controls.Add($m.LblSel)
+  $m.LblNear = & $lbl ''; & $rowAuto; $sl.Controls.Add($m.LblNear)
+  $lh = & $lbl 'Heights found near the point (Z):'; & $rowAuto; $sl.Controls.Add($lh)
+  [void]$sl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  $m.LvLevels = New-LV $sl @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 100); $m.LvLevels.Dock = 'Fill'; $m.LvLevels.MinimumSize = New-Object System.Drawing.Size(0, 110); $m.LvLevels.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6)
+  $m.LblZ = & $lbl ''; $m.LblZ.ForeColor = $script:Th.Accent; & $rowAuto; $sl.Controls.Add($m.LblZ)
+  $m.BtnUse = New-Object System.Windows.Forms.Button; $m.BtnUse.Text = 'Use this spot in Teleport'; $m.BtnUse.Dock = 'Fill'; $m.BtnUse.Height = 38; $m.BtnUse.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4); $m.BtnUse.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $m.BtnUse.Enabled = $false; & $rowAuto; $sl.Controls.Add($m.BtnUse)
+  $m.BtnSpot = New-Object System.Windows.Forms.Button; $m.BtnSpot.Text = 'Save as my spot...'; $m.BtnSpot.Dock = 'Fill'; $m.BtnSpot.Height = 32; $m.BtnSpot.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4); $m.BtnSpot.Enabled = $false; & $rowAuto; $sl.Controls.Add($m.BtnSpot)
+  $vr = New-Object System.Windows.Forms.TableLayoutPanel; $vr.Dock = 'Fill'; $vr.ColumnCount = 3; $vr.RowCount = 1; $vr.AutoSize = $true; $vr.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
+  [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 44))); [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 28))); [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 28)))
+  $mkb = { param([string]$t) $b = New-Object System.Windows.Forms.Button; $b.Text = $t; $b.Dock = 'Fill'; $b.Height = 32; $b.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0); return $b }
+  $bFit = & $mkb 'Show everything'; $bZoomIn = & $mkb 'Zoom +'; $bZoomOut = & $mkb 'Zoom -'; $vr.Controls.Add($bFit, 0, 0); $vr.Controls.Add($bZoomIn, 1, 0); $vr.Controls.Add($bZoomOut, 2, 0); & $rowAuto; $sl.Controls.Add($vr)
+  # the legend, lower right: a coloured mark for everything on the map; the tick boxes switch layers on and off
+  $th = $script:Th; $a = 70.0 / 255; $lightSq = [System.Drawing.Color]::FromArgb([int]($th.Back.R * (1 - $a) + $th.Accent.R * $a), [int]($th.Back.G * (1 - $a) + $th.Accent.G * $a), [int]($th.Back.B * (1 - $a) + $th.Accent.B * $a))
+  $swPaint = { param($s, $e) $d = $s.Tag; $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'; $g.TranslateTransform(0, 3); $br = New-Object System.Drawing.SolidBrush($d.Color); $pn = New-Object System.Drawing.Pen($d.Edge, 1.2)
+    switch ($d.Shape) { 'square' { $g.FillRectangle($br, 2, 5, 15, 15); $g.DrawRectangle($pn, 2, 5, 15, 15) } 'dot' { $g.FillEllipse($br, 4, 7, 11, 11) } 'ring' { $rp = New-Object System.Drawing.Pen($d.Color, 2.2); $g.DrawEllipse($rp, 3, 6, 12, 12); $rp.Dispose() }
+      'diamond' { $pts = [System.Drawing.PointF[]]@([System.Drawing.PointF]::new(9.5, 3), [System.Drawing.PointF]::new(17, 12), [System.Drawing.PointF]::new(9.5, 21), [System.Drawing.PointF]::new(2, 12)); $g.FillPolygon($br, $pts); $g.DrawPolygon($pn, $pts) } }
+    $br.Dispose(); $pn.Dispose() }
+  $mkItem = { param([string]$text, [string]$shape, $color, [bool]$check, [bool]$on)
+    $r = New-Object System.Windows.Forms.FlowLayoutPanel; $r.AutoSize = $true; $r.WrapContents = $false; $r.Margin = New-Object System.Windows.Forms.Padding(0, 1, 6, 1)
+    $sw = New-Object System.Windows.Forms.Panel; $sw.Size = New-Object System.Drawing.Size(21, 31); $sw.Margin = New-Object System.Windows.Forms.Padding(0, 0, 3, 0); $sw.Tag = @{ Shape = $shape; Color = $color; Edge = $th.Muted }; $sw.Add_Paint($swPaint); $r.Controls.Add($sw)
+    if ($check) { $c = New-Object System.Windows.Forms.CheckBox; $c.Text = $text; $c.Checked = $on; $c.AutoSize = $true; $c.Margin = New-Object System.Windows.Forms.Padding(0, 1, 0, 0); $c.ForeColor = $th.Text; $c.Add_CheckedChanged({ if ($script:TM.Pic.Image) { TM-Render } }); $r.Controls.Add($c) }
+    else { $c = New-Object System.Windows.Forms.Label; $c.Text = $text; $c.AutoSize = $true; $c.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 0); $r.Controls.Add($c) }
+    return @{ Row = $r; Ctl = $c } }
+  $gL = New-Object ThemedGroup; $gL.Text = 'Legend'; $gL.Dock = 'Fill'; $gL.AutoSize = $true; $gL.AutoSizeMode = 'GrowAndShrink'; $gL.Padding = New-Object System.Windows.Forms.Padding(10, 6, 10, 8); $gL.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 0)
+  $lt = New-Object System.Windows.Forms.TableLayoutPanel; $lt.Dock = 'Top'; $lt.AutoSize = $true; $lt.AutoSizeMode = 'GrowAndShrink'; $lt.ColumnCount = 2; [void]$lt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50))); [void]$lt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+  $items = @(
+    @('Uncovered area', 'square', $lightSq, $true, $true, 'ChkExplored'), @('Not uncovered yet', 'square', $th.Back, $false, $false, ''),
+    @('Named places', 'diamond', $th.Warn, $true, $true, 'ChkPlaces'), @('Fast travel', 'diamond', $th.Accent2, $false, $false, ''),
+    @('Your spots', 'diamond', $th.Good, $false, $false, ''), @('You (as saved)', 'ring', $th.Bad, $false, $false, ''),
+    @('Ores', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#F8AD41'), $true, $true, 'ChkOres'), @('Containers', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#E3D26F'), $true, $true, 'ChkCont'),
+    @('Loose items', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#6FD3A0'), $true, $true, 'ChkItems'), @('Notes', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#FF70BB'), $true, $true, 'ChkNotes'),
+    @('Trees and bushes', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#3C8F7B'), $true, $false, 'ChkTrees'), @('Breakables', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#8E9AAD'), $true, $false, 'ChkBreak'))
+  foreach ($it in $items) { $x = & $mkItem $it[0] $it[1] $it[2] $it[3] $it[4]; if ($it[5]) { $m[$it[5]] = $x.Ctl }; $lt.Controls.Add($x.Row) }
+  $gL.Controls.Add($lt)
+  $nt = New-Object System.Windows.Forms.Label; $nt.Dock = 'Bottom'; $nt.AutoSize = $true; $nt.MaximumSize = New-Object System.Drawing.Size(430, 0); $nt.ForeColor = $th.Muted; $nt.Padding = New-Object System.Windows.Forms.Padding(0, 6, 0, 0)
+  $nt.Text = "Light squares: uncovered in this save (the game's 50 m fog-of-war squares; an edge can be off by one). Dark squares: not uncovered yet - sea, unvisited ground or gaps. Dots show what the atlas flights found, even on dark squares: where nothing is drawn nothing was found, so there are no heights. East (+X) is right, north is up. Drag to move, wheel to zoom."
+  $gL.Controls.Add($nt); & $rowAuto; $sl.Controls.Add($gL)
   $m.LblPos = New-Object System.Windows.Forms.Label; $m.LblPos.Dock = 'Bottom'; $m.LblPos.Height = 22; $m.LblPos.Padding = New-Object System.Windows.Forms.Padding(8, 3, 0, 0); $f.Controls.Add($m.LblPos); $m.LblPos.BringToFront()
   Apply-Theme $f; Set-AppIcon $f
   $m.ZoomAt = { param([double]$factor, [double]$sx, [double]$sy) $mm = $script:TM; $wb = TM-ToWorld $sx $sy; $mm.Scale = [math]::Min(0.4, [math]::Max(0.0009, $mm.Scale * $factor)); $mm.CX = $wb[0] - ($sx - $mm.Pic.ClientSize.Width / 2) / $mm.Scale; $mm.CY = $wb[1] - ($sy - $mm.Pic.ClientSize.Height / 2) / $mm.Scale; TM-Render }
@@ -138,15 +170,17 @@ function New-TeleportMapForm([string]$savePath, $pd) {
       if ($mm.Drag.Moved -and $mm.Cache) { $mm.CX = $mm.Drag.CX - $dx / $mm.Scale; $mm.CY = $mm.Drag.CY - $dy / $mm.Scale; $tmp = New-Object System.Drawing.Bitmap($mm.Pic.ClientSize.Width, $mm.Pic.ClientSize.Height); $gg = [System.Drawing.Graphics]::FromImage($tmp); $gg.Clear($script:Th.Back); $gg.DrawImage($mm.Cache, $dx, $dy); $gg.Dispose(); $old = $mm.Pic.Image; $mm.Pic.Image = $tmp; if ($old -and $old -ne $mm.Cache) { $old.Dispose() } } } })
   $pic.Add_MouseUp({ param($s, $e) $mm = $script:TM; $d = $mm.Drag; $mm.Drag = $null; if (-not $d) { return }
     if ($d.Moved) { TM-Render } elseif ($e.Button -eq 'Left') { $w = TM-ToWorld $e.X $e.Y; TM-Select $w[0] $w[1] } })
-  $pic.Add_Resize({ if ($script:TM.Scale) { TM-Render } })
+  # re-draw after every size change (a short timer waits for the layout to settle: maximizing the window left a stale picture before)
+  $m.RTimer = New-Object System.Windows.Forms.Timer; $m.RTimer.Interval = 60; $m.RTimer.Add_Tick({ $script:TM.RTimer.Stop(); try { if ($script:TM.Scale) { TM-Render } } catch { $script:TM.LblPos.Text = 'render problem: ' + $_.Exception.Message } })
+  $pic.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_FormClosed({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Dispose() })
   $bFit.Add_Click({ TM-Fit; TM-Render }); $bZoomIn.Add_Click({ $p = $script:TM.Pic; & $script:TM.ZoomAt 1.5 ($p.ClientSize.Width / 2) ($p.ClientSize.Height / 2) }); $bZoomOut.Add_Click({ $p = $script:TM.Pic; & $script:TM.ZoomAt 0.66 ($p.ClientSize.Width / 2) ($p.ClientSize.Height / 2) })
   $m.BtnUse.Add_Click({ TM-Use }); $m.BtnSpot.Add_Click({ TM-SaveSpot }); $bFind.Add_Click({ TM-Find }); $m.TxtFind.Add_KeyDown({ param($s, $e) if ($e.KeyCode -eq 'Return') { $e.SuppressKeyPress = $true; TM-Find } })
-  $f.Add_Shown({ TM-Fit; TM-Render })
+  $f.Add_Shown({ [System.Windows.Forms.Application]::DoEvents(); TM-Fit; TM-Render })
   return $f
 }
 # returns @{ X; Y; Z } for the point the user picked with 'Use this spot', or $null
 function Show-TeleportMap($owner, [string]$savePath, $pd) {
-  $f = New-TeleportMapForm $savePath $pd; $prev = $script:ActiveForm; $script:ActiveForm = $f
+  $f = New-TeleportMapForm $savePath $pd; $f.WindowState = 'Maximized'; $prev = $script:ActiveForm; $script:ActiveForm = $f
   try { [void]$f.ShowDialog($owner) } finally { $script:ActiveForm = $prev }
   return $script:TM.Result
 }
