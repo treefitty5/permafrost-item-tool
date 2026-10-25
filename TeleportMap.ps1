@@ -27,13 +27,38 @@ function TM-Fit {
 function TM-ToScreen([double]$x, [double]$y) { $m = $script:TM; return @(([float](($x - $m.CX) * $m.Scale + $m.Pic.ClientSize.Width / 2)), ([float](($y - $m.CY) * $m.Scale + $m.Pic.ClientSize.Height / 2))) }
 function TM-ToWorld([double]$sx, [double]$sy) { $m = $script:TM; return @((($sx - $m.Pic.ClientSize.Width / 2) / $m.Scale + $m.CX), (($sy - $m.Pic.ClientSize.Height / 2) / $m.Scale + $m.CY)) }
 
+# the picture of the game's map (assets\worldmap.png, 4096 x 4096, built from the player's own game by Build-WorldMap.ps1; it is the developers' artwork and is never shipped).
+# The game's own map-to-world conversion: map pixel = 0.013433912758 * world cm + 1962.694653985, on both axes (east right, south down).
+$script:TMk = 0.013433912758; $script:TMo = 1962.694653985
+function TM-PicturePath { Join-Path $PSScriptRoot 'assets\worldmap.png' }
+function TM-LoadPicture {
+  $m = $script:TM; if ($m.MapImg) { $m.MapImg.Dispose(); $m.MapImg = $null }
+  $p = TM-PicturePath; if (-not (Test-Path -LiteralPath $p)) { return }
+  try { $src = [System.Drawing.Image]::FromFile($p); try { $m.MapImg = New-Object System.Drawing.Bitmap($src) } finally { $src.Dispose() } } catch { $m.MapImg = $null }   # a copy in memory, so the file is not kept open
+}
+function TM-UpdatePictureControls {
+  $m = $script:TM; $has = [bool]$m.MapImg
+  $m.ChkPicture.Enabled = $has; $m.Fade.Enabled = $has; $m.BtnBuildPic.Visible = (-not $has)
+  if (-not $has) { $m.ChkPicture.Checked = $false }
+}
 # paints the whole map into a new bitmap
 function TM-Render {
   $m = $script:TM; $w = [math]::Max(50, $m.Pic.ClientSize.Width); $h = [math]::Max(50, $m.Pic.ClientSize.Height); $th = $script:Th
   $bmp = New-Object System.Drawing.Bitmap($w, $h); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.SmoothingMode = 'AntiAlias'; $g.TextRenderingHint = 'ClearTypeGridFit'
   $g.Clear($th.Back)
-  # the squares you have discovered
-  if ($m.ChkExplored.Checked) { $ec = [System.Drawing.Color]::FromArgb(70, $th.Accent); $eb = New-Object System.Drawing.SolidBrush($ec); $sz = [float](5000 * $m.Scale)
+  # the game's map picture under everything (only the part in view is drawn), faded by the slider
+  $pic = ($m.ChkPicture.Checked -and $m.MapImg)
+  if ($pic) {
+    $wa0 = TM-ToWorld 0 0; $wb0 = TM-ToWorld $w $h
+    $sx0 = [math]::Max(0.0, $script:TMk * $wa0[0] + $script:TMo); $sy0 = [math]::Max(0.0, $script:TMk * $wa0[1] + $script:TMo); $sx1 = [math]::Min(4096.0, $script:TMk * $wb0[0] + $script:TMo); $sy1 = [math]::Min(4096.0, $script:TMk * $wb0[1] + $script:TMo)
+    if ($sx1 -gt $sx0 + 1 -and $sy1 -gt $sy0 + 1) {
+      $d0 = TM-ToScreen (($sx0 - $script:TMo) / $script:TMk) (($sy0 - $script:TMo) / $script:TMk); $d1 = TM-ToScreen (($sx1 - $script:TMo) / $script:TMk) (($sy1 - $script:TMo) / $script:TMk)
+      $cm = New-Object System.Drawing.Imaging.ColorMatrix; $cm.Matrix33 = [float]($m.Fade.Value / 100.0); $ia = New-Object System.Drawing.Imaging.ImageAttributes; $ia.SetColorMatrix($cm); $ia.SetWrapMode([System.Drawing.Drawing2D.WrapMode]::TileFlipXY)
+      $g.InterpolationMode = $(if ($m.Scale / $script:TMk -lt 1) { 'HighQualityBicubic' } else { 'NearestNeighbor' }); $g.PixelOffsetMode = 'Half'
+      $dp = [System.Drawing.PointF[]]@([System.Drawing.PointF]::new($d0[0], $d0[1]), [System.Drawing.PointF]::new($d1[0], $d0[1]), [System.Drawing.PointF]::new($d0[0], $d1[1]))
+      $g.DrawImage($m.MapImg, $dp, [System.Drawing.RectangleF]::new([float]$sx0, [float]$sy0, [float]($sx1 - $sx0), [float]($sy1 - $sy0)), [System.Drawing.GraphicsUnit]::Pixel, $ia); $ia.Dispose() } }
+  # the squares you have discovered (a lighter tint when the picture is shown, so the picture stays readable)
+  if ($m.ChkExplored.Checked) { $ec = [System.Drawing.Color]::FromArgb($(if ($pic) { 40 } else { 70 }), $th.Accent); $eb = New-Object System.Drawing.SolidBrush($ec); $sz = [float](5000 * $m.Scale)
     foreach ($s in $m.Explored) { $p = TM-ToScreen $s.X0 $s.Y0; if ($p[0] + $sz -lt 0 -or $p[1] + $sz -lt 0 -or $p[0] -gt $w -or $p[1] -gt $h) { continue }; $g.FillRectangle($eb, $p[0], $p[1], $sz + 0.6, $sz + 0.6) }; $eb.Dispose() }
   # a light grid every 1,000 m
   $gp = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(28, $th.Text)); $step = 100000; if ($m.Scale * 100000 -gt 260) { $step = 50000 }; if ($m.Scale * 50000 -gt 260) { $step = 10000 }
@@ -106,14 +131,14 @@ function TM-Find {
 
 function New-TeleportMapForm([string]$savePath, $pd) {
   Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
-  TM-Load; $m = $script:TM; $m.Result = $null; $m.Sel = $null; $m.SelZ = $null; $m.Cache = $null; $m.Drag = $null
+  TM-Load; $m = $script:TM; $m.Result = $null; $m.SavePath = $savePath; $m.Sel = $null; $m.SelZ = $null; $m.Cache = $null; $m.Drag = $null
   $m.Explored = @(Get-ExploredSquares $savePath); $m.Player = if ($pd -and $pd.Position) { @{ X = $pd.Position.X; Y = $pd.Position.Y } } else { $null }
   $f = New-Object System.Windows.Forms.Form; $f.Text = 'Teleport map  -  click a point to see its coordinates and heights'; $f.Size = New-Object System.Drawing.Size(1280, [math]::Min(860, [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height - 30)); $f.MinimumSize = New-Object System.Drawing.Size(980, 620)
   $f.StartPosition = 'CenterParent'; $f.Font = New-Object System.Drawing.Font('Segoe UI', 9); $m.Form = $f
   # the side panel is one stack of rows that touch each other (find, selected point, heights, buttons) with the legend in the lower right corner
   $side = New-Object System.Windows.Forms.Panel; $side.Dock = 'Right'; $side.Width = 480; $side.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 8); $side.AutoScroll = $true; $f.Controls.Add($side)
   $pic = New-Object System.Windows.Forms.PictureBox; $pic.Dock = 'Fill'; $pic.SizeMode = 'Normal'; $f.Controls.Add($pic); $pic.BringToFront(); $m.Pic = $pic
-  $sl = New-Object System.Windows.Forms.TableLayoutPanel; $sl.Dock = 'Fill'; $sl.MinimumSize = New-Object System.Drawing.Size(0, [int](650 * $f.DeviceDpi / 96)); $sl.ColumnCount = 1; [void]$sl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100))); $side.Controls.Add($sl)
+  $sl = New-Object System.Windows.Forms.TableLayoutPanel; $sl.Dock = 'Fill'; $sl.MinimumSize = New-Object System.Drawing.Size(0, [int](730 * $f.DeviceDpi / 96)); $sl.ColumnCount = 1; [void]$sl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100))); $side.Controls.Add($sl)
   $rowAuto = { [void]$sl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
   $lbl = { param([string]$text) $l = New-Object System.Windows.Forms.Label; $l.Text = $text; $l.AutoSize = $true; $l.MaximumSize = New-Object System.Drawing.Size(446, 0); $l.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4); return $l }
   # row: find a place
@@ -134,6 +159,12 @@ function New-TeleportMapForm([string]$savePath, $pd) {
   [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 44))); [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 28))); [void]$vr.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 28)))
   $mkb = { param([string]$t) $b = New-Object System.Windows.Forms.Button; $b.Text = $t; $b.Dock = 'Fill'; $b.Height = 32; $b.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0); return $b }
   $bFit = & $mkb 'Show everything'; $bZoomIn = & $mkb 'Zoom +'; $bZoomOut = & $mkb 'Zoom -'; $vr.Controls.Add($bFit, 0, 0); $vr.Controls.Add($bZoomIn, 1, 0); $vr.Controls.Add($bZoomOut, 2, 0); & $rowAuto; $sl.Controls.Add($vr)
+  $pr = New-Object System.Windows.Forms.FlowLayoutPanel; $pr.Dock = 'Fill'; $pr.AutoSize = $true; $pr.WrapContents = $false; $pr.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6)
+  $m.ChkPicture = New-Object System.Windows.Forms.CheckBox; $m.ChkPicture.Text = 'Game map picture'; $m.ChkPicture.Checked = $true; $m.ChkPicture.AutoSize = $true; $m.ChkPicture.Margin = New-Object System.Windows.Forms.Padding(0, 6, 10, 0); $m.ChkPicture.ForeColor = $script:Th.Text; $pr.Controls.Add($m.ChkPicture)
+  $lf = & $lbl 'Fade'; $lf.Margin = New-Object System.Windows.Forms.Padding(0, 8, 4, 0); $pr.Controls.Add($lf)
+  $m.Fade = New-Object System.Windows.Forms.TrackBar; $m.Fade.Minimum = 10; $m.Fade.Maximum = 100; $m.Fade.Value = 70; $m.Fade.TickStyle = 'None'; $m.Fade.Width = 150; $m.Fade.Height = 28; $m.Fade.Margin = New-Object System.Windows.Forms.Padding(0, 3, 6, 0); $pr.Controls.Add($m.Fade)
+  $m.BtnBuildPic = New-Object System.Windows.Forms.Button; $m.BtnBuildPic.Text = 'Build the map picture from my game...'; $m.BtnBuildPic.AutoSize = $true; $m.BtnBuildPic.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 0); $pr.Controls.Add($m.BtnBuildPic)
+  & $rowAuto; $sl.Controls.Add($pr)
   # the legend, lower right: a coloured mark for everything on the map; the tick boxes switch layers on and off
   $th = $script:Th; $a = 70.0 / 255; $lightSq = [System.Drawing.Color]::FromArgb([int]($th.Back.R * (1 - $a) + $th.Accent.R * $a), [int]($th.Back.G * (1 - $a) + $th.Accent.G * $a), [int]($th.Back.B * (1 - $a) + $th.Accent.B * $a))
   $swPaint = { param($s, $e) $d = $s.Tag; $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'; $g.TranslateTransform(0, 3); $br = New-Object System.Drawing.SolidBrush($d.Color); $pn = New-Object System.Drawing.Pen($d.Edge, 1.2)
@@ -158,7 +189,7 @@ function New-TeleportMapForm([string]$savePath, $pd) {
   foreach ($it in $items) { $x = & $mkItem $it[0] $it[1] $it[2] $it[3] $it[4]; if ($it[5]) { $m[$it[5]] = $x.Ctl }; $lt.Controls.Add($x.Row) }
   $gL.Controls.Add($lt)
   $nt = New-Object System.Windows.Forms.Label; $nt.Dock = 'Bottom'; $nt.AutoSize = $true; $nt.MaximumSize = New-Object System.Drawing.Size(430, 0); $nt.ForeColor = $th.Muted; $nt.Padding = New-Object System.Windows.Forms.Padding(0, 6, 0, 0)
-  $nt.Text = "Light squares: discovered in this save (the game's 50 m fog-of-war squares; an edge can be off by one). Dark squares: not discovered yet - sea, unvisited ground or gaps. Dots show what the atlas flights found, even on dark squares: where nothing is drawn nothing was found, so there are no heights. East (+X) is right, north is up. Drag to move, wheel to zoom."
+  $nt.Text = "The map picture is the game's own, built on this PC from your installed game (Pictures window) and kept in the assets folder; it is never part of the tool's download. Light squares: discovered in this save (the game's 50 m fog-of-war squares; an edge can be off by one). Dark squares: not discovered yet - sea, unvisited ground or gaps. Dots show what the atlas flights found, even on dark squares: where nothing is drawn nothing was found, so there are no heights. East (+X) is right, north is up. Drag to move, wheel to zoom."
   $gL.Controls.Add($nt); & $rowAuto; $sl.Controls.Add($gL)
   $m.LblPos = New-Object System.Windows.Forms.Label; $m.LblPos.Dock = 'Bottom'; $m.LblPos.Height = 22; $m.LblPos.Padding = New-Object System.Windows.Forms.Padding(8, 3, 0, 0); $f.Controls.Add($m.LblPos); $m.LblPos.BringToFront()
   Apply-Theme $f; Set-AppIcon $f
@@ -172,9 +203,13 @@ function New-TeleportMapForm([string]$savePath, $pd) {
     if ($d.Moved) { TM-Render } elseif ($e.Button -eq 'Left') { $w = TM-ToWorld $e.X $e.Y; TM-Select $w[0] $w[1] } })
   # re-draw after every size change (a short timer waits for the layout to settle: maximizing the window left a stale picture before)
   $m.RTimer = New-Object System.Windows.Forms.Timer; $m.RTimer.Interval = 60; $m.RTimer.Add_Tick({ $script:TM.RTimer.Stop(); try { if ($script:TM.Scale) { TM-Render } } catch { $script:TM.LblPos.Text = 'render problem: ' + $_.Exception.Message } })
-  $pic.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_FormClosed({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Dispose() })
+  $pic.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_Resize({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() }); $f.Add_FormClosed({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Dispose(); if ($script:TM.MapImg) { $script:TM.MapImg.Dispose(); $script:TM.MapImg = $null } })
   $bFit.Add_Click({ TM-Fit; TM-Render }); $bZoomIn.Add_Click({ $p = $script:TM.Pic; & $script:TM.ZoomAt 1.5 ($p.ClientSize.Width / 2) ($p.ClientSize.Height / 2) }); $bZoomOut.Add_Click({ $p = $script:TM.Pic; & $script:TM.ZoomAt 0.66 ($p.ClientSize.Width / 2) ($p.ClientSize.Height / 2) })
   $m.BtnUse.Add_Click({ TM-Use }); $m.BtnSpot.Add_Click({ TM-SaveSpot }); $bFind.Add_Click({ TM-Find }); $m.TxtFind.Add_KeyDown({ param($s, $e) if ($e.KeyCode -eq 'Return') { $e.SuppressKeyPress = $true; TM-Find } })
+  $m.Fade.BackColor = $script:Th.Back; $m.Fade.AutoSize = $false; $m.Fade.Height = 30
+  TM-LoadPicture; TM-UpdatePictureControls
+  $m.ChkPicture.Add_CheckedChanged({ if ($script:TM.Pic.Image) { TM-Render } }); $m.Fade.Add_Scroll({ $script:TM.RTimer.Stop(); $script:TM.RTimer.Start() })
+  $m.BtnBuildPic.Add_Click({ $mm = $script:TM; $prev = $script:ActiveForm; try { Show-Pictures $mm.Form $mm.SavePath } finally { $script:ActiveForm = $prev }; TM-LoadPicture; TM-UpdatePictureControls; if ($mm.MapImg) { $mm.ChkPicture.Checked = $true }; TM-Render })
   $f.Add_Shown({ [System.Windows.Forms.Application]::DoEvents(); TM-Fit; TM-Render })
   return $f
 }

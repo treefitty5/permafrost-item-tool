@@ -59,7 +59,7 @@ function PIC-Build {
   $u.Out.Text = 'Reading the game files...'; $u.BtnBuild.Enabled = $false
   $u.Log = Join-Path ([IO.Path]::GetTempPath()) ('pictures-' + [Guid]::NewGuid().ToString('N') + '.txt')
   $q = { param($s) "'" + ($s -replace "'", "''") + "'" }
-  $cmd = "Set-Location -LiteralPath $(& $q $PSScriptRoot); & '.\Build-Icons.ps1' -GameDir $(& $q $gd) -OodleDll $(& $q $od); if (Test-Path -LiteralPath '.\catalog\recipe-details.csv') { & '.\Build-RecipeIcons.ps1' -GameDir $(& $q $gd) -OodleDll $(& $q $od) }; 'FINISHED'"
+  $cmd = "Set-Location -LiteralPath $(& $q $PSScriptRoot); & '.\Build-Icons.ps1' -GameDir $(& $q $gd) -OodleDll $(& $q $od); if (Test-Path -LiteralPath '.\catalog\recipe-details.csv') { & '.\Build-RecipeIcons.ps1' -GameDir $(& $q $gd) -OodleDll $(& $q $od) }; try { & '.\Build-WorldMap.ps1' -GameDir $(& $q $gd) -OodleDll $(& $q $od) } catch { 'World map picture: ' + $_.Exception.Message }; 'FINISHED'"
   $pw = (Get-Process -Id $PID).Path
   $u.Proc = Start-Process -FilePath $pw -ArgumentList @('-NoProfile', '-WindowStyle', 'Hidden', '-Command', $cmd) -WindowStyle Hidden -PassThru -RedirectStandardOutput $u.Log -RedirectStandardError ($u.Log + '.err')
   $u.Timer = New-Object System.Windows.Forms.Timer; $u.Timer.Interval = 700
@@ -68,7 +68,7 @@ function PIC-Build {
     if ($u.Proc -and $u.Proc.HasExited) {
       $u.Timer.Stop(); $txt = ''; if (Test-Path -LiteralPath $u.Log) { $txt = (Get-Content -LiteralPath $u.Log -Raw) }; $err = ''; if (Test-Path -LiteralPath ($u.Log + '.err')) { $err = (Get-Content -LiteralPath ($u.Log + '.err') -Raw) }
       $u.Out.Text = (($txt + $(if ($err) { "`r`n" + $err } else { '' })) -replace "`r?`n", "`r`n").Trim()
-      if ($txt -cmatch 'FINISHED') { $u.Msg.Text = 'Done. Pictures are in the icons folder next to the tool. Close and reopen Player tools to see the recipe pictures.' } else { $u.Msg.Text = 'Something went wrong - see the text above.' }
+      if ($txt -cmatch 'FINISHED') { $u.Msg.Text = 'Done. Pictures are in the icons folder next to the tool, the map picture for the Teleport map in the assets folder. Close and reopen Player tools to see the recipe pictures.' } else { $u.Msg.Text = 'Something went wrong - see the text above.' }
       $script:IconCache = @{}; $u.Proc = $null; foreach ($f in @($u.Log, ($u.Log + '.err'))) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
       PIC-Refresh
     }
