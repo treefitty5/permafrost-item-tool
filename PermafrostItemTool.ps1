@@ -13,6 +13,7 @@ try {
 . (Join-Path $PSScriptRoot 'RecipeTweaks.ps1')
   . (Join-Path $PSScriptRoot 'BackpackTweaks.ps1')
   . (Join-Path $PSScriptRoot 'StackTweaks.ps1')
+  . (Join-Path $PSScriptRoot 'WeaponTweaks.ps1')
   . (Join-Path $PSScriptRoot 'WorldCore.ps1')
   . (Join-Path $PSScriptRoot 'WorldReset.ps1')
   . (Join-Path $PSScriptRoot 'WorldResetUI.ps1')
@@ -105,6 +106,36 @@ try {
   $lblPlan = New-Object System.Windows.Forms.Label; $lblPlan.Location = '306,158'; $lblPlan.Size = '254,20'; $lblPlan.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $lblPlan.ForeColor = $script:Th.Accent; $gbSel.Controls.Add($lblPlan)
   $lblStacks = New-Object System.Windows.Forms.Label; $lblStacks.Location = '306,132'; $lblStacks.Size = '130,20'; $lblStacks.Text = '...or number of stacks'; $gbSel.Controls.Add($lblStacks)
   $numStacks = New-Object System.Windows.Forms.NumericUpDown; $numStacks.Location = '440,129'; $numStacks.Size = '80,24'; $numStacks.Minimum = 1; $numStacks.Maximum = 9999; $numStacks.Value = 1; $gbSel.Controls.Add($numStacks)
+  # weapons only: the damage the weapon does in the GAME (a game setting applied by a small in-game mod, not part of the save), in a box to the right of the quantity / condition / "Put it in" rows
+  $script:ShowDmg = $false; $script:DmgBusy = $false
+  $gbDmg = New-Object ThemedGroup; $gbDmg.Text = 'Damage in the game'; $gbDmg.Visible = $false; $gbSel.Controls.Add($gbDmg)
+  $lblDmgA = New-Object System.Windows.Forms.Label; $lblDmgA.Text = 'Damage'; $lblDmgA.AutoSize = $false; $lblDmgA.SetBounds(10, 27, 64, 22); $gbDmg.Controls.Add($lblDmgA)
+  $numDmgMin = New-Object System.Windows.Forms.NumericUpDown; $numDmgMin.SetBounds(78, 24, 76, 24); $numDmgMin.Minimum = 0; $numDmgMin.Maximum = 100000; $numDmgMin.DecimalPlaces = 1; $gbDmg.Controls.Add($numDmgMin)
+  $lblDmgTo = New-Object System.Windows.Forms.Label; $lblDmgTo.Text = 'to'; $lblDmgTo.AutoSize = $false; $lblDmgTo.SetBounds(160, 27, 24, 22); $gbDmg.Controls.Add($lblDmgTo)
+  $numDmgMax = New-Object System.Windows.Forms.NumericUpDown; $numDmgMax.SetBounds(186, 24, 76, 24); $numDmgMax.Minimum = 0; $numDmgMax.Maximum = 100000; $numDmgMax.DecimalPlaces = 1; $gbDmg.Controls.Add($numDmgMax)
+  $btnDmgSet = New-Object System.Windows.Forms.Button; $btnDmgSet.Text = 'Set in game'; $btnDmgSet.SetBounds(10, 52, 130, 28); $btnDmgSet.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $gbDmg.Controls.Add($btnDmgSet)
+  $btnDmgReset = New-Object System.Windows.Forms.Button; $btnDmgReset.Text = 'Reset'; $btnDmgReset.SetBounds(148, 52, 90, 28); $gbDmg.Controls.Add($btnDmgReset)
+  $lblDmg = New-Object System.Windows.Forms.Label; $lblDmg.AutoSize = $false; $lblDmg.SetBounds(10, 82, 250, 32); $lblDmg.ForeColor = $script:Th.Muted; $gbDmg.Controls.Add($lblDmg)
+  function Fmt-Dmg([double]$a, [double]$b) { $ci = [Globalization.CultureInfo]::InvariantCulture; if ([math]::Abs($a - $b) -lt 0.001) { return $a.ToString('0.###', $ci) }; return ($a.ToString('0.###', $ci) + '-' + $b.ToString('0.###', $ci)) }
+  function Update-DmgBox {
+    $i = $script:Selected; $v = if ($i) { Get-WeaponDamageView $i } else { $null }; if (-not $v) { return }
+    $script:DmgBusy = $true; $numDmgMin.Value = [math]::Min([decimal]$v.Min, $numDmgMin.Maximum); $numDmgMax.Value = [math]::Min([decimal]$v.Max, $numDmgMax.Maximum); $script:DmgBusy = $false
+    $ms = WT-ModStatus
+    $lblDmg.Text = $(if ($v.Changed) { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max); changed to $(Fmt-Dmg $v.Min $v.Max)." + $(if ($ms.Active) { ' Applies every time the game starts.' } else { " $($ms.Text)" }) } else { "Game value $(Fmt-Dmg $v.Game.Min $v.Game.Max), not changed. Applies to every copy of this weapon." })
+    $btnDmgReset.Enabled = [bool]$v.Changed
+  }
+  function Do-SetDamage {
+    $i = $script:Selected; if (-not (WT-IsWeapon $i)) { return }
+    $mn = [double]$numDmgMin.Value; $mx = [double]$numDmgMax.Value; $g = WT-GameDamage $i; $ms = WT-ModStatus
+    if ($ms.Text -like 'UE4SS Mods folder not found*') { Msg $ms.Text 'Damage in the game' 'OK' 'Information' | Out-Null; return }
+    if ($mn -gt $mx) { Msg 'The minimum damage cannot be higher than the maximum.' 'Damage in the game' 'OK' 'Warning' | Out-Null; return }
+    $same = ([math]::Abs($mn - $g.Min) -lt 0.001 -and [math]::Abs($mx - $g.Max) -lt 0.001)
+    $q = if ($same) { "These are the game's own values, so the change for the $($i.display) is removed." } else { "Change the damage of EVERY $($i.display) in the game from $(Fmt-Dmg $g.Min $g.Max) to $(Fmt-Dmg $mn $mx)?`n`nThis is a game setting, not a save edit: a small in-game mod (WeaponTweaks, for UE4SS) applies it every time the game starts, to all copies of this weapon. $(if (-not $ms.Installed) { "The mod will be installed into the game's UE4SS Mods folder now. " })Your save is not touched.`n`nRestart the game for it to take effect. Reset puts the game's value back." }
+    if ((Msg $q 'Damage in the game' 'YesNo' 'Question' 'Button2') -ne 'Yes') { return }
+    try { $r = Set-WeaponDamage $i $mn $mx; Log ("Damage of $($i.id) in the game: " + $(if ($same) { 'back to the game value' } else { "set to $(Fmt-Dmg $mn $mx)" }) + $(if (Test-GameRunning) { ' (the game is running: restart it for the change)' } else { '' })); Update-DmgBox }
+    catch { Msg "Nothing was changed.`n`nReason: $($_.Exception.Message)" 'Damage in the game' 'OK' 'Warning' | Out-Null }
+  }
+  $btnDmgSet.Add_Click({ Do-SetDamage }); $btnDmgReset.Add_Click({ $i = $script:Selected; if (-not (WT-IsWeapon $i)) { return }; $g = WT-GameDamage $i; $script:DmgBusy = $true; $numDmgMin.Value = [decimal]$g.Min; $numDmgMax.Value = [decimal]$g.Max; $script:DmgBusy = $false; Do-SetDamage })
   # simplified panel: quick stack buttons, rows shown only when they apply, stack size tucked into 'Advanced'
   $chkAdv = New-Object System.Windows.Forms.CheckBox; $chkAdv.Text = 'Advanced (stack size)'; $chkAdv.AutoSize = $false; $chkAdv.Size = '200,22'; $gbSel.Controls.Add($chkAdv)
   $lblQuick = New-Object System.Windows.Forms.Label; $lblQuick.Text = 'Stacks:'; $lblQuick.Size = '52,20'; $gbSel.Controls.Add($lblQuick)
@@ -124,6 +155,8 @@ try {
     $numLoaded.Visible = $script:ShowLoaded; $numLoaded.Tag.Visible = $script:ShowLoaded; if ($script:ShowLoaded) { $numLoaded.Top = $y; $numLoaded.Tag.Top = $y + 3; $y += 28 }
     $lblTarget.Top = $y + 3; $cmbTarget.Top = $y
     $btnAdd.SetBounds([math]::Max(310, $w - 232), $gbSel.Height - 62, 220, 50)
+    $gbDmg.Visible = [bool]$script:ShowDmg
+    if ($script:ShowDmg) { $lblPlan.Width = 288; $gbDmg.SetBounds(306, $numQty.Top + 30, [math]::Max(250, $w - 318), 116); $lblDmg.Width = $gbDmg.Width - 20 }
   }
 
   # queue panel
@@ -230,7 +263,7 @@ try {
     } catch { } finally { $script:Fitting = $false }
   }
   function On-SelectItem {
-    if ($lvCat.SelectedItems.Count -eq 0) { $script:Selected = $null; $lblSelId.Text = 'Pick an item on the left'; $lblSelInfo.Text = 'Search or choose a category, click an item, set how many, then Add to queue (double-click also works).'; $script:ShowCond = $false; $script:ShowLoaded = $false; Layout-SelRows; Fit-SelInfo; return }
+    if ($lvCat.SelectedItems.Count -eq 0) { $script:Selected = $null; $lblSelId.Text = 'Pick an item on the left'; $lblSelInfo.Text = 'Search or choose a category, click an item, set how many, then Add to queue (double-click also works).'; $script:ShowCond = $false; $script:ShowLoaded = $false; $wasDmg = $script:ShowDmg; $script:ShowDmg = $false; if ($wasDmg) { Do-Layout } else { Layout-SelRows }; Fit-SelInfo; return }
     $i = $lvCat.SelectedItems[0].Tag; $script:Selected = $i
     $lblSelId.Text = $i.id
     $nameTxt = switch ($i.confidence) { 'verified' { 'name verified in real saves' } 'guess' { 'WARNING: best-guess name, may not load' } default { 'name read from the game data' } }; if ($i.formatInferred) { $nameTxt += ', format inferred' }
@@ -243,7 +276,7 @@ try {
     $hint = if ($i.usesAmmo -and @($i.usesAmmo).Count) { "Uses ammo: " + (@($i.usesAmmo) -join ', ') } elseif ($i.usedBy -and @($i.usedBy).Count) { "Used by: " + ((@($i.usedBy) | ForEach-Object { $_ -replace '^Weapon_', '' }) -join ', ') } elseif ($i.category -eq 'Projectiles') { 'No weapon in the game files uses this.' } elseif ($i.category -eq 'Weapons') { 'Melee weapon - uses no ammo.' } else { '' }
     if ($hint) { $lblSelInfo.Text += "`r`n" + $hint }
     $numStack.Value = [math]::Min([math]::Max(1, [int]$i.stackSize), $numStack.Maximum)
-    $numCond.Enabled = ($i.fieldsUsed -ge 2); $numLoaded.Enabled = ($i.fieldsUsed -ge 3); $script:ShowCond = ($i.fieldsUsed -ge 2); $script:ShowLoaded = ($i.fieldsUsed -ge 3); Layout-SelRows
+    $numCond.Enabled = ($i.fieldsUsed -ge 2); $numLoaded.Enabled = ($i.fieldsUsed -ge 3); $script:ShowCond = ($i.fieldsUsed -ge 2); $script:ShowLoaded = ($i.fieldsUsed -ge 3); $wasDmg = $script:ShowDmg; $script:ShowDmg = (WT-IsWeapon $i); if ($script:ShowDmg) { Update-DmgBox }; if ($wasDmg -ne $script:ShowDmg) { Do-Layout } else { Layout-SelRows }
     $numCond.Value = [math]::Min([decimal]$i.condition, $numCond.Maximum); $numLoaded.Value = 0
     $numQty.Value = 1; Update-Plan; Fit-SelInfo
   }
@@ -558,6 +591,9 @@ Lets you choose, item by item, how many fit in ONE slot, in every inventory (bac
 - IMPORTANT (tested): if the mod is not running, the game trims every stack above its own limit to that limit the next time it saves, and the extra items are gone for good. So the tool refuses to untick an item, or to lower its size below your biggest stack, while such stacks exist (use them up first), and the main window shows a red DANGER line if stacks sit in your inventory and the mod is not on. If you remove the mod, UE4SS stops loading or the game updates, open this window before you play.
 - A list of every consumable with its stack size and whether the game gives it a stack setting is in docs\consumables-stack-report.md (and .csv) in the tool folder.
 
+WEAPON DAMAGE (Selected item box)
+When the item you picked is a weapon, a 'Damage in the game' box appears to the right of the quantity / condition rows. A weapon's damage is NOT stored in your save: it belongs to the weapon's game data, so one value counts for every copy of that weapon (hotbar, backpack, containers, new finds). The box therefore does not use the queue and never touches your save. Type the damage (min to max; most weapons have both equal) and press 'Set in game': a small in-game mod (WeaponTweaks, for UE4SS - see the README) that the tool offers to install sets it every time the game starts, so restart the game once. 'Reset' puts the game's own value back. Ammo has no damage of its own (only a multiplier of 1.0 for all arrows and bullets), so the weapon is the only place to change it. Hits are weapon damage x ammo multiplier x hit zone (a bow headshot counts double). Single-player only; very high values make fights trivial, so try small steps.
+
 FINDING TEXT IN THIS WINDOW
 This window (and the Preview window) has a Find bar on top. Type a word and every match lights up, with a counter such as '3 of 44'. The up and down arrows, Enter / Shift+Enter and F3 / Shift+F3 jump to the next / previous match. Ctrl+F jumps to the box, Esc closes the window.
 
@@ -636,9 +672,9 @@ WHERE THINGS ARE
     $gg = 6; $gw = [int][math]::Floor(($W - 2 * $m - 7 * $gg) / 8); $grid = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp)
     for ($c = 0; $c -lt 8; $c++) { $grid[$c].SetBounds($m + $c * ($gw + $gg), $yB1, $gw, 26) }
     $leftW = [int](($W - 3 * $m) * 0.46); $rightX = $m + $leftW + $m; $rightW = $W - $rightX - $m
-    $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })) + $gap + 150 + $m)
+    $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })) + $gap + 150 + $m)
     $avail = $H - $top - $m
-    $minTopH = 346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
+    $minTopH = 346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })   # the queue box under "Selected item" needs room for its four buttons
     $topH = [math]::Max($minTopH, [int](($avail - $gap) * 0.66)); $botH = $avail - $topH - $gap
     $botMin = 150; if ($botH -lt $botMin) { $botH = $botMin; $topH = [math]::Max($minTopH, $avail - $gap - $botH) }
     # catalog (top-left)
@@ -647,7 +683,7 @@ WHERE THINGS ARE
     $txtSearch.SetBounds(10, 22, $leftW - 10 - 190 - 8 - 10, 24)
     $lvCat.SetBounds(10, 52, $leftW - 20, $topH - 62)
     # selected item (top-right)
-    $selH = 200 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 })
+    $selH = 200 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 62 } else { 0 })
     $gbSel.SetBounds($rightX, $top, $rightW, $selH)
     $lblSelInfo.Width = $rightW - 24; $lblSelInfo.Height = $script:SelInfoH
     Layout-SelRows
@@ -945,6 +981,8 @@ WHERE THINGS ARE
       }
       Switch-Theme 'Frostbite'
       $cmbCat.SelectedItem = 'All'; $txtSearch.Text = ''; [System.Windows.Forms.Application]::DoEvents(); $lvCat.Items[40].Selected = $true; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS 'cat_specs.png')
+      foreach ($wsz in @(@(1400, 900, 'weapon_dmg'), @(1100, 760, 'weapon_dmg_small'))) { $form.ClientSize = New-Object System.Drawing.Size($wsz[0], $wsz[1]); $cmbCat.SelectedItem = 'All'; $txtSearch.Text = 'CompoundBow'; [System.Windows.Forms.Application]::DoEvents(); $lvCat.Items[0].Selected = $true; [System.Windows.Forms.Application]::DoEvents(); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS ($wsz[2] + '.png')) }
+      $txtSearch.Text = ''; $form.ClientSize = New-Object System.Drawing.Size(1400, 900)
       # simplified Selected-item panel: weapon, resource (+ quick buttons), advanced mode
       $txtSearch.Text = 'PU-12_Stratos'; [System.Windows.Forms.Application]::DoEvents(); $lvCat.Items[0].Selected = $true; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $form (Join-Path $env:PF_SHOTS 'sel_weapon.png')
       $txtSearch.Text = 'Coal'; [System.Windows.Forms.Application]::DoEvents(); $lvCat.Items[0].Selected = $true; [System.Windows.Forms.Application]::DoEvents()
@@ -1091,7 +1129,19 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       $mpAt = { param($x, $y) $i = ($y * 8 + $x) * 3; "$($mpImg[$i]),$($mpImg[$i + 1]),$($mpImg[$i + 2])" }
       $mpOk = ($mpImg.Length -eq 8 * 8 * 3) -and ((& $mpAt 0 0) -eq '0,0,255') -and ((& $mpAt 4 0) -eq '0,255,0') -and ((& $mpAt 0 4) -eq '255,0,0') -and ((& $mpAt 7 7) -eq '255,255,255')
       $out += "map picture decoder (synthetic tiles): $mpOk"; if (-not $mpOk) { $errs.Add('map picture decoder test failed') }
-    } catch { $errs.Add("map picture decoder test: $($_.Exception.Message)") }    # backpack size: install the mod into a temporary Mods folder, set / refuse / reset a size, and check what the tool counts as capacity
+    } catch { $errs.Add("map picture decoder test: $($_.Exception.Message)") }    # weapon damage: the game's own value from items.json, set / refuse / reset in a temporary Mods folder, and what lands in tweaks.lua and mods.txt
+    $wtTmp = Join-Path $env:TEMP ('wt-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $wtTmp | Out-Null
+    [IO.File]::WriteAllText("$wtTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nRecipeTweaks : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $wtTmp; $script:WtTweakPathOverride = "$wtTmp\weapon-tweaks.json"
+    try {
+      $wtBow = (Get-Content (Join-Path $PSScriptRoot 'items.json') -Raw | ConvertFrom-Json) | Where-Object { $_.id -eq 'CompoundBow' } | Select-Object -First 1
+      $wtG = WT-GameDamage $wtBow; $wtRange = WT-GameDamage ([pscustomobject]@{ asset = 'x'; damage = '27-22' })
+      $wtS1 = Set-WeaponDamage $wtBow 300 300; $wtLua1 = Get-Content "$wtTmp\WeaponTweaks\tweaks.lua" -Raw; $wtMt = Get-Content "$wtTmp\mods.txt" -Raw; $wtView = Get-WeaponDamageView $wtBow
+      $wtBad1 = $false; try { [void](Set-WeaponDamage $wtBow 400 300) } catch { $wtBad1 = $true }; $wtBad2 = $false; try { [void](Set-WeaponDamage $wtBow 1 999999) } catch { $wtBad2 = $true }
+      Reset-WeaponDamage $wtBow; $wtLua2 = Get-Content "$wtTmp\WeaponTweaks\tweaks.lua" -Raw; $wtView2 = Get-WeaponDamageView $wtBow
+      $wtOk = ($wtG.Min -eq 150 -and $wtG.Max -eq 150) -and ($wtRange.Min -eq 27 -and $wtRange.Max -eq 22) -and $wtS1.Active -and ($wtLua1 -match 'DA_Weapon_Firearms_CompoundBow = \{ 300, 300 \}') -and ($wtMt -match '(?s)WeaponTweaks : 1.*Built-in keybinds') -and $wtView.Changed -and $wtBad1 -and $wtBad2 -and ($wtLua2 -notmatch 'CompoundBow') -and (-not $wtView2.Changed) -and (WT-IsWeapon $wtBow)
+      $out += "weapon damage: game value $($wtG.Min)-$($wtG.Max), set / refuse / reset ok = $wtOk"; if (-not $wtOk) { $errs.Add('weapon damage test failed') }
+    } catch { $errs.Add("weapon damage test: $($_.Exception.Message)") }
+    $script:RtModsDirOverride = $null; $script:WtTweakPathOverride = $null; Remove-Item -LiteralPath $wtTmp -Recurse -Force -ErrorAction SilentlyContinue    # backpack size: install the mod into a temporary Mods folder, set / refuse / reset a size, and check what the tool counts as capacity
     $bsTmp = Join-Path $env:TEMP ('bs-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $bsTmp | Out-Null
     [IO.File]::WriteAllText("$bsTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nRecipeTweaks : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $bsTmp; $script:BtTweakPathOverride = "$bsTmp\backpack-tweaks.json"; $script:BtStatusCache = $null
     try {

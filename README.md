@@ -26,6 +26,7 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
 12. [Reference: Build move (in-game mod)](#12-reference-build-move-in-game-mod)
     * [12b. Backpack size (in-game mod)](#12b-reference-backpack-size-in-game-mod)
     * [12c. Stack sizes (in-game mod)](#12c-reference-stack-sizes-in-game-mod)
+    * [12d. Weapon damage (in-game mod)](#12d-reference-weapon-damage-in-game-mod)
 13. [Reference: Pictures](#13-reference-pictures)
 14. [Backups, restoring, and Steam Cloud](#14-backups-restoring-and-steam-cloud)
 15. [Files and settings](#15-files-and-settings)
@@ -59,7 +60,7 @@ Optional but recommended: a bar under the status lines offers **Build pictures n
 * **Keep Steam Cloud off for Permafrost while you edit** (see [section 14](#14-backups-restoring-and-steam-cloud)). Otherwise Steam can put the old save back.
 * **Every change is backed up automatically** (`Backups` folder inside the tool folder) and **checked before it replaces your save**. If a check fails, the tool puts the original back and tells you.
 * **Nothing is written until you press an Apply / Save button.** Previews, the Overview, the Game data browser and the catalog never change your save.
-* **Recipe tweaks, Build move, the backpack size and the stack sizes work inside the running game** and never touch your save file.
+* **Recipe tweaks, Build move, the backpack size, the stack sizes and the weapon damage work inside the running game** and never touch your save file.
 * The tool only edits what each feature names (inventory entries, player values, learned recipes, position, world records). It refuses to write if its own checks fail rather than guessing.
 * **Keep a copy of your save yourself** before big changes: the `.pfs` files live in `...\steamapps\common\Permafrost\Permafrost\SaveGame`.
 
@@ -356,6 +357,16 @@ What it does and why: the stack limit belongs to the *item*, so one setting make
 
 Tested in the game: kit stacks of 5 and 10 in the hotbar, in the backpack and in a container (each use takes one kit; kits that had run down to 0% became usable again), and Panacea, Surgical Spirit and Painkillers at 20 (use, split, hotbar, backpack and container). The three bandages (Bandage, Makeshift Bandage, Military Bandage) at 10 per slot behave like the other stacks. The **Add items** window still adds these items one stack at a time at the game's own size; merge them in the game.
 
+## 12d. Reference: Weapon damage (in-game mod)
+
+Pick a weapon in the item catalog (for example the Compound Bow) and a **Damage in the game** box appears to the right of the quantity, condition and *Put it in* rows. A weapon's damage is **not stored in your save**: it belongs to the weapon's game data, so one value counts for every copy of that weapon (hotbar, backpack, containers, newly found ones). That is why the box does not use the queue and never touches your save.
+
+1. Type the damage (*min to max*; most weapons have both equal) and press **Set in game**.
+2. The first time, the tool offers to install a small UE4SS mod (**WeaponTweaks**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)) into the game's `Mods` folder. Restart the game: the mod applies the value every time the game starts.
+3. **Reset** puts the game's own value back (or type the game's value and press **Set in game**).
+
+Ammo has no damage of its own: every arrow and bullet only has a multiplier (1.0; flares 0.2), so a hit is *weapon damage x ammo multiplier x hit zone* (a bow headshot counts double). Single-player only; very high values make fights trivial, so try small steps. The setting is kept in `weapon-tweaks.json` and written to the mod's `tweaks.lua`; what the mod did is in `WeaponTweaks.log` in its folder.
+
 ## 13. Reference: Pictures
 
 ![Pictures window](docs/screenshot-pictures.png)
@@ -393,6 +404,7 @@ The bar has **Not now** (hide it until the next start) and **Don't ask again** (
 | `spoiler.json` | Whether story text is hidden. |
 | `backpack-tweaks.json` | Backpack sizes you set with **Apply in game** (also written to the mod's `tweaks.lua`). |
 | `stack-tweaks.json` | The Stack sizes settings (per item: on/off and the size; also written to the mod's `tweaks.lua`). |
+| `weapon-tweaks.json` | The weapons whose damage you changed (min / max; also written to the mod's `tweaks.lua`). |
 | `teleport-spots.json` | Your own saved teleport spots (name and X / Y / Z). |
 | `teleport-undo.json` | The position (and vitals) before your last teleport of each save, for **Undo last teleport**. |
 | `backpacks.json` | Only an older version used it (slot numbers typed with "Remember"); safe to delete. |
@@ -417,7 +429,7 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 ## 16. Installing UE4SS (only for the in-game mods)
 
-**Recipe tweaks**, **Build move**, the **Backpack slots** box and **Stack sizes** work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
+**Recipe tweaks**, **Build move**, the **Backpack slots** box, **Stack sizes** and the **Damage in the game** box work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
@@ -565,7 +577,7 @@ PowerShell traps seen in this code base (worth knowing before you edit): a funct
 * `Paths.ps1` - finds your game folder and save (and FModel's export for the advanced rebuild); reads `config.json`.
 * `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README). `catalog\places.csv` (the game's named places and fast-travel points, positions read from its level data by `Build-Places.ps1` with `MapCore.ps1`), `catalog\terrain-levels.csv` and `catalog\map-points.csv` (heights and dots from the same flights, built by `Build-Terrain.ps1`) feed the Teleport tab and its map (`TeleportMap.ps1`). `Build-WorldMap.ps1` (with `WorldMapDecode.ps1`) puts the game's map picture back together from the installed game for that map; the Pictures window runs it.
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all and then `Build-Finalize.ps1`; `Rebuild-All.ps1` runs the JSON-based ones. `Make-Release.ps1` builds the release ZIP.
-* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `StackSizesMod\main.lua` - the in-game stack sizes mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
+* `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `WeaponTweaksMod\main.lua` - the in-game weapon damage mod (`WeaponTweaks.ps1` installs it and writes its `tweaks.lua`). `StackSizesMod\main.lua` - the in-game stack sizes mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `docs\` - screenshots and the announcement text.
 
 To check what the tool will do to your save, read `SaveCore.ps1`: it only touches the inventory entries, and it refuses to write if its checks fail.
