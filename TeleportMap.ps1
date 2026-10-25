@@ -1,4 +1,4 @@
-# TeleportMap.ps1 - the "Teleport map": the game's named places, the squares of the map you have uncovered and the objects the atlas flights found,
+# TeleportMap.ps1 - the "Teleport map": the game's named places, the squares of the map you have discovered and the objects the atlas flights found,
 # drawn from the tool's own data (catalog\places.csv, catalog\map-points.csv, your save's fog of war). Click a point to see its coordinates and the heights found
 # there, then use it in Player tools > Teleport. Needs PlayerCore.ps1 + Theme.ps1 + PlayerTools.ps1 (New-LV / New-Lbl / New-Btn / Msg) loaded.
 # Orientation as on the game's own map: east (+X) is to the right, north is up (up = -Y, down = +Y).
@@ -13,7 +13,7 @@ function TM-Load {
 }
 function TM-Bounds {
   $m = $script:TM; $xs = New-Object System.Collections.Generic.List[double]; $ys = New-Object System.Collections.Generic.List[double]
-  # the uncovered squares and the named places frame the map (a few stray dots far out must not shrink it); with neither, the dots do
+  # the discovered squares and the named places frame the map (a few stray dots far out must not shrink it); with neither, the dots do
   foreach ($pl in (Get-Places)) { $xs.Add($pl.X); $ys.Add($pl.Y) }
   foreach ($s in $m.Explored) { $xs.Add($s.X0); $xs.Add($s.X0 + 5000); $ys.Add($s.Y0); $ys.Add($s.Y0 + 5000) }
   if ($m.Explored.Count -eq 0) { foreach ($k in $m.Dots.Keys) { foreach ($d in $m.Dots[$k]) { $xs.Add($d[0]); $ys.Add($d[1]) } } }
@@ -32,7 +32,7 @@ function TM-Render {
   $m = $script:TM; $w = [math]::Max(50, $m.Pic.ClientSize.Width); $h = [math]::Max(50, $m.Pic.ClientSize.Height); $th = $script:Th
   $bmp = New-Object System.Drawing.Bitmap($w, $h); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.SmoothingMode = 'AntiAlias'; $g.TextRenderingHint = 'ClearTypeGridFit'
   $g.Clear($th.Back)
-  # the squares you have uncovered
+  # the squares you have discovered
   if ($m.ChkExplored.Checked) { $ec = [System.Drawing.Color]::FromArgb(70, $th.Accent); $eb = New-Object System.Drawing.SolidBrush($ec); $sz = [float](5000 * $m.Scale)
     foreach ($s in $m.Explored) { $p = TM-ToScreen $s.X0 $s.Y0; if ($p[0] + $sz -lt 0 -or $p[1] + $sz -lt 0 -or $p[0] -gt $w -or $p[1] -gt $h) { continue }; $g.FillRectangle($eb, $p[0], $p[1], $sz + 0.6, $sz + 0.6) }; $eb.Dispose() }
   # a light grid every 1,000 m
@@ -149,7 +149,7 @@ function New-TeleportMapForm([string]$savePath, $pd) {
   $gL = New-Object ThemedGroup; $gL.Text = 'Legend'; $gL.Dock = 'Fill'; $gL.AutoSize = $true; $gL.AutoSizeMode = 'GrowAndShrink'; $gL.Padding = New-Object System.Windows.Forms.Padding(10, 6, 10, 8); $gL.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 0)
   $lt = New-Object System.Windows.Forms.TableLayoutPanel; $lt.Dock = 'Top'; $lt.AutoSize = $true; $lt.AutoSizeMode = 'GrowAndShrink'; $lt.ColumnCount = 2; [void]$lt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50))); [void]$lt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
   $items = @(
-    @('Uncovered area', 'square', $lightSq, $true, $true, 'ChkExplored'), @('Not uncovered yet', 'square', $th.Back, $false, $false, ''),
+    @('Discovered area', 'square', $lightSq, $true, $true, 'ChkExplored'), @('Not discovered yet', 'square', $th.Back, $false, $false, ''),
     @('Named places', 'diamond', $th.Warn, $true, $true, 'ChkPlaces'), @('Fast travel', 'diamond', $th.Accent2, $false, $false, ''),
     @('Your spots', 'diamond', $th.Good, $false, $false, ''), @('You (as saved)', 'ring', $th.Bad, $false, $false, ''),
     @('Ores', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#F8AD41'), $true, $true, 'ChkOres'), @('Containers', 'dot', [System.Drawing.ColorTranslator]::FromHtml('#E3D26F'), $true, $true, 'ChkCont'),
@@ -158,7 +158,7 @@ function New-TeleportMapForm([string]$savePath, $pd) {
   foreach ($it in $items) { $x = & $mkItem $it[0] $it[1] $it[2] $it[3] $it[4]; if ($it[5]) { $m[$it[5]] = $x.Ctl }; $lt.Controls.Add($x.Row) }
   $gL.Controls.Add($lt)
   $nt = New-Object System.Windows.Forms.Label; $nt.Dock = 'Bottom'; $nt.AutoSize = $true; $nt.MaximumSize = New-Object System.Drawing.Size(430, 0); $nt.ForeColor = $th.Muted; $nt.Padding = New-Object System.Windows.Forms.Padding(0, 6, 0, 0)
-  $nt.Text = "Light squares: uncovered in this save (the game's 50 m fog-of-war squares; an edge can be off by one). Dark squares: not uncovered yet - sea, unvisited ground or gaps. Dots show what the atlas flights found, even on dark squares: where nothing is drawn nothing was found, so there are no heights. East (+X) is right, north is up. Drag to move, wheel to zoom."
+  $nt.Text = "Light squares: discovered in this save (the game's 50 m fog-of-war squares; an edge can be off by one). Dark squares: not discovered yet - sea, unvisited ground or gaps. Dots show what the atlas flights found, even on dark squares: where nothing is drawn nothing was found, so there are no heights. East (+X) is right, north is up. Drag to move, wheel to zoom."
   $gL.Controls.Add($nt); & $rowAuto; $sl.Controls.Add($gL)
   $m.LblPos = New-Object System.Windows.Forms.Label; $m.LblPos.Dock = 'Bottom'; $m.LblPos.Height = 22; $m.LblPos.Padding = New-Object System.Windows.Forms.Padding(8, 3, 0, 0); $f.Controls.Add($m.LblPos); $m.LblPos.BringToFront()
   Apply-Theme $f; Set-AppIcon $f

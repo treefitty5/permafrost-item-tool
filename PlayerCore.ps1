@@ -295,7 +295,7 @@ function Undo-Teleport([string]$savePath, [switch]$SkipGameCheck) {
   $res = Set-SaveKeys $savePath $changes -SkipGameCheck:$SkipGameCheck; Save-TeleportUndo $savePath $null; return $res
 }
 
-# --- the squares of the map you have uncovered (the game's fog of war: 50 m squares, column = floor(X / 5000) + 31, row = floor(Y / 5000) + 31) ---
+# --- the squares of the map you have discovered (the game's fog of war: 50 m squares, column = floor(X / 5000) + 31, row = floor(Y / 5000) + 31) ---
 function Get-ExploredSquares([string]$savePath) {
   $res = New-Object System.Collections.Generic.List[object]
   try { $m = [regex]::Match((Get-SaveText $savePath), 'FogOfWarRevealer_Voxels>([0-9,;]+)'); foreach ($v in ($m.Groups[1].Value -split ';')) { if ($v -match '^(-?\d+),(-?\d+)$') { $res.Add([pscustomobject]@{ X0 = (([int]$Matches[1] - 31) * 5000); Y0 = (([int]$Matches[2] - 31) * 5000) }) } } } catch { }
