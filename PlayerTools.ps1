@@ -217,7 +217,7 @@ function PT-FillTele {
   }
   $lv.EndUpdate()
   $u = Get-TeleportUndo $script:SavePath; $ui.BtnUndo.Enabled = [bool]$u
-  $ui.BtnUndo.Text = if ($u) { 'Undo last teleport' } else { 'Undo last teleport (none yet)' }
+  $ui.BtnUndo.Text = 'Undo last teleport'
   $sel = $ui.LvTele.SelectedItems; $ui.BtnDelSpot.Enabled = ($sel.Count -gt 0 -and $sel[0].Tag.Kind -eq 'My spot')
 }
 # the heights found near a spot, with the one that will be used marked; $ui.TeleLevelZ is the height chosen (null = none known)
@@ -402,23 +402,48 @@ function New-PlayerForm {
   PT-RcInitTip $ui.LvRecipes; $ui.RcMode.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcKind.Add_SelectedIndexChanged({ PT-FillRecipes }); $ui.RcFilter.Add_TextChanged({ PT-FillRecipes })
   $bAllRc.Add_Click({ foreach ($i in $script:PT.LvRecipes.Items) { $i.Checked = ($i.SubItems[3].Text -eq 'not learned') } }); $bNoRc.Add_Click({ foreach ($i in $script:PT.LvRecipes.Items) { $i.Checked = $false } }); $bUn.Add_Click({ PT-UnlockRecipes })
 
-  # --- tab 3: teleport
+  # --- tab 3: teleport (docked panels and flow rows, so it fills any window size and display scaling: places on the left, the heights and the controls on the right)
   $t3 = NewTab 'Teleport'
-  $ui.TeleNow = New-Lbl $t3 '' 8 8 1100 22; $ui.TeleNow.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  New-Lbl $t3 'Search' 8 38 70 | Out-Null; $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Location = '82,35'; $ui.TeleFilter.Size = '190,24'; $t3.Controls.Add($ui.TeleFilter)
-  New-Lbl $t3 'Show' 284 38 56 | Out-Null; $ui.TeleKind = New-Object System.Windows.Forms.ComboBox; $ui.TeleKind.DropDownStyle = 'DropDownList'; $ui.TeleKind.Location = '342,35'; $ui.TeleKind.Size = '190,24'; foreach ($k in 'All', 'Named places', 'Fast travel', 'My spots', 'Bed, start and builds') { [void]$ui.TeleKind.Items.Add($k) }; $ui.TeleKind.SelectedIndex = 0; $t3.Controls.Add($ui.TeleKind)
-  $bTp = New-Btn $t3 'Teleport to selected place' 546 30 250 36; $bTp.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  $ui.BtnUndo = New-Btn $t3 'Undo last teleport (none yet)' 806 30 270 36
-  $ui.BtnDelSpot = New-Btn $t3 'Remove my spot' 1086 30 170 36; $ui.BtnDelSpot.Enabled = $false
-  New-Lbl $t3 'Coordinates (X / Y / Z)' 8 78 262 | Out-Null; $ui.TeleX = New-Num $t3 274 75 100 -400000 400000 0; $ui.TeleY = New-Num $t3 382 75 100 -400000 400000 0; $ui.TeleZ = New-Num $t3 490 75 90 -20000 40000 0
-  $bHere = New-Btn $t3 'Heights here' 596 72 150 30; $bXyz = New-Btn $t3 'Teleport to coordinates' 756 72 250 30; $bXyz.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-  New-Lbl $t3 'Drop height (cm)' 8 114 262 | Out-Null; $ui.TeleDrop = New-Num $t3 274 111 90 50 2000 0; $ui.TeleDrop.Value = 150
-  $ui.TeleVitals = New-Object System.Windows.Forms.CheckBox; $ui.TeleVitals.Text = 'Refill my vitals first (recommended)'; $ui.TeleVitals.Checked = $true; $ui.TeleVitals.AutoSize = $false; $ui.TeleVitals.Size = '320,24'; $ui.TeleVitals.Location = '382,111'; $ui.TeleVitals.ForeColor = $script:Th.Text; $t3.Controls.Add($ui.TeleVitals)
-  $bMap = New-Btn $t3 'Open the map...' 716 108 180 32; $bSpot = New-Btn $t3 'Save my position as a spot...' 906 108 270 32
-  $ui.LvTele = New-LV $t3 @('Place', 'Kind', 'Distance (m)', 'Height (Z)') @(280, 150, 130, 120); $ui.LvTele.Location = '8,150'; $ui.LvTele.Size = '700,426'; $ui.LvTele.Anchor = 'Top,Left,Bottom'
-  New-Lbl $t3 'Heights found near the selected spot' 724 150 440 | Out-Null
-  $ui.LvLevels = New-LV $t3 @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 120); $ui.LvLevels.Location = '724,176'; $ui.LvLevels.Size = '452,230'; $ui.LvLevels.Anchor = 'Top,Left'
-  $ui.TeleInfo = New-Lbl $t3 "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings." 724 414 452 170; $ui.TeleInfo.ForeColor = $script:Th.Muted
+  $bold = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  $mkLbl = { param([string]$text) $l = New-Object System.Windows.Forms.Label; $l.Text = $text; $l.AutoSize = $true; $l.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0); return $l }
+  $mkBtn = { param([string]$text, [bool]$primary) $b = New-Object System.Windows.Forms.Button; $b.Text = $text; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'; $b.MinimumSize = New-Object System.Drawing.Size(0, 34); $b.Padding = New-Object System.Windows.Forms.Padding(12, 0, 12, 0); $b.Margin = New-Object System.Windows.Forms.Padding(0, 4, 10, 4); if ($primary) { $b.Font = $bold }; return $b }
+  $mkNum = { param([int]$w, [decimal]$min, [decimal]$max) $n = New-Object System.Windows.Forms.NumericUpDown; $n.Width = $w; $n.Minimum = $min; $n.Maximum = $max; $n.DecimalPlaces = 0; $n.Margin = New-Object System.Windows.Forms.Padding(0, 4, 14, 4); return $n }
+  $mkRow = { $r = New-Object System.Windows.Forms.FlowLayoutPanel; $r.Dock = 'Fill'; $r.AutoSize = $true; $r.AutoSizeMode = 'GrowAndShrink'; $r.WrapContents = $true; $r.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 2); return $r }
+  $mkGroup = { param([string]$title) $g = New-Object ThemedGroup; $g.Text = $title; $g.Dock = 'Fill'; $g.Padding = New-Object System.Windows.Forms.Padding(12, 8, 12, 10); return $g }
+  $head = New-Object System.Windows.Forms.Panel; $head.Dock = 'Top'; $head.Height = 34; $t3.Controls.Add($head)
+  $ui.TeleNow = New-Object System.Windows.Forms.Label; $ui.TeleNow.Dock = 'Fill'; $ui.TeleNow.TextAlign = 'MiddleLeft'; $ui.TeleNow.Font = $bold; $head.Controls.Add($ui.TeleNow)
+  $tl = New-Object System.Windows.Forms.TableLayoutPanel; $tl.Dock = 'Fill'; $tl.ColumnCount = 2; $tl.RowCount = 1
+  [void]$tl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 54))); [void]$tl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 46))); [void]$tl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  $t3.Controls.Add($tl); $tl.BringToFront()
+  # left: the places
+  $gP = & $mkGroup 'Places'; $gP.Margin = New-Object System.Windows.Forms.Padding(0, 0, 10, 0); $tl.Controls.Add($gP, 0, 0)
+  $fr = New-Object System.Windows.Forms.FlowLayoutPanel; $fr.Dock = 'Top'; $fr.AutoSize = $true; $fr.AutoSizeMode = 'GrowAndShrink'; $fr.WrapContents = $false; $fr.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6); $gP.Controls.Add($fr)
+  $fr.Controls.Add((& $mkLbl 'Search'))
+  $ui.TeleFilter = New-Object System.Windows.Forms.TextBox; $ui.TeleFilter.Width = 230; $ui.TeleFilter.Margin = New-Object System.Windows.Forms.Padding(0, 5, 18, 5); $fr.Controls.Add($ui.TeleFilter)
+  $fr.Controls.Add((& $mkLbl 'Show'))
+  $ui.TeleKind = New-Object System.Windows.Forms.ComboBox; $ui.TeleKind.DropDownStyle = 'DropDownList'; $ui.TeleKind.Width = 210; $ui.TeleKind.Margin = New-Object System.Windows.Forms.Padding(0, 5, 0, 5); foreach ($k in 'All', 'Named places', 'Fast travel', 'My spots', 'Bed, start and builds') { [void]$ui.TeleKind.Items.Add($k) }; $ui.TeleKind.SelectedIndex = 0; $fr.Controls.Add($ui.TeleKind)
+  $ui.LvTele = New-LV $gP @('Place', 'Kind', 'Distance (m)', 'Height (Z)') @(240, 130, 120, 110); $ui.LvTele.Dock = 'Fill'; $ui.LvTele.BringToFront()
+  # right: the controls on top, the heights below
+  $rt = New-Object System.Windows.Forms.TableLayoutPanel; $rt.Dock = 'Fill'; $rt.ColumnCount = 1; $rt.RowCount = 2; [void]$rt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  [void]$rt.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 44))); [void]$rt.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 56))); $tl.Controls.Add($rt, 1, 0)
+  $gG = & $mkGroup 'Go there'; $gG.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10); $rt.Controls.Add($gG, 0, 0)
+  $gt = New-Object System.Windows.Forms.TableLayoutPanel; $gt.Dock = 'Top'; $gt.AutoSize = $true; $gt.AutoSizeMode = 'GrowAndShrink'; $gt.ColumnCount = 1; [void]$gt.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100))); $pnl = New-Object System.Windows.Forms.Panel; $pnl.Dock = 'Fill'; $pnl.AutoScroll = $true; $gG.Controls.Add($pnl); $pnl.Controls.Add($gt)
+  $r1 = & $mkRow; $r1.Controls.Add((& $mkLbl 'X')); $ui.TeleX = & $mkNum 96 -400000 400000; $r1.Controls.Add($ui.TeleX); $r1.Controls.Add((& $mkLbl 'Y')); $ui.TeleY = & $mkNum 96 -400000 400000; $r1.Controls.Add($ui.TeleY); $r1.Controls.Add((& $mkLbl 'Z')); $ui.TeleZ = & $mkNum 86 -20000 40000; $r1.Controls.Add($ui.TeleZ)
+  $bHere = & $mkBtn 'Heights here' $false; $r1.Controls.Add($bHere)
+  $r2 = & $mkRow; $r2.Controls.Add((& $mkLbl 'Drop height (cm)')); $ui.TeleDrop = & $mkNum 80 50 2000; $ui.TeleDrop.Value = 150; $r2.Controls.Add($ui.TeleDrop)
+  $ui.TeleVitals = New-Object System.Windows.Forms.CheckBox; $ui.TeleVitals.Text = 'Refill my vitals first (recommended)'; $ui.TeleVitals.Checked = $true; $ui.TeleVitals.AutoSize = $true; $ui.TeleVitals.Margin = New-Object System.Windows.Forms.Padding(8, 7, 0, 0); $ui.TeleVitals.ForeColor = $script:Th.Text; $r2.Controls.Add($ui.TeleVitals)
+  $r3 = & $mkRow; $r3.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 8); $bTp = & $mkBtn 'Teleport to selected place' $true; $bXyz = & $mkBtn 'Teleport to coordinates' $true; $r3.Controls.Add($bTp); $r3.Controls.Add($bXyz)
+  $r4 = & $mkRow; $bMap = & $mkBtn 'Open the map...' $false; $bSpot = & $mkBtn 'Save my position...' $false; $ui.BtnUndo = & $mkBtn 'Undo last teleport' $false; $ui.BtnDelSpot = & $mkBtn 'Remove my spot' $false; $ui.BtnDelSpot.Enabled = $false
+  foreach ($b in $bMap, $bSpot, $ui.BtnUndo, $ui.BtnDelSpot) { $r4.Controls.Add($b) }
+  foreach ($rw in $r3, $r1, $r2, $r4) { $gt.Controls.Add($rw) }   # the two main buttons first: they stay in view in a small window
+  $gH = & $mkGroup 'Heights found near the selected spot'; $rt.Controls.Add($gH, 0, 1)
+  $hl = New-Object System.Windows.Forms.TableLayoutPanel; $hl.Dock = 'Fill'; $hl.ColumnCount = 1; $hl.RowCount = 2; [void]$hl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 56))); [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 44))); $gH.Controls.Add($hl)
+  $ui.LvLevels = New-LV $hl @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 120); $ui.LvLevels.Dock = 'Fill'; $ui.LvLevels.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
+  $ui.TeleInfo = New-Object System.Windows.Forms.Label; $ui.TeleInfo.Dock = 'Fill'; $ui.TeleInfo.AutoSize = $false; $ui.TeleInfo.ForeColor = $script:Th.Muted
+  $ui.TeleInfo.Text = "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings."
+  $hl.Controls.Add($ui.TeleInfo)
+  $fitCols = { Fit-LastColumn $this; $lc = $this.Columns[$this.Columns.Count - 1]; $lc.Width = [math]::Max(40, $lc.Width - 24) }; $ui.LvTele.Add_Resize($fitCols); $ui.LvLevels.Add_Resize($fitCols)   # leave room for the scroll bar so no horizontal bar shows
   $ui.TeleLevelZ = $null; $ui.TeleBusy = $false
   $ui.TeleFilter.Add_TextChanged({ PT-FillTele }); $ui.TeleKind.Add_SelectedIndexChanged({ PT-FillTele })
   $bTp.Add_Click({ PT-Teleport }); $ui.LvTele.Add_DoubleClick({ PT-Teleport }); $ui.LvTele.Add_SelectedIndexChanged({ PT-OnPlaceSelected }); $ui.LvLevels.Add_SelectedIndexChanged({ PT-OnLevelPicked })
