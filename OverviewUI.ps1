@@ -45,6 +45,7 @@ function Get-SaveOverview([string]$savePath) {
     if ($pd.Position) { '  {0,-16}  X {1:N0}   Y {2:N0}   Z {3:N0}' -f 'Position', $pd.Position.X, $pd.Position.Y, $pd.Position.Z }
     if ($pd.Bed) { '  {0,-16}  X {1:N0}   Y {2:N0}   Z {3:N0}' -f 'Bed (respawn)', $pd.Bed.X, $pd.Bed.Y, $pd.Bed.Z }
     '  Skill points to spend: ' + $pd.Points
+    $tu = Get-TeleportUndo $savePath; if ($tu) { "  Last teleport:    to $($tu.to), $($tu.at) - 'Undo last teleport' (Player tools) can put you back" }
   }
   Sec 'Skills' { foreach ($s in ($pd.Skills | Sort-Object Name)) { '  {0,-26} level {1}' -f $s.Name, $s.Level } }
   Sec 'Inventory' {
@@ -80,6 +81,8 @@ function Get-SaveOverview([string]$savePath) {
     $w = Read-WorldCells $text; $cells = @($w.Cells); $recs = 0; $cont = 0; $opened = 0; $unopened = 0
     foreach ($c in $cells) { foreach ($r in $c.Recs) { $recs++; $be = $r.Get('bEverOpened'); if ($null -ne $be) { $cont++; if ($be -eq 'true') { $opened++ } else { $unopened++ } } } }
     $used = ([regex]::Matches($text, '\[rGUID>')).Count
+    $disc = $null; try { $disc = @(Get-ExploredSquares $savePath).Count } catch { }
+    if ($null -ne $disc) { "  Map squares discovered (50 m x 50 m, as on the Teleport map): $disc" }
     "  Map areas explored (loaded at least once): $($cells.Count)"
     "  Objects saved in those areas:              $recs"
     "  Containers found: $cont   (opened $opened, still unopened $unopened)"
@@ -105,6 +108,12 @@ function Get-SaveOverview([string]$savePath) {
         try { $fs = ST-FindStacks $savePath
           if ($fs.Stacks -gt 0) { "                    Stacks bigger than the game allows in your save: $($fs.Stacks)  ($($fs.Extra) items too many; $($fs.Player) in your inventory, $($fs.Containers) in containers)"
             $dg = ST-DangerText $fs $sc; if ($dg) { '                    ' + $dg } } } catch { } }
+      $wts = $null; try { $wts = WT-ModStatus } catch { }
+      if ($wts) { $wsm = ''; try { $wsm = WT-SummaryText } catch { }
+        '  Weapon damage:    ' + $wts.Text + '  Setting: ' + $(if ($wsm) { $wsm + '.' } else { 'none (every weapon keeps the game''s own damage).' }) }
+      $gss = $null; try { $gss = GS-ModStatus } catch { }
+      if ($gss) { $gsl = ''; try { $gsl = GS-LastResult } catch { }
+        '  Teleport ground:  ' + $gss.Text + $(if ($gsl) { '  Last time in the game: ' + $gsl } else { '' }) }
     } else { '  UE4SS (the free script loader the mods need) was not found next to your save, so none of the in-game mods can be installed from here.' }
   }
   Sec 'Backups of this world' {

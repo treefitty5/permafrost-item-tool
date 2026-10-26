@@ -2,7 +2,7 @@
 
 <img src="assets/app-icon.png" width="96" align="right" alt="icon">
 
-A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, stack your first aid kits, medicine and bandages, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
+A Windows tool for **single-player** [Permafrost](https://store.steampowered.com/app/2254990/) saves. Add items to your backpack, fix a stuck quest, teleport, learn recipes, set skills, put harvested trees / ores / loot back, change crafting recipes, make your backpack bigger, stack your first aid kits, medicine and bandages, change how hard a weapon hits, and move buildings you placed. It **finds your saves by itself** and ships with everything it needs: no exporting, no mappings, no setup.
 
 ![Overview window: everything the tool can read from your save](docs/screenshot-overview.png)
 
@@ -27,6 +27,7 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
     * [12b. Backpack size (in-game mod)](#12b-reference-backpack-size-in-game-mod)
     * [12c. Stack sizes (in-game mod)](#12c-reference-stack-sizes-in-game-mod)
     * [12d. Weapon damage (in-game mod)](#12d-reference-weapon-damage-in-game-mod)
+    * [12e. GroundSnap: the real ground after a teleport (in-game mod)](#12e-reference-groundsnap-in-game-mod)
 13. [Reference: Pictures](#13-reference-pictures)
 14. [Backups, restoring, and Steam Cloud](#14-backups-restoring-and-steam-cloud)
 15. [Files and settings](#15-files-and-settings)
@@ -104,7 +105,7 @@ The window opens maximized and follows your window size; the item catalog gets a
 | **Status lines** | Green/red game status, the world, play time and last-saved time, and a red DANGER line if stacked kits or medicine are at risk. |
 | **Pictures bar** | Shown only while there are no item pictures: **Build pictures now**, **Not now**, **Don't ask again**. |
 | **Item catalog** (left) | Every item in the game, searchable and sortable. |
-| **Selected item** (right) | Details and the quantity / condition boxes for the item you clicked. |
+| **Selected item** (right) | Details and the quantity / condition boxes for the item you clicked. For a weapon, a **Damage in the game** box sits to the right of them ([section 12d](#12d-reference-weapon-damage-in-game-mod)). |
 | **Queue** (right) | Items waiting to be added, with **Preview** and **Apply to save**. |
 | **Current inventory** (bottom left) | What your hotbar and backpack hold right now. |
 | **Log** (bottom right) | A running record of everything the tool did, plus **Restore a backup...** and **Open backups folder**. |
@@ -126,7 +127,10 @@ Close the game → search the catalog (by name or id) → click the item → set
 **Player tools → Recipes.** Tick the ones you want and press **Learn ticked recipes**.
 
 **...teleport somewhere?**
-**Player tools → Teleport.** Pick one of the game's named places (Church, Horizon, Technocrats Colony...), a fast-travel point, your bed, the crash site, something you built or a spot you saved, or click a point on **Open the map...**. The new position is written into the save (with a backup, and **Undo last teleport** puts it back); you appear there when you load. Each place lists the heights found there: if you appear inside rock, try a higher one; after a long fall, a lower one.
+**Player tools → Teleport.** Pick one of the game's named places (Church, Horizon, Technocrats Colony...), a fast-travel point, your bed, the crash site, something you built or a spot you saved, or click a point on **Open the map...**. The new position is written into the save (with a backup, and **Undo last teleport** puts it back); you appear there when you load. Each place lists the heights found there: with **Let the game fix my height when I arrive** ticked (the default), a small in-game mod then measures the real ground when you load and puts you on it, so an estimated height cannot put you under the map ([section 8](#8-reference-player-tools)). Close the game first.
+
+**...make a weapon hit harder?**
+Click the weapon in the catalog: a **Damage in the game** box appears next to the quantity and condition boxes. Type the damage, press **Set in game** and restart the game ([section 12d](#12d-reference-weapon-damage-in-game-mod)). It needs the small WeaponTweaks in-game mod (the tool offers to install it) and never touches your save.
 
 **...find out what a stuck quest is waiting for?**
 **Game data → Quests.** Pick the quest: its states and tasks are listed, and **>>** marks where your save is. The *Items this step needs* box lists what the current step asks for, and a button queues exactly those items. For a missing key or quest item, search it under **Find anything** (for example `KeyAnnas`) and queue it from there.
@@ -214,15 +218,15 @@ If a step fails, the message says whether your save was left untouched or the or
 **Overview** (top of the window) is a **read-only** report built from the save. Sections:
 
 * **World** - world name and file, play time, created / last saved, the installed game's Steam build, and the build the shipped data was made for (with a warning if the game was updated since).
-* **Character** - health, stamina, energy, hunger, body warmth, position, bed, unspent skill points.
+* **Character** - health, stamina, energy, hunger, body warmth, position, bed, unspent skill points, and your last teleport (so you can see that **Undo last teleport** is available).
 * **Skills** - the 16 skills with their levels.
 * **Inventory** - the hotbar slot by slot, and the backpack with totals per item and slots used out of the size in use (your **Backpack slots** setting while its mod is on, else the game's own; with a red DANGER line if an item sits beyond it).
 * **Recipes** - how many you know out of the game's total.
 * **Quests** - started and active quests (in-game names), unlocked regions.
 * **Buildings you placed** - how many parts, grouped by type.
-* **Explored world** - map areas loaded at least once, objects saved in them, containers found (opened / still unopened), objects used up.
+* **Explored world** - map squares you have discovered (the ones the Teleport map shades), map areas loaded at least once, objects saved in them, containers found (opened / still unopened), objects used up.
 * **Companion (dog)** - state, bond and carried items.
-* **In-game mods and settings** - whether the Recipe tweaks, Build move, BackpackSlots and StackSizes mods are installed and on, the backpack sizes you set, your Stack sizes settings and the biggest stack of each item your save holds (with a DANGER line if the mod is not on).
+* **In-game mods and settings** - whether the Recipe tweaks, Build move, BackpackSlots, StackSizes, WeaponTweaks and GroundSnap mods are installed and on, the backpack sizes you set, your Stack sizes settings and the biggest stack of each item your save holds (with a DANGER line if the mod is not on), the weapon damage you changed, and what GroundSnap did the last time you teleported.
 * **Backups of this world** - how many, the newest, and whether the starting snapshot exists.
 
 **Refresh** re-reads the save; **Copy report** copies the text.
@@ -300,7 +304,7 @@ The game never respawns trees, boulders, picked-up items or container loot. **Wo
 
 **A brand-new world with no history yet?** The tool ships a **map of untouched objects** (`catalog\pristine-world.bin`, 175 KB): every boulder, ore, breakable and world item as the game places it, recorded by flying over the whole playable map in a world nobody had played. World reset uses it as its oldest history, so even a world with no backups at all gets its mined boulders and ores back, and picked-up items too (an item is only restored from it when your save lists it as used up, because items spawn at random per world). Tested on worlds that were not used to build it, it has 98-99% of the ores, 99% of the breakables and 94-98% of the world items; the rest are objects that get a different random id in every world, which no map can know. Your own backups and your other worlds always win over it. The first time the tool opens a world that has no backup it also saves a **starting snapshot** into `Backups` (`yyyymmdd-hhmmss_BASELINE_World#N.pfs`; a read-only copy of your save, skipped while the game is running and tried again later). The snapshot is what brings back **container loot** exactly as it was and anything the shipped map does not list, so **open the tool early in a new world, before you start mining and looting.** Felled trees, partly mined boulders, harvested bushes and emptied containers can be put back with no history at all.
 
-**How it works.** The save has a record for every object of every area you have visited; a destroyed or picked-up object simply has no record any more. Felled trees are removed from the record (they stand again); partly mined boulders go back to full health; destroyed boulders and picked-up items are put back from your **earlier backups** (so keep the `Backups` folder), **from the saves of your other worlds on the same map**, **and, last, from the shipped map of untouched objects**: the same object has the same id in every world, so what another world still has untouched can be put back (ores, breakables and items only; container loot is rolled per world). A fresh world that you teleport around with *Player tools > Teleport* is a clean source for any area you care about. Looted containers get their original loot back from a backup, or the loot of another unopened container with the same loot table; if none is left in your world, a real roll from the shipped loot pool (`catalog\loot-pool.json`, about 1,500 real rolls over 33 loot groups) is used as the last resort. Quest items and keys are never re-rolled.
+**How it works.** The save has a record for every object of every area you have visited; a destroyed or picked-up object simply has no record any more. Felled trees are removed from the record (they stand again); partly mined boulders go back to full health; destroyed boulders and picked-up items are put back from your **earlier backups** (so keep the `Backups` folder), **from the saves of your other worlds on the same map**, **and, last, from the shipped map of untouched objects**: the same object has the same id in every world, so what another world still has untouched can be put back (ores, breakables and items only; container loot is rolled per world). A fresh world that you teleport around with *Player tools > Teleport* is a clean source for any area you care about. Looted containers get their original loot back from a backup, or the loot of another unopened container with the same loot table; if none is left in your world, a real roll from the shipped loot pool (`catalog\loot-pool.json`, about 1,570 real rolls over 33 loot groups) is used as the last resort. Quest items and keys are never re-rolled.
 
 Two more things the game keeps in the save are handled too:
 
@@ -367,6 +371,20 @@ Pick a weapon in the item catalog (for example the Compound Bow) and a **Damage 
 
 Ammo has no damage of its own: every arrow and bullet only has a multiplier (1.0; flares 0.2), so a hit is *weapon damage x ammo multiplier x hit zone* (a bow headshot counts double). Single-player only; very high values make fights trivial, so try small steps. The setting is kept in `weapon-tweaks.json` and written to the mod's `tweaks.lua`; what the mod did is in `WeaponTweaks.log` in its folder.
 
+## 12e. Reference: GroundSnap (in-game mod)
+
+The tool does not have the game's terrain, only **estimates** of each spot's height (from the objects the atlas flights saw: hills and buildings have several floors). A teleport that is a few metres too low puts you **under the map**; one that is too high is a long fall. In the first test of this feature on seven teleports the estimates were off by -2 to +22 m, and two of them would have put you under the map.
+
+**GroundSnap** lets the game decide. On the **Teleport** tab the box **Let the game fix my height when I arrive** is ticked by default. When you teleport to an *estimated* height (a named place, a fast-travel point, a height from the list, coordinates whose Z came from the list):
+
+1. The tool writes the teleport into the save as before (backup first) and leaves a small request for the mod. The first time, it installs the mod (**GroundSnap**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods)) into the game's `Mods` folder and adds `GroundSnap : 1` to `mods.txt` (backed up first).
+2. Start the game and load the world. When the game puts you at the requested spot, the mod **holds you in the air**, waits until the game's ground has loaded and three measurements agree, then puts you just above the real ground and lets you drop. It takes a few seconds after the world appears.
+3. It deletes the request and records what it did: the Teleport tab shows *Last time in the game*, the **Overview** lists it, and `ue4ss\Mods\GroundSnap\GroundSnap.log` has every measurement.
+
+Heights that are **real** are never changed: your bed, the crash site, things you built, your own saved spots and a Z you typed yourself, because they may be inside a building or a bunker. **Undo last teleport** also cancels a request that has not been used. Your save is not touched by the mod; to switch it off, untick the box or set `GroundSnap : 0` in `mods.txt`.
+
+Limits: the mod puts you on whatever solid surface the game reports at that spot (a roof, a ledge, or in unfinished areas a floor that is not drawn on the map), so use **Undo** if you do not like the landing. It works only for the first load after a teleport, in the world you teleported in, and needs UE4SS. It was tested in the game on a copy of a world with seven teleports (caves, a building, open ground) and all landed safely.
+
 ## 13. Reference: Pictures
 
 ![Pictures window](docs/screenshot-pictures.png)
@@ -425,7 +443,7 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 `GameDir` is the folder that contains the inner `Permafrost` folder; `ExportRoot` (only for [section 18](#18-advanced-rebuild-the-data-from-your-own-game-files)) is the folder that **contains** FModel's `Permafrost` export folder.
 
-**Moving the tool:** close it, move the whole folder (keep `Backups` with it), and start the `.cmd` from the new place. **Uninstalling:** delete the folder; the only things outside it are the optional UE4SS mods (`RecipeTweaks`, `BuildMove`, `BackpackSlots`, `StackSizes` in `...\ue4ss\Mods`, listed in `mods.txt`). To remove a mod, set its line in `mods.txt` to `0` (or delete its folder).
+**Moving the tool:** close it, move the whole folder (keep `Backups` with it), and start the `.cmd` from the new place. **Uninstalling:** delete the folder; the only things outside it are the optional UE4SS mods (`RecipeTweaks`, `BuildMove`, `BackpackSlots`, `StackSizes`, `WeaponTweaks`, `GroundSnap` in `...\ue4ss\Mods`, listed in `mods.txt`). To remove a mod, set its line in `mods.txt` to `0` (or delete its folder).
 
 ## 16. Installing UE4SS (only for the in-game mods)
 
@@ -433,7 +451,7 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
-3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move**, **Apply in game** next to Backpack slots, **Stack sizes**) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
+3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move**, **Apply in game** next to Backpack slots, **Stack sizes**, **Set in game** in the Damage box, and the first teleport with GroundSnap ticked) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
 
 If the game ever fails to start after a game update, remove `dwmapi.dll` from `Binaries\Win64` to start it normally (see [section 17](#17-after-a-game-update)).
 
@@ -575,7 +593,7 @@ PowerShell traps seen in this code base (worth knowing before you edit): a funct
 * `PermafrostItemTool.ps1` - the main window (its `Do-Layout` positions everything from the window size and turns on scroll bars when the window is small). `SaveCore.ps1` - reading and writing the `.pfs` save (the inventory exists in **three synced copies** inside it; all are patched together and verified). `PlayerCore.ps1` / `PlayerTools.ps1` - player data and its window. `OverviewUI.ps1` - the read-only report. `WorldPicker.ps1` - the world list. `GameData.ps1` - the data browser. `RecipeTweaks.ps1` - the recipe editor. `WorldCore.ps1` / `WorldReset.ps1` / `WorldResetUI.ps1` - the world reset (reading and rewriting the world block of the save, which is checked to round-trip byte for byte; planning; the window). `BuildMove.ps1` - installs the Build move mod. `Theme.ps1` - colours.
 * `GameFiles.ps1` / `PicturesUI.ps1` / `TextureDecode.ps1` - read-only access to the installed game's own packed files (the IoStore container, Oodle-compressed) and decoding of its textures into small PNGs.
 * `Paths.ps1` - finds your game folder and save (and FModel's export for the advanced rebuild); reads `config.json`.
-* `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README). `catalog\places.csv` (the game's named places and fast-travel points, positions read from its level data by `Build-Places.ps1` with `MapCore.ps1`), `catalog\terrain-levels.csv` and `catalog\map-points.csv` (heights and dots from the same flights, built by `Build-Terrain.ps1`) feed the Teleport tab and its map (`TeleportMap.ps1`). `Build-WorldMap.ps1` (with `WorldMapDecode.ps1`) puts the game's map picture back together from the installed game for that map; the Pictures window runs it.
+* `items.json`, `catalog\`, `datapack.json` - the data pack. `catalog\pristine-world.bin` is the shipped map of untouched ore / breakable / item records, built by `Build-Pristine.ps1` (which also writes `loot-pool.json`) from a save that was flown over the whole map with the `AtlasDumpMod` (see its README; two flights, the second at 75 m spacing, gave 2,761 records in 491 areas). `catalog\places.csv` (the game's named places and fast-travel points, positions read from its level data by `Build-Places.ps1` with `MapCore.ps1`), `catalog\terrain-levels.csv` and `catalog\map-points.csv` (heights and dots from the same flights, built by `Build-Terrain.ps1`) feed the Teleport tab and its map (`TeleportMap.ps1`). `Build-WorldMap.ps1` (with `WorldMapDecode.ps1`) puts the game's map picture back together from the installed game for that map; the Pictures window runs it.
 * `Build-*.ps1` - turn FModel's exports into `items.json` and `catalog\*.csv`. `Build-Everything.ps1` runs them all and then `Build-Finalize.ps1`; `Rebuild-All.ps1` runs the JSON-based ones. `Make-Release.ps1` builds the release ZIP.
 * `RecipeTweaksMod\main.lua` - the in-game recipe mod. `BuildMoveMod\main.lua` - the in-game Build move mod. `GroundSnapMod\main.lua` - the in-game mod that puts you on the real ground after a teleport (`GroundSnap.ps1` installs it and writes its request). `WeaponTweaksMod\main.lua` - the in-game weapon damage mod (`WeaponTweaks.ps1` installs it and writes its `tweaks.lua`). `StackSizesMod\main.lua` - the in-game stack sizes mod (`StackTweaks.ps1` installs it and writes its `tweaks.lua`). `BackpackSlotsMod\main.lua` - the in-game backpack size mod (`BackpackTweaks.ps1` installs it and writes its `tweaks.lua`). `UE4SSMods\DumpUsmapNative` - the F9 mappings helper.
 * `docs\` - screenshots and the announcement text.
