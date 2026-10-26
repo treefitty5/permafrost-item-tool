@@ -969,6 +969,8 @@ WHERE THINGS ARE
       $g.Dispose(); $cv.Save((Join-Path $dd '06_busy_popup.png')); $cv.Dispose(); $mb.Dispose(); $f1.Dispose(); $f2.Dispose()
       $wf = New-WorldResetForm; $wf.Opacity = 0; $wf.ShowInTaskbar = $false; $wf.StartPosition = 'Manual'; $wf.Location = New-Object System.Drawing.Point(-4000, -4000); $wf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 400; [System.Windows.Forms.Application]::DoEvents()
       Save-WindowShot $wf (Join-Path $dd '07_world_reset.png'); $wf.Close()
+      $tmf = New-TeleportMapForm $script:SavePath (Get-PlayerData $script:SavePath); $tmf.Size = New-Object System.Drawing.Size(1500, 860); $tmf.Opacity = 0; $tmf.ShowInTaskbar = $false; $tmf.StartPosition = 'Manual'; $tmf.Location = New-Object System.Drawing.Point(-4000, -4000); $tmf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 400; [System.Windows.Forms.Application]::DoEvents()
+      $script:TM.TxtFind.Text = 'Church'; TM-Find; TM-Render; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $tmf (Join-Path $dd '08_teleport_map.png'); $tmf.Close()
       $script:TestMode = $false; Remove-Item (Join-Path $dd '_main_plain.png') -ErrorAction SilentlyContinue; $script:Queue.Clear(); Refresh-Queue; $txtSearch.Text = ''
     }
     if ($env:PF_SHOTS) {
