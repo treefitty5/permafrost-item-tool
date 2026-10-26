@@ -9,17 +9,18 @@ I'm loving Permafrost, and I wanted a deeper look at what's actually going on un
 * **Overview:** a read-only report of your save: play time, vitals, skills, inventory, recipes known, quests, buildings, explored area, companion, the state of the in-game mods, backups. Nothing in it changes the save.
 * **Item catalog:** every item with its in-game name, description, stack size, condition, damage, frost protection, value, ammo and where to find it, with drop chances.
 * **Add items** to your save (backpack or hotbar) with stack and backpack-space checks. A backup is made before every change, and one click restores it.
-* **Player tools:** vitals, skills and skill points, known recipes, teleport (places or exact coordinates), read-only quest view.
+* **Player tools:** vitals, skills and skill points, known recipes, read-only quest view, and **teleport**: about 55 of the game's named places and fast-travel points, your bed and builds, spots you save, a clickable map (with the game's real map picture under it, built on your PC), Undo, and **GroundSnap**, which asks the game for the real ground height after the teleport so you cannot end up under the map.
 * **Game data browser:** reward pools, quests (with a spoiler guard, on by default), recipes, loot tables, building parts, effects, difficulty, animals, NPCs and more.
 * **Recipe tweaks:** change ingredient amounts, how many you craft and crafting time, live in game through a small UE4SS mod. Your save is never touched.
 * **World reset:** put chopped trees, mined boulders and ores, picked-up items, harvested bushes and looted containers back (the game never respawns them), per world, with a backup first.
 * **Build move:** pick up a placed building from the Q wheel and put it down elsewhere, live in game. Storage can be stacked and put on walls.
 * **Backpack size:** the **Backpack slots** box makes the backpack you wear bigger (any multiple of 5 up to 100), through a small UE4SS mod. Your save is never touched, but the game deletes items that have no slot, so the tool refuses unsafe sizes, makes a backup and shows a red warning if the mod is not running.
-* **Stack sizes:** first aid kits stack (10 per slot by default) in the backpack, hotbar and containers; each use consumes one whole kit. Same kind of mod, same safeguards.
+* **Stack sizes:** first aid kits, medicine (Panacea, Surgical Spirit, Painkillers) and bandages stack, each item with its own size, in the backpack, hotbar and containers; each use of a kit consumes one whole kit. Same kind of mod, same safeguards.
+* **Weapon damage:** pick a weapon in the catalog and a **Damage in the game** box lets you change what it does, through another small UE4SS mod. Your save is never touched.
 
 **Pictures:** the item and recipe pictures are the game's artwork, so they are not in the download. One button (**Pictures**) builds them from your own installed game in about 20 seconds; it needs a small free decompression library once and asks before downloading it.
 
-**Needs:** Windows and PowerShell 7 (the launcher offers to install it). UE4SS is only needed for the in-game mods (Recipe tweaks, Build move, Backpack size, Stack sizes).
+**Needs:** Windows and PowerShell 7 (the launcher offers to install it). UE4SS is only needed for the in-game mods (Recipe tweaks, Build move, Backpack size, Stack sizes, Weapon damage and the Teleport ground fix).
 
 **How it was made:** I built this together with Claude, Anthropic's AI assistant. I set the goals and tested everything in game on my own save; the AI wrote the code and decoded the data. The source is fully open here, so you can read what it does before running it.
 

@@ -581,7 +581,7 @@ There is **one** copy of the tool: this repository folder. You run it from the f
 **Making a release**
 
 ```powershell
-pwsh -NoProfile -File .\Make-Release.ps1 -Version 1.4.0     # -> Releases\PermafrostItemTool-v1.4.0.zip
+pwsh -NoProfile -File .\Make-Release.ps1 -Version 1.5.0     # -> Releases\PermafrostItemTool-v1.5.0.zip
 ```
 
 It zips exactly the files git would commit (tracked + new non-ignored files), scans them for personal strings, and refuses to include private files. Then tag the commit and attach the ZIP to a GitHub release.
