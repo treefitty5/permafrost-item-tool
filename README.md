@@ -28,6 +28,7 @@ A Windows tool for **single-player** [Permafrost](https://store.steampowered.com
     * [12c. Stack sizes (in-game mod)](#12c-reference-stack-sizes-in-game-mod)
     * [12d. Weapon damage (in-game mod)](#12d-reference-weapon-damage-in-game-mod)
     * [12e. GroundSnap: the real ground after a teleport (in-game mod)](#12e-reference-groundsnap-in-game-mod)
+    * [12f. Solar panel fix: the "Press F" prompt back on solar panels (in-game mod)](#12f-reference-solar-panel-fix-in-game-mod)
 13. [Reference: Pictures](#13-reference-pictures)
 14. [Backups, restoring, and Steam Cloud](#14-backups-restoring-and-steam-cloud)
 15. [Files and settings](#15-files-and-settings)
@@ -101,7 +102,7 @@ The window opens maximized and follows your window size; the item catalog gets a
 |---|---|
 | **Banner** (top) | The **Overview** button (the read-only report) and the **Theme** box (three colour themes, remembered). |
 | **Save file row** | The `.pfs` save being edited. **Browse...** lists all worlds, **Reload** re-reads the save. At the right end: the **Backpack slots** box with **Apply in game**, and under it a line saying which backpack you wear ("Worn: ScavengerBackpack - using 35 slots"), where that number comes from, and a red DANGER text if items are at risk. |
-| **Row of buttons** | One row, always in this order: **Player tools**, **World reset**, **Game data**, **Pictures**, **Recipe tweaks**, **Build move**, **Stack sizes**, **Help / how it works**. |
+| **Row of buttons** | One row, always in this order: **Player tools**, **World reset**, **Game data**, **Pictures**, **Recipe tweaks**, **Build move**, **Stack sizes**, **Panel fix**, **Help**. |
 | **Status lines** | Green/red game status, the world, play time and last-saved time, and a red DANGER line if stacked kits or medicine are at risk. |
 | **Pictures bar** | Shown only while there are no item pictures: **Build pictures now**, **Not now**, **Don't ask again**. |
 | **Item catalog** (left) | Every item in the game, searchable and sortable. |
@@ -226,7 +227,7 @@ If a step fails, the message says whether your save was left untouched or the or
 * **Buildings you placed** - how many parts, grouped by type.
 * **Explored world** - map squares you have discovered (the ones the Teleport map shades), map areas loaded at least once, objects saved in them, containers found (opened / still unopened), objects used up.
 * **Companion (dog)** - state, bond and carried items.
-* **In-game mods and settings** - whether the Recipe tweaks, Build move, BackpackSlots, StackSizes, WeaponTweaks and GroundSnap mods are installed and on, the backpack sizes you set, your Stack sizes settings and the biggest stack of each item your save holds (with a DANGER line if the mod is not on), the weapon damage you changed, and what GroundSnap did the last time you teleported.
+* **In-game mods and settings** - whether the Recipe tweaks, Build move, SolarPanelFix, BackpackSlots, StackSizes, WeaponTweaks and GroundSnap mods are installed and on, the backpack sizes you set, your Stack sizes settings and the biggest stack of each item your save holds (with a DANGER line if the mod is not on), the weapon damage you changed, and what GroundSnap did the last time you teleported.
 * **Backups of this world** - how many, the newest, and whether the starting snapshot exists.
 
 **Refresh** re-reads the save; **Copy report** copies the text.
@@ -385,6 +386,14 @@ Heights that are **real** are never changed: your bed, the crash site, things yo
 
 Limits: the mod puts you on whatever solid surface the game reports at that spot (a roof, a ledge, or in unfinished areas a floor that is not drawn on the map), so use **Undo** if you do not like the landing. It works only for the first load after a teleport, in the world you teleported in, and needs UE4SS. It was tested in the game on a copy of a world with seven teleports (caves, a building, open ground) and all landed safely.
 
+## 12f. Reference: Solar panel fix (in-game mod)
+
+In the game as it is, no solar panel shows **Press F**. Measured in a brand-new world with no mods (so it is the game, not your save): the loot box of a panel, the only part that answers the game's interaction ray, lies 70 to 120 cm below the terrain surface, the terrain collision swallows the ray before it reaches the box, leftover decor copies of the panels in the solar fields block it as well, and the cabinet you aim at is set to ignore it. Why it started is not known (the panel files did not change in the 29 October game update).
+
+**Panel fix** installs a small UE4SS mod (**SolarPanelFix**, [section 16](#16-installing-ue4ss-only-for-the-in-game-mods); `mods.txt` is backed up first) that makes the panel's cabinet, the part with the white dot at its base, answer the ray too. Nothing has to be switched on in the game: the mod applies itself every time the game starts and as panels load (restart the game once after installing). Look at the white dot from about 2 to 3 metres and **F** appears; in the test every panel in the solar field could be opened and emptied.
+
+It only changes collision while the game runs; your save and the game's files are not touched, and if the developers fix the cause the mod simply has nothing left to do. Not tested: panels that were already emptied before the mod was on. Log: `ue4ss\Mods\SolarPanelFix\SolarPanelFix.log`. Switch it off with `SolarPanelFix : 0` in `mods.txt`.
+
 ## 13. Reference: Pictures
 
 ![Pictures window](docs/screenshot-pictures.png)
@@ -447,11 +456,11 @@ Deleting any of the settings files just resets that setting. **`config.json`** k
 
 ## 16. Installing UE4SS (only for the in-game mods)
 
-**Recipe tweaks**, **Build move**, the **Backpack slots** box, **Stack sizes**, the **Damage in the game** box and the **GroundSnap** option of Teleport work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
+**Recipe tweaks**, **Build move**, **Panel fix**, the **Backpack slots** box, **Stack sizes**, the **Damage in the game** box and the **GroundSnap** option of Teleport work through small mods for [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases), a free script loader for Unreal Engine games (`v3.0.1-1181` experimental was used; newer builds are untested). Everything else in the tool works without it.
 
 1. Download the UE4SS release and follow its documentation: the files go next to `Permafrost-Win64-Shipping.exe`, in `Permafrost\Binaries\Win64` (you end up with `dwmapi.dll` there and a `ue4ss` folder).
 2. Start the game once to check it still runs.
-3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move**, **Apply in game** next to Backpack slots, **Stack sizes**, **Set in game** in the Damage box, and the first teleport with GroundSnap ticked) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
+3. The tool installs each mod for you (**Install / update mod** in Recipe tweaks, **Build move**, **Panel fix**, **Apply in game** next to Backpack slots, **Stack sizes**, **Set in game** in the Damage box, and the first teleport with GroundSnap ticked) into `...\ue4ss\Mods\` for you and add the line to `mods.txt` (a backup of `mods.txt` is made). Restart the game after installing or updating a mod.
 
 If the game ever fails to start after a game update, remove `dwmapi.dll` from `Binaries\Win64` to start it normally (see [section 17](#17-after-a-game-update)).
 

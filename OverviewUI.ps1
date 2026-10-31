@@ -99,6 +99,7 @@ function Get-SaveOverview([string]$savePath) {
     if ($ms -and $ms.Text -notmatch 'Mods folder not found') {
       '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + ($ms.Text -replace '\s+(start-up|spawned in the world):.*$', '')
       $bm = $null; try { $bm = BM-Status } catch { }; if ($bm) { '  Build move:       ' + $bm.Text }
+      $sp = $null; try { $sp = SP-Status } catch { }; if ($sp) { '  Solar panel fix:  ' + $sp.Text }
       $bt = $null; try { $bt = BT-ModStatus } catch { }
       if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
         '  Backpack size:    ' + $bt.Text + $(if ($set.Count) { '  Your sizes: ' + ($set -join ', ') + '.' } else { '  No size set (the game''s own sizes are used).' }) }

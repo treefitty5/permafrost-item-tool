@@ -23,6 +23,7 @@ try {
   . (Join-Path $PSScriptRoot 'WorldPicker.ps1')
   . (Join-Path $PSScriptRoot 'OverviewUI.ps1')
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
+  . (Join-Path $PSScriptRoot 'SolarPanelFix.ps1')
   . (Join-Path $PSScriptRoot 'HelpUI.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
@@ -64,8 +65,8 @@ try {
   $txtSave = New-Ctl System.Windows.Forms.TextBox 84 11 760 24; $txtSave.Text = $script:SavePath; $txtSave.Anchor = 'Top,Left,Right'
   $btnBrowse = New-Ctl System.Windows.Forms.Button 852 10 80 26 'Browse...'; $btnBrowse.Anchor = 'Top,Right'
   $btnReload = New-Ctl System.Windows.Forms.Button 938 10 80 26 'Reload'; $btnReload.Anchor = 'Top,Right'
-  $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help / how it works'; $btnHelp.Anchor = 'Top,Right'
-  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview'; $btnStk = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Stack sizes'
+  $btnHelp = New-Ctl System.Windows.Forms.Button 1024 10 132 26 'Help'; $btnHelp.Anchor = 'Top,Right'
+  $btnData = New-Ctl System.Windows.Forms.Button 900 10 110 26 'Game data'; $btnPlayer = New-Ctl System.Windows.Forms.Button 780 10 110 26 'Player tools'; $btnTweaks = New-Ctl System.Windows.Forms.Button 650 10 120 26 'Recipe tweaks'; $btnWorld = New-Ctl System.Windows.Forms.Button 520 10 110 26 'World reset'; $btnMove = New-Ctl System.Windows.Forms.Button 400 10 110 26 'Build move'; $btnPics = New-Ctl System.Windows.Forms.Button 300 10 90 26 'Pictures'; $btnOv = New-Ctl System.Windows.Forms.Button 200 10 90 26 'Overview'; $btnStk = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Stack sizes'; $btnPanel = New-Ctl System.Windows.Forms.Button 100 10 110 26 'Panel fix'
   # first-run bar: shown under the save row while no pictures exist (Update-PicsBar), so the player does not have to find the top button
   $script:PicsBarOn = $false; $pnlPics = New-Object System.Windows.Forms.Panel; $pnlPics.Visible = $false; $form.Controls.Add($pnlPics)
   $lblPics = New-Object System.Windows.Forms.Label; $lblPics.AutoSize = $false; $lblPics.BackColor = [System.Drawing.Color]::Transparent; $lblPics.TextAlign = 'MiddleLeft'; $lblPics.Text = 'Item pictures are not built yet. Build them from your installed game: read-only, about 20 seconds, one time.'; $pnlPics.Controls.Add($lblPics)
@@ -588,6 +589,13 @@ Lets you pick up a building you placed and put it somewhere else, inside the gam
 - Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
 - Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
 
+SOLAR PANEL FIX (button 'Panel fix')
+Gives the solar panels their 'Press F' prompt back. In the game as it is, no solar panel can be opened: the loot box of a panel (the only part that answers the game's interaction ray) lies below the terrain surface, so the ray never reaches it. This was measured in a brand-new world with no mods, so it is the game, not your save. The button installs a small in-game mod (a UE4SS mod; Mods\mods.txt is backed up first) that makes the panel's cabinet, the part with the white dot, answer the ray too.
+- Nothing to switch on - once installed, the mod applies itself every time the game starts and as panels load. Restart the game once after installing.
+- Aim at the cabinet - look at the white dot at the base of the panel from about 2 to 3 metres; F appears. (Panels you have already emptied have not been tested.)
+- Safe - it changes collision only while the game runs. Your save and the game's files are not touched. If the game's developers fix the cause, the mod simply has nothing left to do.
+- Log - ue4ss\Mods\SolarPanelFix\SolarPanelFix.log in the game folder says how many panels it changed. To switch the mod off set 'SolarPanelFix : 0' in Mods\mods.txt.
+
 STACK SIZES (button row)
 Lets you choose, item by item, how many fit in ONE slot, in every inventory (backpack, hotbar, containers). The list has three groups: First aid kits (Medkit AFAK, MFAK, IFAK and the Car Medkit), Medicine (Panacea, Surgical Spirit, Painkillers) and Bandages (Bandage, Makeshift Bandage, Military Bandage). It works through a small in-game mod (StackSizes, for UE4SS - see the README) that the tool offers to install; your save is never touched by the mod.
 - Each item has a tick box (the switch for that item), a 'game: N per slot' note (the game's own size, used when the box is not ticked) and a number box for your size. Allowed sizes: from the game's own size (at least 2) up to 20. Suggested starting values: kits 10, medicine 20, bandages 10.
@@ -646,7 +654,7 @@ WHERE THINGS ARE
 - This tool: <tool folder>
 - Backups: the Backups folder inside it (one backup per change, from any window)
 - Data: the catalog folder (CSV files you can open in Excel) and items.json
-- In-game mod logs: ue4ss\Mods\<mod name>\ in the game folder (for example WeaponTweaks.log, GroundSnap.log, BuildMove.log)
+- In-game mod logs: ue4ss\Mods\<mod name>\ in the game folder (for example WeaponTweaks.log, GroundSnap.log, BuildMove.log, SolarPanelFix.log)
 - Your save: <your save file>
 '@
     $h = $h.Replace('<tool folder>', $PSScriptRoot).Replace('<your save file>', $script:SavePath)
@@ -678,9 +686,9 @@ WHERE THINGS ARE
     # Save file row: path box (up to 640 px) + Browse + Reload right after it, and the Backpack slots box at the right end of the same row
     $tw = [math]::Max(300, [math]::Min(640, $W - 570))
     $txtSave.SetBounds(84, $ySave + 1, $tw, 24); $btnBrowse.SetBounds($txtSave.Right + 8, $ySave, 80, 26); $btnReload.SetBounds($btnBrowse.Right + 6, $ySave, 80, 26); $lblSave.Top = $ySave + 4
-    # the other eight buttons in ONE row, equal width, spread across the whole window. First what works from your save and the game data, then the three in-game mods (need UE4SS), Help last
-    $gg = 6; $gw = [int][math]::Floor(($W - 2 * $m - 7 * $gg) / 8); $grid = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp)
-    for ($c = 0; $c -lt 8; $c++) { $grid[$c].SetBounds($m + $c * ($gw + $gg), $yB1, $gw, 26) }
+    # the other nine buttons in ONE row, equal width, spread across the whole window. First what works from your save and the game data, then the in-game mods (need UE4SS), Help last
+    $gg = 6; $gw = [int][math]::Floor(($W - 2 * $m - 8 * $gg) / 9); $grid = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnPanel, $btnHelp)
+    for ($c = 0; $c -lt 9; $c++) { $grid[$c].SetBounds($m + $c * ($gw + $gg), $yB1, $gw, 26) }
     $leftW = [int](($W - 3 * $m) * 0.46); $rightX = $m + $leftW + $m; $rightW = $W - $rightX - $m
     $H = [math]::Max($H, $top + (346 + $script:SelInfoH + $(if ($chkAdv.Checked) { 28 } else { 0 }) + $(if ($script:ShowDmg) { 66 } else { 0 })) + $gap + 150 + $m)
     $avail = $H - $top - $m
@@ -916,7 +924,8 @@ WHERE THINGS ARE
   $btnApply.Add_Click({ Apply-Queue })
   $btnPreview.Add_Click({ Invoke-Busy 'Working out the slots...' { Show-Preview } $form })
   $btnHelp.Add_Click({ Show-Help })
-  $btnStk.Add_Click({ try { Invoke-Busy 'Checking the stacks in your save...' { Show-StackSizes $form $script:SavePath } $form; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Invoke-Busy 'Reading your save...' { Show-Overview $form $script:SavePath } $form } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Invoke-Busy 'Opening Pictures' { Show-Pictures $form $script:SavePath } $form; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
+  $btnStk.Add_Click({ try { Invoke-Busy 'Checking the stacks in your save...' { Show-StackSizes $form $script:SavePath } $form; Update-StackWarning } catch { Log ('Error opening Stack sizes: ' + $_.Exception.Message) } }); $btnOv.Add_Click({ try { Invoke-Busy 'Reading your save...' { Show-Overview $form $script:SavePath } $form } catch { Log ('Error opening Overview: ' + $_.Exception.Message) } }); $btnPicsGo.Add_Click({ try { Show-Pictures $form $script:SavePath -AutoStart; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPicsLater.Add_Click({ $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPicsNever.Add_Click({ try { '{"dismissed": true}' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pictures.json') -Encoding utf8 } catch { }; $script:PicsBarOn = $false; $pnlPics.Visible = $false; Do-Layout }); $btnPics.Add_Click({ try { Invoke-Busy 'Opening Pictures' { Show-Pictures $form $script:SavePath } $form; $script:IconCache = @{}; Update-PicsBar } catch { Log ('Error opening Pictures: ' + $_.Exception.Message) } }); $btnPlayer.Add_Click({ Open-Player }); $btnData.Add_Click({ Open-Data }); $btnMove.Add_Click({ try { BM-Open } catch { Log ("Error opening Build move: " + $_.Exception.Message) } })
+ $btnPanel.Add_Click({ try { SP-Open } catch { Log ("Error opening Solar panel fix: " + $_.Exception.Message) } }); $btnWorld.Add_Click({ try { Open-World } catch { Log ("Error opening World reset: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } }); $btnTweaks.Add_Click({ try { Open-Tweaks } catch { Log ("Error opening Recipe tweaks: " + $_.Exception.Message + " @ " + $_.InvocationInfo.ScriptLineNumber) } })
   $btnBp.Add_Click({ Apply-BackpackSize })
   $btnReload.Add_Click({ Invoke-Busy 'Re-reading your save...' { Reload-Inventory } $form })
   $btnBrowse.Add_Click({ $pick = Invoke-Busy 'Looking for your worlds...' { Show-WorldPicker $form $txtSave.Text } $form; if ($pick) { $txtSave.Text = $pick; if (Get-Command PF-SetConfig -ErrorAction SilentlyContinue) { PF-SetConfig 'SavePath' $pick }; Reload-Inventory } })
@@ -940,7 +949,7 @@ WHERE THINGS ARE
       $form.ClientSize = New-Object System.Drawing.Size($sz[0], $sz[1]); [System.Windows.Forms.Application]::DoEvents()
       $bs = @($form.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Top -lt 40 }); $bad = 0
       foreach ($a in $bs) { foreach ($b in $bs) { if ($a -ne $b -and $a.Bounds.IntersectsWith($b.Bounds)) { $bad++ } } }
-      $hdr = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnHelp, $btnBrowse, $btnReload, $txtSave, $lblSave, $lblBp, $numBp, $btnBp, $lblBpHint, $lblGame, $lblInfo, $lblNote, $pnlPics); $hov = 0
+      $hdr = @($btnPlayer, $btnWorld, $btnData, $btnPics, $btnTweaks, $btnMove, $btnStk, $btnPanel, $btnHelp, $btnBrowse, $btnReload, $txtSave, $lblSave, $lblBp, $numBp, $btnBp, $lblBpHint, $lblGame, $lblInfo, $lblNote, $pnlPics); $hov = 0
       for ($ia = 0; $ia -lt $hdr.Count; $ia++) { for ($ib = $ia + 1; $ib -lt $hdr.Count; $ib++) { if ($hdr[$ia].Visible -and $hdr[$ib].Visible -and $hdr[$ia].Bounds.IntersectsWith($hdr[$ib].Bounds)) { $hov++ } } }
       $bar = [math]::Max(0, $gbLog.Bottom + 12 - [math]::Max($form.ClientSize.Height, $form.AutoScrollMinSize.Height))
       $split = [int](100 * $gbCat.Height / ($gbCat.Height + $gbInv.Height)); $out += ("size {0}x{1}: catalog {13}% / inventory {14}%; header overlaps {2}, save box {3}..{4}; lower panels end at {5}, the layout needs {6} of {7} (scrolls {8}); content past the scroll area {9}; status widths {10}/{11}/{12}" -f $sz[0], $sz[1], $hov, $txtSave.Left, $txtSave.Right, $gbLog.Bottom, $form.AutoScrollMinSize.Height, $form.ClientSize.Height, $(if ($form.ClientSize.Height -lt $form.AutoScrollMinSize.Height) { 'yes' } else { 'no' }), $bar, $lblGame.Width, $lblInfo.Width, $lblNote.Width, $split, (100 - $split))
@@ -1219,6 +1228,16 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
     try { $s0 = (BM-Status).Text; BM-Install; $s1 = (BM-Status).Text; $mt2 = Get-Content "$bmTmp\mods.txt" -Raw
       $out += "build move: before = [$s0]; after install = [$s1]; mods.txt order ok = " + ($mt2 -match '(?s)BPModLoaderMod : 1.*BuildMove : 1.*Built-in keybinds') + "; main.lua copied = " + (Test-Path "$bmTmp\BuildMove\Scripts\main.lua") + "; backup = " + (Test-Path "$bmTmp\mods.txt.bak-before-buildmove") } catch { $out += "build move TEST ERROR: $($_.Exception.Message)" }
     $script:RtModsDirOverride = $null; Remove-Item -LiteralPath $bmTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # Solar panel fix installer against a temporary mods folder
+    $spTmp = Join-Path $env:TEMP ('sp-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $spTmp | Out-Null
+    [IO.File]::WriteAllText("$spTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`nBuildMove : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $spTmp
+    try { $p0 = (SP-Status).Text; SP-Install; $p1 = SP-Status; SP-Install; $mt3 = Get-Content "$spTmp\mods.txt" -Raw
+      $spOrder = $mt3 -match '(?s)BuildMove : 1.*SolarPanelFix : 1.*Built-in keybinds'; $spOnce = ([regex]::Matches($mt3, 'SolarPanelFix : 1')).Count -eq 1
+      $spLua = Get-Content "$spTmp\SolarPanelFix\Scripts\main.lua" -Raw
+      $out += "solar panel fix: before = [$p0]; after install = [$($p1.Text)]; mods.txt order ok = $spOrder; one line after a second install = $spOnce; main.lua copied = " + (Test-Path "$spTmp\SolarPanelFix\Scripts\main.lua") + "; backup = " + (Test-Path "$spTmp\mods.txt.bak-before-solarpanelfix") + "; lua sets channel 14 to block = " + ($spLua -match 'CHANNEL, BLOCK = 14, 2')
+      if (-not ($p1.Ok -and $spOrder -and $spOnce -and ($spLua -match 'CHANNEL, BLOCK = 14, 2'))) { $errs.Add('solar panel fix installer test failed') }
+    } catch { $errs.Add("solar panel fix test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:RtModsDirOverride = $null; Remove-Item -LiteralPath $spTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Find bar of the text dialogs (Help / Preview): runs against an invisible copy of the dialog
     $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
       $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents()
