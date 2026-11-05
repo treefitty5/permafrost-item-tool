@@ -25,6 +25,7 @@ try {
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
   . (Join-Path $PSScriptRoot 'SolarPanelFix.ps1')
   . (Join-Path $PSScriptRoot 'ContainerLabels.ps1')
+  . (Join-Path $PSScriptRoot 'TransferWorld.ps1')
   . (Join-Path $PSScriptRoot 'HelpUI.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
@@ -563,6 +564,7 @@ PLAYER TOOLS
 - A teleport only moves you; it does not open doors or unlock anything, and some places are dangerous or glitchy in the game itself (interiors, areas still being built). If you are unsure about a spot, copy your world (.pfs) to another slot and try it there first.
 - Quest progress - READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters, rewards already claimed, journal. Quests are not edited.
 - Container labels - Give your storage containers (barrels, chests, bookshelves) names that show in the game: white capitals hanging in front of the container, one word per line (FOOD / FATS / WOOD), while you are within 10 m. The list shows every container of your base with where it is and what it holds; type a label (words separated by / or spaces) and press Set label, or let 'Suggest labels' make one from the contents. 'Save labels and update the game mod' writes your labels and installs the small in-game mod (ContainerLabels; Mods\mods.txt is backed up first). The game does not have to be closed and your save is not touched. The label hangs at a fixed spot in front of the container. You can also label inside the game: look at a container and press Ctrl + right mouse button, type the label (it shows on the container as you type), Enter to save, Esc to cancel, Insert for the other side, Delete to clear the text, Ctrl + Backspace to remove the last word; the tool picks those labels up when you open or save this tab. Ctrl+F5 in the game shows every container's number (the # column) for 25 m around you. Labels are kept by position in container-labels.json.
+- Transfer to a new world - Copies what is yours from the world open in the tool (the source) into another world (the target) so you can start the story again without rebuilding: your base with every container, bench, furnace and the bed, the items on you (hotbar, worn gear, backpack with contents), and your 16 skills with skill points. Recipes are a separate option, OFF by default (some story steps unlock recipes). Create the new world in the game, let it load, save and quit, close the game, pick that world as the target, press Preview, then 'Copy into the target world'. The source is only read; the target gets a backup first (Backups\..._BEFORE-TRANSFER_...) and the result is checked, and the target's story, vitals and world are never touched. Not yet tested in the game itself.
 - Save info - Summary of the save: world, play time, position, skills, vitals, everything you built.
 
 RECIPE TWEAKS
@@ -999,6 +1001,7 @@ WHERE THINGS ARE
         Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_$tn.png")
         $ptTabs = $pw.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] } | Select-Object -First 1; if ($ptTabs) { foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Teleport') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_teleport_$tn.png")
           foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Container labels') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_labels_$tn.png")
+          foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Transfer to a new world') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_transfer_$tn.png")
           foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Quest progress') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_quest_$tn.png") }
         $pw.Close()
          try { $ww = New-WorldResetForm; $ww.Opacity = 0; $ww.ShowInTaskbar = $false; $ww.StartPosition = 'Manual'; $ww.Location = New-Object System.Drawing.Point(-4000, -4000); $ww.Show(); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $ww (Join-Path $env:PF_SHOTS "world_$tn.png"); $ww.Close() } catch { $errs.Add("world reset window shot: $($_.Exception.Message)") }
@@ -1264,6 +1267,33 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       if ($clc.Count -ne 3 -or $clS[0] -ne 'COAL' -or $clS[1] -ne 'AMMO' -or $clS[2] -ne 'CANDLE' -or $clN -ne 2 -or $clF -ne 'COAL' -or $clE -ne '' -or $clDir0 -ne 123.4 -or -not $clMerged -or -not $clLua.Contains('dir = 123.4') -or -not $c1.Ok -or -not $clOrder -or -not $clOnce -or -not (Test-Path "$clTmp\ContainerLabels\Scripts\main.lua") -or -not $clLua.Contains('\"')) { $errs.Add('container labels test failed') }
     } catch { $errs.Add("container labels test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $script:RtModsDirOverride = $null; $script:ClLabelsPathOverride = $null; Remove-Item -LiteralPath $clTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # Transfer to a new world: copies into temporary files only (replace path with the real save; add path with the archived fresh-world file when it exists); the source is checked to stay byte-identical
+    $twTmp = Join-Path $env:TEMP ('tw-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $twTmp | Out-Null; $script:BackupDirOverride = "$twTmp\bk"; New-Item -ItemType Directory -Force $script:BackupDirOverride | Out-Null
+    try {
+      $twSrc = $script:SavePath; $twH0 = (Get-FileHash -LiteralPath $twSrc).Hash
+      # (1) replace path: a copy of the same save with other points and a different hotbar gets the originals back
+      $twA = "$twTmp\replace.pfs"; Copy-Item -LiteralPath $twSrc $twA
+      $twV = Get-PlayerData $twA; $twPts = [string]([int]$twV.Entries['PointsAmount'] + 7)
+      $twB = Build-KeyEdit $twA @{ PointsAmount = $twPts }; [IO.File]::WriteAllBytes($twA, $twB.Bytes)
+      $twPlan = TW-Plan $twSrc $twA @('Skills'); $twRes = TW-Run $twSrc $twA @('Skills') -SkipGameCheck
+      $twBack = (Get-PlayerData $twA).Entries['PointsAmount'] -ceq (Get-PlayerData $twSrc).Entries['PointsAmount']
+      $twSame = $false; try { [void](TW-Run $twSrc $twSrc @('Base') -SkipGameCheck) } catch { $twSame = $_.Exception.Message -match 'same file' }
+      $twNothing = $false; try { [void](TW-Run $twSrc $twA @('Skills') -SkipGameCheck) } catch { $twNothing = $_.Exception.Message -match 'Nothing to copy' }
+      $twMsg = "transfer: replace path restored points = $twBack, backup made = $(Test-Path -LiteralPath $twRes.Backup), plan lines $($twPlan.Lines.Count), same file refused = $twSame, repeat refused = $twNothing"
+      # (2) add path: a brand-new character (no base, no bed) receives the base, the bed, items and skills
+      $twFresh = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Archive\atlas-flight') -Filter 'NEWFLIGHT-v9-raw-*.pfs' -ErrorAction SilentlyContinue | Select-Object -First 1)
+      $twAddOk = $true
+      if ($twFresh.Count -eq 1 -and (Get-PlayerData $twSrc).Entries.ContainsKey('PlayerBuildParts')) {
+        $twC = "$twTmp\fresh.pfs"; Copy-Item -LiteralPath $twFresh[0].FullName $twC
+        $twR2 = TW-Run $twSrc $twC @('Base', 'Items', 'Skills') -SkipGameCheck; $e1 = (Get-PlayerData $twSrc).Entries; $e2 = (Get-PlayerData $twC).Entries
+        $twAddOk = ($twR2.Added.Count -eq 3) -and ($e1['PlayerBuildParts'] -ceq $e2['PlayerBuildParts']) -and ($e1['BedRespawnLocation'] -ceq $e2['BedRespawnLocation']) -and ($e1['Equipment'] -ceq $e2['Equipment']) -and ($e1['BaseInvSlots'] -ceq $e2['BaseInvSlots'])
+        $twMsg += "; add path (fresh character) ok = $twAddOk"
+      }
+      $twSrcOk = ((Get-FileHash -LiteralPath $twSrc).Hash -eq $twH0)
+      $out += $twMsg + "; source unchanged = $twSrcOk"
+      if (-not ($twBack -and $twSame -and $twNothing -and $twAddOk -and $twSrcOk -and (Test-Path -LiteralPath $twRes.Backup))) { $errs.Add('transfer test failed') }
+    } catch { $errs.Add("transfer test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:BackupDirOverride = $null; Remove-Item -LiteralPath $twTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Find bar of the text dialogs (Help / Preview): runs against an invisible copy of the dialog
     $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
       $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents()
