@@ -312,7 +312,7 @@ Two more things the game keeps in the save are handled too:
 1. One **list of used-up objects** (`[rGUID>...` entries) grows with everything you destroy or collect. The game drops a restored object again while it is still on that list, so the reset takes every object it puts back off the list (without this, restored ores simply vanished when the area loaded).
 2. **Bushes and other generated plants / rocks** are not records: each harvested one is a single entry (its position) in a list on the game's PCG actors, and the reset removes the entries inside your radius so they grow back. Checked in the game with a bush; the other kinds in those lists were not identified one by one, so try a small radius first.
 
-**Solar panels:** no save ever records an unopened panel, so their loot is rolled from the game's own table (one pick: wire, components, electrical parts, rarely metal junk). Known game issue (version 0.44.3, reproduced with every mod off and in a brand-new world): panels show no "Press F" prompt, so restored panel loot cannot be opened for now; everything else works. **Not covered:** containers with no loot sample at all.
+**Solar panels:** no save ever records an unopened panel, so their loot is rolled from the game's own table (one pick: wire, components, electrical parts, rarely metal junk). Known game issue (listed by the developers in Content Update #1; reproduced with every mod off and in a brand-new world): panels show no "Press F" prompt. The **Panel fix** mod ([section 12f](#12f-reference-solar-panel-fix-in-game-mod)) gives it back, so restored panel loot can be opened; without the mod it cannot. Everything else works. **Not covered:** containers with no loot sample at all.
 
 ## 12. Reference: Build move (in-game mod)
 
