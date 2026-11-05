@@ -36,8 +36,8 @@ function BM-Open {
     "  F7               the same as the wheel's Move, without opening the wheel.`n" +
     "  Page Up/Down     turn it 15 degrees while you hold it (not tested yet).`n" +
     "  F6               cancel: it jumps back to where it was (not tested yet).`n`n" +
-    "There is no collision check, on purpose: parts can be placed on top of other parts, storage can be stacked (chests on chests, barrels on barrels) and put on walls. A part that ends up inside a wall can be picked up again.`n`n" +
-    "The same object is moved: health, contents and variation stay, no materials are used or refunded. Walls, floors, foundations, roofs, doors, beams and stairs are meant to be refused because they are tied to the building grid (not tested yet).`n`n" +
+    "The mod will not drop a part where it would overlap a solid object (a wall, another part, a rock, a tree): the part stays at the last free spot until you aim at a free one. It does not enforce the game's other placement rules (a smelter that normally needs a foundation can be put down off a foundation), so check where you drop such parts. Benches and every other station can be moved, like furniture, storage, lamps and the bed.`n`n" +
+    "The same object is moved: health, contents and variation stay, no materials are used or refunded. Walls, floors, foundations, roofs, doors, beams and stairs are refused because they are tied to the building grid (from the mod's code; not tried in the game yet).`n`n" +
     "The mod fills the wheel's empty padlock slot with Move. Everything it does is logged to ue4ss\Mods\BuildMove\BuildMove.log.`n`n" +
     "A mod only loads when the game starts, so restart the game after installing."
   $a = Msg ("Build move mod: $($st.Text)`n`nInstall / update it now? (Mods\mods.txt is backed up first; your save is not touched.)`n`n$how") 'Build move' 'YesNo' 'Question'

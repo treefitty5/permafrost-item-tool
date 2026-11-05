@@ -587,8 +587,8 @@ Lets you pick up a building you placed and put it somewhere else, inside the gam
 - Move from the wheel - look at a placed part (furniture, storage chest, barrel, workbench, lamp, brazier, bed), press Q and choose Move. Move is the slot that used to show a padlock, between Deconstruction and Call dog. The part then follows your crosshair.
 - Left click - puts it down where it is. Choosing Move again, or pressing F7, also puts it down. F7 does the same as the wheel's Move without opening the wheel.
 - Same object - health, contents and variation stay; no materials are used or refunded.
-- No collision check - you can put a part on top of another one, stack storage (chests on chests, barrels on barrels) and put storage on walls. This is on purpose. It also means a part can end up inside a wall or the ground; pick it up again with Move to fix it.
-- Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back) and the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs).
+- Overlap check - the mod will not drop a part where it would overlap a solid object (a wall, another part, a rock, a tree): the part stays at the last free spot until you aim at a free one (read from the mod's code, not yet tried in the game). The check is off for a part whose original spot is already blocked (something stacked, for example); the log says ON or OFF for each part you pick up. It does NOT enforce the game's other placement rules: a smelter that normally needs a foundation can be put down off a foundation. Benches and every other station can be moved, like furniture, storage, lamps and the bed; walls, floors, foundations, roofs, doors, stairs and beams are refused.
+- Not tested yet - Page Up / Page Down (turn the held part 15 degrees), F6 (cancel: the part jumps back), the refusal of structural pieces (walls, floors, foundations, roofs, doors, beams, stairs) and the overlap check.
 - Log - ue4ss\Mods\BuildMove\BuildMove.log in the game folder lists every step the mod took. To switch the mod off set 'BuildMove : 0' in Mods\mods.txt.
 
 SOLAR PANEL FIX (button 'Panel fix')
@@ -648,7 +648,7 @@ LIMITS
 - Stackable first aid kits exist only while the StackSizes mod is on: without it the game trims every stack to one kit when it saves (see STACK SIZES).
 - A bigger backpack exists only while the BackpackSlots mod is on. If the mod stops loading (UE4SS reinstalled or updated, a game update, mods.txt changed) the backpack goes back to the game's own size and the game DELETES the items in the extra slots at its next save. Before playing after any such change, check the box under Backpack slots (no red DANGER line) and keep your backups.
 - World reset cannot know the few objects that get a different random id in every world (about 1-2% of ores, up to 6% of items), and without a backup it refills container loot with a real roll of the same loot group, not the original contents.
-- Build move has no collision check, so a part can be put inside a wall or the ground (pick it up again to fix it).
+- Build move only checks that a part would not overlap a solid object; it does not enforce the game's other placement rules (a smelter that normally needs a foundation, for example), so check where you drop such parts.
 - Weapon damage changes exist only while the WeaponTweaks mod is on (UE4SS loading, mods.txt, the tool folder's weapon-tweaks.json); without it every weapon has the game's own damage. Restart the game after Set in game.
 - GroundSnap needs UE4SS and works only for heights the tool estimated, only for the first load after a teleport, and only if you start the game and load the world you teleported in; it cannot see which surfaces are finished parts of the map. Heights are still estimates when the mod is off.
 
