@@ -24,6 +24,7 @@ try {
   . (Join-Path $PSScriptRoot 'OverviewUI.ps1')
   . (Join-Path $PSScriptRoot 'BuildMove.ps1')
   . (Join-Path $PSScriptRoot 'SolarPanelFix.ps1')
+  . (Join-Path $PSScriptRoot 'ContainerLabels.ps1')
   . (Join-Path $PSScriptRoot 'HelpUI.ps1')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
@@ -561,6 +562,7 @@ PLAYER TOOLS
 - GROUNDSNAP (the tick box 'Let the game fix my height when I arrive', on by default) - the tool only has estimates of each spot's height. When you teleport to an estimated height (a named place, a fast-travel point, a height from the list, coordinates whose Z came from the list) the tool installs a small in-game mod (GroundSnap, for UE4SS - see the README) and leaves it a request. When the game loads you, the mod holds you in the air, waits until the game's ground has loaded, asks the game where the ground really is under you, puts you just above it and lets you drop; it needs a few seconds after the world appears. Heights that are real are never changed: your bed, the crash site, things you built, your saved spots and a Z you typed yourself (they may be inside a building or a bunker). In a test of 7 teleports the estimates were off by up to 22 m, and 2 of them would have put you under the map. The mod puts you on whatever solid surface the game reports, so in unfinished areas that can be a floor you cannot see on the map. What it did is shown in the Teleport tab ('Last time in the game'), in the Overview and in ue4ss\Mods\GroundSnap\GroundSnap.log. Your save is not touched by the mod; to switch it off untick the box or set 'GroundSnap : 0' in Mods\mods.txt.
 - A teleport only moves you; it does not open doors or unlock anything, and some places are dangerous or glitchy in the game itself (interiors, areas still being built). If you are unsure about a spot, copy your world (.pfs) to another slot and try it there first.
 - Quest progress - READ ONLY. Every quest in your save with its in-game name, what the game says about your current step and the next task (from the game's own quest data); green = the game marks that state as an end state. Also task counters, rewards already claimed, journal. Quests are not edited.
+- Container labels - Give your storage containers (barrels, chests, bookshelves) names that show in the game: white capitals hanging in front of the container, one word per line (FOOD / FATS / WOOD), while you are within 10 m. The list shows every container of your base with where it is and what it holds; type a label (words separated by / or spaces) and press Set label, or let 'Suggest labels' make one from the contents. 'Save labels and update the game mod' writes your labels and installs the small in-game mod (ContainerLabels; Mods\mods.txt is backed up first). The game does not have to be closed and your save is not touched. In the game, Ctrl+F5 shows every container's number (the # column) for 25 m around you so you can tell which row is which barrel. Labels are kept by position in container-labels.json.
 - Save info - Summary of the save: world, play time, position, skills, vitals, everything you built.
 
 RECIPE TWEAKS
@@ -995,7 +997,8 @@ WHERE THINGS ARE
         Save-WindowShot $dw (Join-Path $env:PF_SHOTS "data_$tn.png"); $dw.Close()
         $pw = New-PlayerForm; $pw.Opacity = 0; $pw.ShowInTaskbar = $false; $pw.StartPosition = 'Manual'; $pw.Location = New-Object System.Drawing.Point(-4000, -4000); $pw.Size = New-Object System.Drawing.Size(1500, 820); $pw.Show(); [System.Windows.Forms.Application]::DoEvents()
         Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_$tn.png")
-        $ptTabs = $pw.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] } | Select-Object -First 1; if ($ptTabs) { foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Teleport') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_teleport_$tn.png") }
+        $ptTabs = $pw.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] } | Select-Object -First 1; if ($ptTabs) { foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Teleport') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_teleport_$tn.png")
+          foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Container labels') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_labels_$tn.png") }
         $pw.Close()
         foreach ($sw in @(@{ F = { New-OverviewForm $script:SavePath }; N = 'overview' }, @{ F = { New-PicturesForm $script:SavePath }; N = 'pictures' })) {
           $sf = & $sw.F; $sf.Opacity = 0; $sf.ShowInTaskbar = $false; $sf.StartPosition = 'Manual'; $sf.Location = New-Object System.Drawing.Point(-4000, -4000); $sf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300; [System.Windows.Forms.Application]::DoEvents()
@@ -1238,6 +1241,21 @@ $script:GD.Tabs.SelectedIndex = 3; [System.Windows.Forms.Application]::DoEvents(
       if (-not ($p1.Ok -and $spOrder -and $spOnce -and ($spLua -match 'CHANNEL, BLOCK = 14, 2'))) { $errs.Add('solar panel fix installer test failed') }
     } catch { $errs.Add("solar panel fix test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
     $script:RtModsDirOverride = $null; Remove-Item -LiteralPath $spTmp -Recurse -Force -ErrorAction SilentlyContinue
+    # Container labels: a made-up base (barrels, a bookshelf, a campfire, a bed, a foundation), the suggestions, the labels file, labels.lua and the installer
+    $clTmp = Join-Path $env:TEMP ('cl-test-' + [guid]::NewGuid().ToString('N').Substring(0, 6)); New-Item -ItemType Directory -Force $clTmp | Out-Null
+    [IO.File]::WriteAllText("$clTmp\mods.txt", "CheatManagerEnablerMod : 1`r`nBPModLoaderMod : 1`r`nBuildMove : 1`r`n`r`n; Built-in keybinds, do not move up!`r`nKeybinds : 1`r`n"); $script:RtModsDirOverride = $clTmp; $script:ClLabelsPathOverride = "$clTmp\container-labels.json"
+    try {
+      $clParts = '#WoodenFoundation&X=-44887.2,Y=-106827.0,Z=4069.4&P=0.0,Y=-110.2,R=0.0&1&1$#PlasticBarrel&X=-44099.68,Y=-107030.49,Z=4075.83&P=0.0,Y=68.9,R=0.0&0&1$@0=Coal&50@1=Coal&50@2=Wood&10#Campfire&X=1,Y=2,Z=3&P=0,Y=0,R=0&0&1$0&Wood*9*28.0&None*0*0.0@#PlasticBarrel&X=-44282.17,Y=-107474.0,Z=4184.65&P=0.0,Y=0.0,R=0.0&0&1$@0=9x19_Ammo&100@1=762x54R_Ammo&100@2=Wood&5#WoodenBookshelf&X=-44653.83,Y=-107379.79,Z=4311.18&P=90.0,Y=0.0,R=110.2&0&1$@0=Candle&5&50@1=Valuable_ComicBooks&1#Bed&X=1,Y=1,Z=1&P=0,Y=0,R=0&0&1$@claimer=Test'
+      $clc = @(CL-ParseParts $clParts); $clNames = @{ Coal = 'Coal'; Wood = 'Wood' }
+      $clS = @($clc | ForEach-Object { CL-Suggest $_.Items $clNames }); $clTexts = @($clS[0], '', 'FOOD/FATS "wood"\x')
+      $clN = CL-WriteLabelsFile $clc $clTexts; $clBack = @(CL-ReadLabels); $clF = CL-FindLabel $clBack $clc[0]; $clE = CL-FindLabel $clBack $clc[1]
+      CL-WriteLua $clc $clTexts; $clLua = Get-Content "$clTmp\ContainerLabels\labels.lua" -Raw
+      $s0 = (CL-Status).Text; CL-Install; $c1 = CL-Status; CL-Install; $clMt = Get-Content "$clTmp\mods.txt" -Raw
+      $clOrder = $clMt -match '(?s)BuildMove : 1.*ContainerLabels : 1.*Built-in keybinds'; $clOnce = ([regex]::Matches($clMt, 'ContainerLabels : 1')).Count -eq 1
+      $out += "container labels: parsed $($clc.Count) containers ($($clc.Type -join ', ')); suggestions [$($clS -join ' | ')]; summary [$(CL-Summary $clc[0].Items $clNames)]; labels file kept $clN, found [$clF], empty [$clE]; lua escapes quote = $($clLua.Contains('\"')) and has 3 rows = $(([regex]::Matches($clLua, 'type = ')).Count -eq 3); installer before [$s0] after [$($c1.Text)]; order ok = $clOrder; one line = $clOnce"
+      if ($clc.Count -ne 3 -or $clS[0] -ne 'COAL' -or $clS[1] -ne 'AMMO' -or $clS[2] -ne 'CANDLE' -or $clN -ne 2 -or $clF -ne 'COAL' -or $clE -ne '' -or -not $c1.Ok -or -not $clOrder -or -not $clOnce -or -not (Test-Path "$clTmp\ContainerLabels\Scripts\main.lua") -or -not $clLua.Contains('\"')) { $errs.Add('container labels test failed') }
+    } catch { $errs.Add("container labels test: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)") }
+    $script:RtModsDirOverride = $null; $script:ClLabelsPathOverride = $null; Remove-Item -LiteralPath $clTmp -Recurse -Force -ErrorAction SilentlyContinue
     # Find bar of the text dialogs (Help / Preview): runs against an invisible copy of the dialog
     $script:DialogTestHook = { param($dlg, $tfx, $tbx, $lcx, $bN, $bP, $tmr)
       $dlg.Opacity = 0; $dlg.ShowInTaskbar = $false; $dlg.StartPosition = 'Manual'; $dlg.Location = New-Object System.Drawing.Point(-4000, -4000); $dlg.Show(); [System.Windows.Forms.Application]::DoEvents()

@@ -31,6 +31,7 @@ function PT-Load {
   Set-Num $ui.Points $d.Points
   $ui.Pend = @{}; PT-FillSkills
   PT-FillRecipes; PT-FillTele; PT-FillQuest; PT-FillInfo
+  try { CL-Load } catch { }
   PT-Status ("Loaded {0}: {1:N1} h played, {2} recipes known, {3} skills." -f $d.World, ($d.Playtime / 3600), $d.Known.Count, $d.Skills.Count)
 }
 
@@ -368,7 +369,7 @@ function PT-FillInfo {
 function New-PlayerForm {
   Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
   $ui = @{}; $script:PT = $ui
-  $f = New-Object System.Windows.Forms.Form; $f.Text = 'Player tools  -  vitals, skills, recipes, teleport, quest progress'; $f.Size = New-Object System.Drawing.Size(1100, 760); $f.MinimumSize = New-Object System.Drawing.Size(980, 640)
+  $f = New-Object System.Windows.Forms.Form; $f.Text = 'Player tools  -  vitals, skills, recipes, teleport, quest progress, container labels'; $f.Size = New-Object System.Drawing.Size(1100, 760); $f.MinimumSize = New-Object System.Drawing.Size(980, 640)
   $f.StartPosition = 'CenterParent'; $f.Font = New-Object System.Drawing.Font('Segoe UI', 9); $ui.Form = $f
   $st = New-Object System.Windows.Forms.Label; $st.Dock = 'Bottom'; $st.Height = 26; $st.TextAlign = 'MiddleLeft'; $st.Padding = New-Object System.Windows.Forms.Padding(8, 0, 0, 0); $st.Tag = 'status'; $f.Controls.Add($st); $ui.Status = $st
   $tabs = New-Object ThemedTabs; $tabs.Dock = 'Fill'; $f.Controls.Add($tabs); $tabs.BringToFront()
@@ -473,7 +474,10 @@ function New-PlayerForm {
   $ui.LvQuest = New-LV $t4 @('x') @(100); $ui.LvQuest.Dock = 'Fill'; $ui.LvQuest.BringToFront()
   $ui.QSpoil.Add_CheckedChanged({ Set-HideSpoilers $script:PT.QSpoil.Checked; PT-FillQuest }); $ui.QView.Add_SelectedIndexChanged({ PT-FillQuest }); $ui.QFilter.Add_TextChanged({ PT-FillQuest })
 
-  # --- tab 5: save info
+  # --- tab 5: container labels (ContainerLabels.ps1)
+  $t6 = NewTab 'Container labels'; CL-BuildTab $t6
+
+  # --- tab 6: save info
   $t5 = NewTab 'Save info'
   $ui.InfoBox = New-Object System.Windows.Forms.TextBox; $ui.InfoBox.Multiline = $true; $ui.InfoBox.ReadOnly = $true; $ui.InfoBox.ScrollBars = 'Vertical'; $ui.InfoBox.Dock = 'Fill'; $ui.InfoBox.Font = New-Object System.Drawing.Font('Consolas', 10); $ui.InfoBox.BackColor = [System.Drawing.Color]::White; $t5.Controls.Add($ui.InfoBox)
 
