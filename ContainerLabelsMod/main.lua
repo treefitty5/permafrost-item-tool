@@ -4,9 +4,9 @@
 --       Ctrl + right mouse button while you look at a container (within 6 m)  -> label mode: type the text (letters, digits, space), it appears on the container as you type
 --       Enter, or Ctrl + right mouse button again  -> save      Esc -> cancel      Backspace -> delete a letter      Insert -> hang the label on the other side
 --     The label hangs on the side of the container you were standing on when you saved it. Saving an empty text removes the label.
+--     Delete clears the whole text, Ctrl + Backspace removes the last word (holding Backspace does not repeat: the game gives the mod one key press at a time).
 --     In-game labels are written to ingame-labels.lua; the tool picks them up the next time you open or save the Container labels tab.
 --   * A label shows while you are within SHOW_DIST of the container. Ctrl+F5 shows every container's number (the # column of the tool's list) for 25 m around you.
---   * Optional (tool checkbox "Show the label in the game's own prompt", experimental): the container's name in the "Press F" prompt becomes "<name>: <label>".
 -- Nothing is saved in your world: a label is a temporary text actor. One timer chain only (UE4SS's Lua timers are not thread-safe). Log: ContainerLabels.log.
 local TAG = "[ContainerLabels] "
 local function modDir()
@@ -50,7 +50,6 @@ local shown = {}               -- entry number -> { actor, text, dir }
 local actors = {}              -- class name -> list of { a, x, y, z }
 local tick = 0
 local typing = nil             -- label mode: { target = {a,type,x,y,z}, buf, dir, actor, hint, entryN }
-local hookDone = false
 
 -- ------------------------------------------------------------------ small helpers
 local function near(e, x, y, z) return math.abs(e.x - x) < 30 and math.abs(e.y - y) < 30 and math.abs(e.z - z) < 30 end
@@ -189,7 +188,7 @@ local function step()
   local pc = UEHelpers.GetPlayerController(); if not valid(pc) then return end
   local pawn = pc.Pawn; if not valid(pawn) then return end
   local p = safe(function() return pawn:K2_GetActorLocation() end); if not p then return end
-  if tick % REFRESH_TICKS == 1 then refreshActors(); if data.options and data.options.prompt and not hookDone then pcall(function() installPrompt() end) end end
+  if tick % REFRESH_TICKS == 1 then refreshActors() end
   for _, e in ipairs(list) do
     local n = e.n
     local dx, dy, dz = e.x - p.X, e.y - p.Y, e.z - p.Z
@@ -336,75 +335,17 @@ bind("OEM_MINUS", function() if typing then guarded(typed, "-") end end)
 bind("OEM_PERIOD", function() if typing then guarded(typed, ".") end end)
 bind("OEM_TWO", function() if typing then guarded(typed, "/") end end)
 bind("BACKSPACE", function() if typing then guarded(backspace) end end)
+-- holding a key does not repeat (a key press reaches the mod once), so two shortcuts delete faster: Delete clears the whole text, Ctrl + Backspace removes the last word
+local function clearAll() if typing then typing.last = os.time(); typing.buf = ""; renderTyping() end end
+local function backWord() if typing then typing.last = os.time(); typing.buf = typing.buf:gsub("%s+$", ""):gsub("[^%s/,]+$", ""); renderTyping() end end
+bind("DEL", function() if typing then guarded(clearAll) end end)
+bind("DELETE", function() if typing then guarded(clearAll) end end)
+bind("BACKSPACE", function() if typing then guarded(backWord) end end, { ModifierKey.CONTROL })
 bind("INS", function() if typing then guarded(flipSide) end end)
 bind("RETURN", function() if typing then guarded(stopTyping, true) end end)
 bind("ESCAPE", function() if typing then guarded(stopTyping, false) end end)
 local startOk = bind("RIGHT_MOUSE_BUTTON", function() guarded(function() if typing then stopTyping(true) else startTyping() end end) end, { ModifierKey.CONTROL })
 bind("F5", function() numbersOn = not numbersOn; removeAllLabels(); log("numbers " .. (numbersOn and "ON (every container within 25 m shows its number)" or "OFF")) end, { ModifierKey.CONTROL })
-
--- ------------------------------------------------------------------ optional: the name in the game's own "Press F" prompt (experimental, switched on in the tool)
-function installPrompt()
-  hookDone = true
-  -- find where the game defines the name functions: walk up the class chain of a real container and look for <class>:GetInteractionName / :GetDisplayName
-  local sample
-  for _, list in pairs(actors) do if list[1] and valid(list[1].a) then sample = list[1].a; break end end
-  if not sample then hookDone = false; return end            -- no container loaded yet: try again at the next refresh
-  local paths, seen = {}, {}
-  local c = safe(function() return sample:GetClass() end); local guard = 0
-  while valid(c) and guard < 14 do
-    guard = guard + 1
-    local cp = safe(function() return c:GetPathName() end)
-    if cp then
-      for _, fname in ipairs({ "GetInteractionName", "GetDisplayName" }) do
-        local p = cp .. ":" .. fname
-        local fn = safe(function() return StaticFindObject(p) end)
-        if valid(fn) and not seen[p] then seen[p] = true; paths[#paths + 1] = p end
-      end
-    end
-    c = safe(function() return c:GetSuperStruct() end)
-  end
-  log("prompt: class chain of " .. typeOf(sample) .. " defines " .. #paths .. " name function(s)")
-  local hits = 0
-  local n = 0
-  for _, path in ipairs(paths) do
-    log("prompt: found " .. path)
-    local ok, err = pcall(function()
-      RegisterHook(path, function() end, function(self, ...)
-        local args = { ... }; local rv = args[#args]
-        local a = safe(function() return self:get() end); if not valid(a) then return end
-        local l = safe(function() return a:K2_GetActorLocation() end); if not l then return end
-        for _, e in ipairs(entries()) do
-          if near(e, l.X, l.Y, l.Z) and (e.text or "") ~= "" then
-            local label = (e.text or ""):upper():gsub("%s+", " ")
-            local base = safe(function() return rv:get():ToString() end) or typeOf(a)
-            if not base:find(":", 1, true) then
-              local done = safe(function() rv:set(FText(base .. ": " .. label)); return true end)
-              hits = hits + 1; if hits <= 4 then log(string.format("prompt hook %s: '%s' -> '%s: %s' (%s)", path:match(":(%w+)$") or "?", base, base, label, done and "set" or "SET FAILED")) end
-            end
-            return
-          end
-        end
-      end)
-    end)
-    log("prompt: hook " .. (ok and "registered" or ("failed: " .. tostring(err)))); if ok then n = n + 1 end
-  end
-  log("prompt hooks registered: " .. n)
-end
-
--- key repeat for Backspace: a key press reaches the mod once, so while Backspace is held a fast timer deletes a letter every 80 ms after the first 0.4 s
-local heldTicks = 0
-local repeatOk = pcall(function() return IsKeyBindDown(Key.BACKSPACE) end)
-LoopAsync(80, function()
-  if typing and repeatOk then
-    ExecuteInGameThread(function()
-      local down = safe(function() return IsKeyBindDown(Key.BACKSPACE) end)
-      if down then heldTicks = heldTicks + 1; if heldTicks > 5 then pcall(backspace) end else heldTicks = 0 end
-    end)
-  else
-    heldTicks = 0
-  end
-  return false
-end)
 
 loadLabels(); loadIngame()
 LoopAsync(TICK_MS, function()
@@ -414,4 +355,4 @@ LoopAsync(TICK_MS, function()
   end)
   return false
 end)
-log(string.format("loaded; %d containers in labels.lua, %d labelled in the game. Ctrl+right-click on a container = label it (%s), Ctrl+F5 = numbers. Backspace repeat: %s.", #data.items, #edits, startOk and "key ok" or "RIGHT MOUSE KEY NOT AVAILABLE", repeatOk and "on" or "not available (press Backspace once per letter)"))
+log(string.format("loaded; %d containers in labels.lua, %d labelled in the game. Ctrl+right-click on a container = label it (%s), Ctrl+F5 = numbers.", #data.items, #edits, startOk and "key ok" or "RIGHT MOUSE KEY NOT AVAILABLE"))
