@@ -15,7 +15,7 @@ $script:TwGroups = [ordered]@{
   Items   = @{ Label = 'The items on you: hotbar, worn clothes and backpack with everything in it, special items'; Keys = @('BaseInvSlots', 'Equipment', 'SpecialItems'); Default = $true }
   Skills  = @{ Label = 'Your 16 skills (levels and experience) and unspent skill points'; Keys = $script:TwSkillKeys; Default = $true }
   Vitals  = @{ Label = 'Your vitals: health, stamina, energy, hunger and body warmth (a new character starts cold and hurt)'; Keys = @('health', 'MaxHealth', 'stamina', 'MaxStamina', 'energy', 'MaxEnergy', 'hunger', 'MaxHunger', 'BodyWarmth', 'MaxBodyWarmth'); Default = $true }
-  Map     = @{ Label = 'The map you have uncovered (the fog of war: the squares you have explored)'; Keys = @('FogOfWarRevealer_Voxels'); Default = $true }
+  Map     = @{ Label = 'The map you have uncovered (OFF by default: the new world starts with a blank map, as a new game does)'; Keys = @('FogOfWarRevealer_Voxels'); Default = $false }
   Tutorial = @{ Label = 'SKIP THE TUTORIAL: mark the opening quests done (tools, campfire, bow, the cave, the dog), start Robyn''s next quest and bring your dog along'; Keys = @('QuestSystem'); Default = $true }
   Recipes = @{ Label = 'The recipes you have learned (OFF by default: a few story steps unlock recipes, so copying them can skip or confuse parts of the story)'; Keys = @('PlayerKnowledge_Knowledge'); Default = $false }
 }
