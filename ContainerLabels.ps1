@@ -1,11 +1,11 @@
-# ContainerLabels.ps1 - names for your storage containers (barrels, chests, bookshelves...), shown in the game as floating text above each one.
-# Two halves: this file (reads the containers of your base from the save, keeps your labels in container-labels.json, writes the mod's labels.lua, installs the mod)
-# and ContainerLabelsMod\main.lua (the UE4SS mod that draws the text; it only reads labels.lua, the save is never touched).
+# ContainerLabels.ps1 - names for your storage containers (barrels, chests, bookshelves...), shown in the game as white text hanging in front of each one.
+# Two halves: this file (reads the containers of your base from the save, keeps your labels in container-labels.json, writes the mod's labels.lua, installs the mod, merges the
+# labels you typed in the game) and ContainerLabelsMod\main.lua (the UE4SS mod that draws the text and lets you label a container from inside the game; the save is never touched).
 # Needs RecipeTweaks.ps1 (RT-ModsDir finds the UE4SS Mods folder next to the save) and PlayerTools.ps1 (Msg and the list / button helpers).
 #
 # The base is the save's player entry PlayerBuildParts: one "#Type&X=..,Y=..,Z=..&P=..,Y=..,R=..&a&b$<content>" segment per part, and a container's content is a slot list
 # "@0=Coal&50@1=Coal&50&0.0@2=..." (item&count[&condition]). A part whose content starts with "@<number>=" is a container. Its position identifies it in the game (the actor sits at the
-# same X, Y, Z to within a millimetre), so labels are kept by position.
+# same X, Y, Z to within a millimetre), so labels are kept by position. A label also has an optional side ("dir", degrees: the direction from the container to the label).
 
 $script:ClInv = [Globalization.CultureInfo]::InvariantCulture
 function CL-ModDir { return (Join-Path (RT-ModsDir) 'ContainerLabels') }
@@ -47,7 +47,7 @@ function CL-Summary($items, $names, [int]$top = 4) {
   return ($txt -join ', ')
 }
 
-# a short label from the contents: one dominant item -> its name; several calibers of ammo -> "Ammo"; otherwise the top three names
+# a short label from the contents: one dominant item -> its name; several calibers of ammo -> "AMMO"; mostly weapons -> "WEAPONS"; otherwise the three biggest piles as single words
 function CL-Suggest($items, $names) {
   if (-not $items -or $items.Count -eq 0) { return '' }
   $total = 0; foreach ($v in $items.Values) { $total += $v }
@@ -69,35 +69,68 @@ function CL-Short([string]$id, $names) {
   return $last.ToUpper()
 }
 
-# --- the labels file: { "labels": [ { "x":..., "y":..., "z":..., "text":"..." } ] } ---
+# --- the labels file: { "version":1, "options":{ "floating":true, "prompt":false }, "labels":[ { "x":..., "y":..., "z":..., "text":"...", "dir":... } ] } ---
+function CL-ReadJson { $p = CL-LabelsPath; if (Test-Path -LiteralPath $p) { try { return (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json) } catch { } }; return $null }
 function CL-ReadLabels {
-  $res = New-Object System.Collections.Generic.List[object]; $p = CL-LabelsPath
-  try { if (Test-Path -LiteralPath $p) { $j = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; foreach ($l in @($j.labels)) { if ($null -ne $l.x) { $res.Add([pscustomobject]@{ X = [double]$l.x; Y = [double]$l.y; Z = [double]$l.z; Text = [string]$l.text }) } } } } catch { }
+  $res = New-Object System.Collections.Generic.List[object]; $j = CL-ReadJson
+  if ($j) { foreach ($l in @($j.labels)) { if ($null -ne $l.x) { $res.Add([pscustomobject]@{ X = [double]$l.x; Y = [double]$l.y; Z = [double]$l.z; Text = [string]$l.text; Dir = $(if ($null -ne $l.dir) { [double]$l.dir } else { $null }) }) } } }
   return $res.ToArray()
 }
-function CL-FindLabel($labels, $c) { foreach ($l in $labels) { if ([math]::Abs($l.X - $c.X) -lt 30 -and [math]::Abs($l.Y - $c.Y) -lt 30 -and [math]::Abs($l.Z - $c.Z) -lt 30) { return $l.Text } }; return '' }
-function CL-WriteLabelsFile($containers, $texts) {
+function CL-ReadOptions {
+  $o = @{ Floating = $true; Prompt = $false }; $j = CL-ReadJson
+  if ($j -and $j.options) { if ($null -ne $j.options.floating) { $o.Floating = [bool]$j.options.floating }; if ($null -ne $j.options.prompt) { $o.Prompt = [bool]$j.options.prompt } }
+  return $o
+}
+function CL-FindEntry($labels, $c) { foreach ($l in $labels) { if ([math]::Abs($l.X - $c.X) -lt 30 -and [math]::Abs($l.Y - $c.Y) -lt 30 -and [math]::Abs($l.Z - $c.Z) -lt 30) { return $l } }; return $null }
+function CL-FindLabel($labels, $c) { $e = CL-FindEntry $labels $c; if ($e) { return $e.Text }; return '' }
+function CL-WriteLabelsFile($containers, $texts, $dirs, $opts) {
   $out = New-Object System.Collections.Generic.List[object]
-  for ($i = 0; $i -lt $containers.Count; $i++) { $t = [string]$texts[$i]; if ($t.Trim()) { $out.Add([ordered]@{ x = $containers[$i].X; y = $containers[$i].Y; z = $containers[$i].Z; text = $t.Trim() }) } }
-  $o = [ordered]@{ version = 1; labels = $out.ToArray() }
+  for ($i = 0; $i -lt $containers.Count; $i++) { $t = [string]$texts[$i]; if ($t.Trim()) {
+    $e = [ordered]@{ x = $containers[$i].X; y = $containers[$i].Y; z = $containers[$i].Z; text = $t.Trim() }
+    if ($dirs -and $null -ne $dirs[$i]) { $e['dir'] = [math]::Round([double]$dirs[$i], 1) }
+    $out.Add($e) } }
+  if (-not $opts) { $opts = @{ Floating = $true; Prompt = $false } }
+  $o = [ordered]@{ version = 2; options = [ordered]@{ floating = [bool]$opts.Floating; prompt = [bool]$opts.Prompt }; labels = $out.ToArray() }
   [IO.File]::WriteAllText((CL-LabelsPath), ($o | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
   return $out.Count
 }
 
-# the mod's labels.lua: every container of the base (so numbers mode can number them all), with its label text when it has one
+# the mod's labels.lua: every container of the base (so numbers mode can number them all), with its label text (and side) when it has one
 function CL-LuaQuote([string]$s) { $t = $s -replace '\\', '\\' -replace '"', '\"' -replace "[\r\n\t]", ' '; return '"' + $t + '"' }
-function CL-LuaText($containers, $texts) {
+function CL-LuaText($containers, $texts, $dirs, $opts, [string]$stamp) {
+  if (-not $opts) { $opts = @{ Floating = $true; Prompt = $false } }
   $sb = New-Object System.Text.StringBuilder
   [void]$sb.AppendLine('-- written by the Permafrost Item Tool (Player tools > Container labels). Do not edit: the tool overwrites this file.')
-  [void]$sb.AppendLine('return { version = 1, items = {')
+  [void]$sb.AppendLine(('return {{ version = 2, generated = {0}, options = {{ floating = {1}, prompt = {2} }}, items = {{' -f (CL-LuaQuote $stamp), ([string]([bool]$opts.Floating)).ToLower(), ([string]([bool]$opts.Prompt)).ToLower()))
   for ($i = 0; $i -lt $containers.Count; $i++) { $c = $containers[$i]
-    [void]$sb.AppendLine(('  {{ type = {0}, x = {1}, y = {2}, z = {3}, text = {4} }},' -f (CL-LuaQuote $c.Type), $c.X.ToString('0.###', $script:ClInv), $c.Y.ToString('0.###', $script:ClInv), $c.Z.ToString('0.###', $script:ClInv), (CL-LuaQuote ([string]$texts[$i]).Trim()))) }
+    $d = if ($dirs -and $null -ne $dirs[$i]) { ', dir = ' + ([double]$dirs[$i]).ToString('0.#', $script:ClInv) } else { '' }
+    [void]$sb.AppendLine(('  {{ type = {0}, x = {1}, y = {2}, z = {3}, text = {4}{5} }},' -f (CL-LuaQuote $c.Type), $c.X.ToString('0.###', $script:ClInv), $c.Y.ToString('0.###', $script:ClInv), $c.Z.ToString('0.###', $script:ClInv), (CL-LuaQuote ([string]$texts[$i]).Trim()), $d)) }
   [void]$sb.AppendLine('} }')
   return $sb.ToString()
 }
-function CL-WriteLua($containers, $texts) {
+function CL-WriteLua($containers, $texts, $dirs, $opts) {
   $dir = CL-ModDir; New-Item -ItemType Directory -Force $dir | Out-Null
-  [IO.File]::WriteAllText((Join-Path $dir 'labels.lua'), (CL-LuaText $containers $texts), (New-Object Text.UTF8Encoding($false)))
+  $stamp = Get-Date -Format 'yyyyMMddHHmmssfff'
+  [IO.File]::WriteAllText((Join-Path $dir 'labels.lua'), (CL-LuaText $containers $texts $dirs $opts $stamp), (New-Object Text.UTF8Encoding($false)))
+  return $stamp
+}
+
+# labels typed in the game: the mod writes ingame-labels.lua next to labels.lua; the entries that match a container of the base replace the tool's label and side.
+# Only a file made against the labels.lua that is installed now counts (the mod forgets its in-game labels when the tool saves a new labels.lua).
+function CL-Unquote([string]$s) { return ($s -replace '\\"', '"' -replace '\\\\', '\') }
+function CL-MergeIngame($containers, $texts, $dirs) {
+  $dir = CL-ModDir; $f = Join-Path $dir 'ingame-labels.lua'; $lf = Join-Path $dir 'labels.lua'
+  if (-not (Test-Path -LiteralPath $f) -or -not (Test-Path -LiteralPath $lf)) { return 0 }
+  $t = Get-Content -LiteralPath $f -Raw; $lt = Get-Content -LiteralPath $lf -Raw
+  $g1 = [regex]::Match($t, 'generated = "([^"]*)"').Groups[1].Value; $g2 = [regex]::Match($lt, 'generated = "([^"]*)"').Groups[1].Value
+  if ($g1 -ne $g2) { return 0 }
+  $n = 0
+  foreach ($m in [regex]::Matches($t, '\{ type = "([^"]*)", x = ([-\d\.eE]+), y = ([-\d\.eE]+), z = ([-\d\.eE]+), text = "((?:[^"\\]|\\.)*)", dir = ([-\d\.eE]+) \}')) {
+    $x = [double]::Parse($m.Groups[2].Value, $script:ClInv); $y = [double]::Parse($m.Groups[3].Value, $script:ClInv); $z = [double]::Parse($m.Groups[4].Value, $script:ClInv)
+    for ($i = 0; $i -lt $containers.Count; $i++) { $c = $containers[$i]
+      if ([math]::Abs($c.X - $x) -lt 30 -and [math]::Abs($c.Y - $y) -lt 30 -and [math]::Abs($c.Z - $z) -lt 30) { $texts[$i] = CL-Unquote $m.Groups[5].Value; $dirs[$i] = [double]::Parse($m.Groups[6].Value, $script:ClInv); $n++; break } }
+  }
+  return $n
 }
 
 # --- the mod itself ---
@@ -126,7 +159,7 @@ function CL-Install {
 }
 
 # --- the tab in Player tools ---
-$script:CL = @{ Rows = @(); Texts = @(); Names = @{}; Dirty = $false }
+$script:CL = @{ Rows = @(); Texts = @(); Dirs = @(); Names = @{}; Dirty = $false }
 function CL-Where($c, $bed) {
   if (-not $bed) { return '' }
   $d = [math]::Sqrt([math]::Pow($c.X - $bed.X, 2) + [math]::Pow($c.Y - $bed.Y, 2)) / 100.0; $dz = ($c.Z - $bed.Z) / 100.0
@@ -148,8 +181,15 @@ function CL-Load {
   $d = $ui.Data; if (-not $d) { return }
   $script:CL.Names = CL-ItemNames; $script:CL.Bed = $d.Bed
   $rows = @(CL-ParseParts ([string]$d.Entries['PlayerBuildParts'])); $labels = @(CL-ReadLabels)
-  $script:CL.Rows = $rows; $script:CL.Texts = @($rows | ForEach-Object { CL-FindLabel $labels $_ }); $script:CL.Dirty = $false
+  $script:CL.Rows = $rows
+  $script:CL.Texts = @($rows | ForEach-Object { CL-FindLabel $labels $_ })
+  $script:CL.Dirs = @($rows | ForEach-Object { $e = CL-FindEntry $labels $_; if ($e) { $e.Dir } else { $null } })
+  $script:CL.Dirty = $false
+  $o = CL-ReadOptions; $ui.ClFloat.Checked = $o.Floating; $ui.ClPrompt.Checked = $o.Prompt
+  $m = 0; try { $m = CL-MergeIngame $script:CL.Rows $script:CL.Texts $script:CL.Dirs } catch { }
+  if ($m) { $script:CL.Dirty = $true }
   CL-Fill
+  if ($m) { PT-Status ("$m labels you typed in the game were picked up (shown below). Press 'Save labels' to keep them in the tool.") }
 }
 function CL-OnSelect {
   $ui = $script:PT; $sel = $ui.LvLabels.SelectedItems
@@ -174,17 +214,20 @@ function CL-SuggestEmpty {
 function CL-ClearAll {
   if (-not $script:CL.Rows.Count) { return }
   $a = Msg 'Remove every label? (Nothing is saved until you press Save labels.)' 'Container labels' 'YesNo' 'Question'; if ($a -ne 'Yes') { return }
-  $script:CL.Texts = @($script:CL.Rows | ForEach-Object { '' }); $script:CL.Dirty = $true; CL-Fill
+  $script:CL.Texts = @($script:CL.Rows | ForEach-Object { '' }); $script:CL.Dirs = @($script:CL.Rows | ForEach-Object { $null }); $script:CL.Dirty = $true; CL-Fill
 }
 function CL-Save {
   if (-not $script:CL.Rows.Count) { PT-Status 'This save has no containers in your base.'; return }
   try {
-    $n = CL-WriteLabelsFile $script:CL.Rows $script:CL.Texts
+    $m = 0; try { $m = CL-MergeIngame $script:CL.Rows $script:CL.Texts $script:CL.Dirs } catch { }    # anything typed in the game since this tab was opened
+    $opts = @{ Floating = [bool]$script:PT.ClFloat.Checked; Prompt = [bool]$script:PT.ClPrompt.Checked }
+    $n = CL-WriteLabelsFile $script:CL.Rows $script:CL.Texts $script:CL.Dirs $opts
     $st = $null; try { $st = CL-Status } catch { }
     if (-not $st -or -not $st.Ok) { CL-Install }
-    CL-WriteLua $script:CL.Rows $script:CL.Texts
+    [void](CL-WriteLua $script:CL.Rows $script:CL.Texts $script:CL.Dirs $opts)
+    try { Remove-Item -LiteralPath (Join-Path (CL-ModDir) 'ingame-labels.lua') -Force -ErrorAction SilentlyContinue } catch { }
     $script:CL.Dirty = $false; CL-Fill
-    PT-Status ("Saved $n labels and updated the game mod. In the game they show within 10 m of each container; the mod re-reads the file every 15 seconds, so a running game picks changes up by itself. (If the mod was just installed, start the game once.)")
+    PT-Status ("Saved $n labels and updated the game mod" + $(if ($m) { " (including $m typed in the game)" } else { '' }) + ". A running game picks the change up within 15 seconds. (If the mod was just installed, start the game once.)")
   } catch { PT-Status ('Could not save the labels: ' + $_.Exception.Message) }
 }
 function CL-BuildTab($tab) {
@@ -193,11 +236,13 @@ function CL-BuildTab($tab) {
   $bR = New-Btn $top 'Reload from the save' 0 5 160; $bS = New-Btn $top 'Suggest labels for the empty ones' 168 5 240; $bC = New-Btn $top 'Remove all labels' 416 5 150
   $bSave = New-Btn $top 'Save labels and update the game mod' 574 5 300; $bSave.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   $ui.ClCount = New-Object System.Windows.Forms.Label; $ui.ClCount.Dock = 'Bottom'; $ui.ClCount.Height = 24; $ui.ClCount.TextAlign = 'MiddleLeft'; $tab.Controls.Add($ui.ClCount)
-  $bot = New-Object System.Windows.Forms.Panel; $bot.Dock = 'Bottom'; $bot.Height = 112; $tab.Controls.Add($bot)
+  $bot = New-Object System.Windows.Forms.Panel; $bot.Dock = 'Bottom'; $bot.Height = 170; $tab.Controls.Add($bot)
   New-Lbl $bot 'Label for the selected container(s)' 0 10 250 | Out-Null
   $ui.ClText = New-Object System.Windows.Forms.TextBox; $ui.ClText.Location = '258,7'; $ui.ClText.Size = '360,24'; $ui.ClText.MaxLength = 40; $bot.Controls.Add($ui.ClText)
   $bSet = New-Btn $bot 'Set label' 628 4 110; $bSug = New-Btn $bot 'Suggest from contents' 746 4 190; $bNo = New-Btn $bot 'Clear label' 944 4 110
-  $nt = New-Lbl $bot "In the game a label hangs in front of its container while you are within 10 m, in white capitals with one word per line (type FOOD/FATS/WOOD, or separate the words with spaces), and turns to face you; nothing is saved in your world. Press Ctrl+F5 in the game to show every container's NUMBER (the # column) for 25 m around you, so you can tell which row is which barrel; press it again to hide them. The labels file (container-labels.json) stays on your computer. The game does not have to be closed." 0 40 1050 64
+  $ui.ClFloat = New-Object System.Windows.Forms.CheckBox; $ui.ClFloat.Text = 'Show the labels in front of the containers (white text, one word per line)'; $ui.ClFloat.AutoSize = $true; $ui.ClFloat.Location = '0,42'; $ui.ClFloat.Checked = $true; $ui.ClFloat.ForeColor = $script:Th.Text; $bot.Controls.Add($ui.ClFloat)
+  $ui.ClPrompt = New-Object System.Windows.Forms.CheckBox; $ui.ClPrompt.Text = "Also put the label in the game's own prompt when you look at a container (experimental: it hooks a game function; switch it off if the game misbehaves)"; $ui.ClPrompt.AutoSize = $true; $ui.ClPrompt.Location = '0,68'; $ui.ClPrompt.ForeColor = $script:Th.Text; $bot.Controls.Add($ui.ClPrompt)
+  $nt = New-Lbl $bot "In the game: look at a container and press CTRL + RIGHT MOUSE BUTTON, type the label (it shows on the container as you type), then ENTER (or Ctrl + right click again) to save, ESC to cancel, INSERT to hang it on the other side. The label hangs in white capitals, one word per line, on the side you stood on, and shows within 10 m. Press Ctrl+F5 to show every container's NUMBER (the # column) for 25 m around you. Labels typed in the game are picked up here when you open or save this tab. Nothing is saved in your world; container-labels.json stays on your computer. The game does not have to be closed." 0 98 1050 70
   $nt.ForeColor = $script:Th.Muted
   $ui.LvLabels = New-LV $tab @('#', 'Type', 'Where', 'Contents', 'Label') @(46, 150, 230, 520, 260); $ui.LvLabels.Dock = 'Fill'; $ui.LvLabels.FullRowSelect = $true; $ui.LvLabels.MultiSelect = $true; $ui.LvLabels.BringToFront()
   $ui.LvLabels.Add_Resize({ $lv = $script:PT.LvLabels; if ($lv.Columns.Count -ge 5) { $o = 0; for ($i = 0; $i -lt 4; $i++) { $o += $lv.Columns[$i].Width }; $lv.Columns[4].Width = [math]::Max(200, $lv.ClientSize.Width - $o - 4) } })
