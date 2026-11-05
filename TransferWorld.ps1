@@ -15,6 +15,7 @@ $script:TwGroups = [ordered]@{
   Items   = @{ Label = 'The items on you: hotbar, worn clothes and backpack with everything in it, special items'; Keys = @('BaseInvSlots', 'Equipment', 'SpecialItems'); Default = $true }
   Skills  = @{ Label = 'Your 16 skills (levels and experience) and unspent skill points'; Keys = $script:TwSkillKeys; Default = $true }
   Vitals  = @{ Label = 'Your vitals: health, stamina, energy, hunger and body warmth (a new character starts cold and hurt)'; Keys = @('health', 'MaxHealth', 'stamina', 'MaxStamina', 'energy', 'MaxEnergy', 'hunger', 'MaxHunger', 'BodyWarmth', 'MaxBodyWarmth'); Default = $true }
+  Map     = @{ Label = 'The map you have uncovered (the fog of war: the squares you have explored)'; Keys = @('FogOfWarRevealer_Voxels'); Default = $true }
   Tutorial = @{ Label = 'SKIP THE TUTORIAL: mark the opening quests done (tools, campfire, bow, the cave, the dog), start Robyn''s next quest and bring your dog along'; Keys = @('QuestSystem'); Default = $true }
   Recipes = @{ Label = 'The recipes you have learned (OFF by default: a few story steps unlock recipes, so copying them can skip or confuse parts of the story)'; Keys = @('PlayerKnowledge_Knowledge'); Default = $false }
 }
@@ -36,6 +37,24 @@ function TW-QuestEntries([string]$qs) {
 }
 function TW-ReplaceOnce([string]$t, [string]$old, [string]$new) { $i = $t.IndexOf($old, [StringComparison]::Ordinal); if ($i -lt 0 -or $t.IndexOf($old, $i + 1, [StringComparison]::Ordinal) -ge 0) { throw "could not find '$old' exactly once in the quest data" }; return $t.Substring(0, $i) + $new + $t.Substring($i + $old.Length) }
 
+# where to put you after the copy: just outside the front door = the door closest to the bed (outwards = away from the middle of the foundations), a little above the ground
+function TW-DoorSpot($parts, $bed) {
+  $inv = [Globalization.CultureInfo]::InvariantCulture; $doors = @(); $fx = 0.0; $fy = 0.0; $fn = 0; $rx = '^#([A-Za-z0-9_]+)&X=([-\d\.]+),Y=([-\d\.]+),Z=([-\d\.]+)&P=[-\d\.]+,Y=([-\d\.]+),R='
+  foreach ($seg in ($parts -split '(?=#[A-Za-z])')) { $m = [regex]::Match($seg, $rx); if (-not $m.Success) { continue }
+    $x = [double]::Parse($m.Groups[2].Value, $inv); $y = [double]::Parse($m.Groups[3].Value, $inv); $z = [double]::Parse($m.Groups[4].Value, $inv); $yaw = [double]::Parse($m.Groups[5].Value, $inv); $ty = $m.Groups[1].Value
+    if ($ty -match 'Foundation|Floor') { $fx += $x; $fy += $y; $fn++ }
+    if ($ty -match 'Door$') { $doors += [pscustomobject]@{ X = $x; Y = $y; Z = $z; Yaw = $yaw } } }
+  if (-not $doors.Count) { foreach ($seg in ($parts -split '(?=#[A-Za-z])')) { $m = [regex]::Match($seg, $rx); if ($m.Success -and $m.Groups[1].Value -match 'Doorway$') { $doors += [pscustomobject]@{ X = [double]::Parse($m.Groups[2].Value, $inv); Y = [double]::Parse($m.Groups[3].Value, $inv); Z = [double]::Parse($m.Groups[4].Value, $inv); Yaw = [double]::Parse($m.Groups[5].Value, $inv) } } } }
+  if (-not $doors.Count -or $fn -eq 0) { return $null }
+  $cx = $fx / $fn; $cy = $fy / $fn
+  $d = $doors | Sort-Object { [math]::Pow($_.X - $bed.X, 2) + [math]::Pow($_.Y - $bed.Y, 2) } | Select-Object -First 1
+  $a = $d.Yaw * [math]::PI / 180; $axes = @(@([math]::Cos($a), [math]::Sin($a)), @(-[math]::Sin($a), [math]::Cos($a)))   # the door's two horizontal axes
+  $vx = $d.X - $cx; $vy = $d.Y - $cy; $len = [math]::Sqrt($vx * $vx + $vy * $vy); if ($len -lt 1) { return $null }
+  $best = $null; $bd = 0.0; foreach ($u in $axes) { $dot = ($vx * $u[0] + $vy * $u[1]) / $len; if ([math]::Abs($dot) -gt [math]::Abs($bd)) { $bd = $dot; $best = $u } }
+  $sg = if ($bd -ge 0) { 1 } else { -1 }
+  return @{ X = $d.X + $sg * $best[0] * 100; Y = $d.Y + $sg * $best[1] * 100; Z = $d.Z; DoorX = $d.X; DoorY = $d.Y }
+}
+
 # the new QuestSystem value for the target and the dog record, or @{ Skip = 'why' }
 function TW-Tutorial($S, $D, [string]$srcText, [string]$dstText) {
   $sq = $S.PV['QuestSystem']; $dq = $D.PV['QuestSystem']; if (-not $sq -or -not $dq) { return @{ Skip = 'a save has no quest data' } }
@@ -47,7 +66,10 @@ function TW-Tutorial($S, $D, [string]$srcText, [string]$dstText) {
   # the first real quest, only STARTED: first state, every counter at 0
   $p = $pick[$script:TwFirstReal].Split('*'); if ($p.Count -ne 4 -or $p[2] -notmatch '^Branches' -or $p[3] -notmatch '^States\$') { return @{ Skip = 'the layout of the next quest record is not the expected one' } }
   $first = $p[3].Substring(7).Split('$')[0]
-  $startRec = $p[0] + '*' + $first + '*' + ($p[2] -replace ',\d+', ',0') + '*States$' + $first
+  $next = 'QuestState_6'; $exitBranch = 'QuestBranch_45'   # "Exit the Bone Cave" (State_1_Start -> QuestState_6) is done: you are not in the cave
+  if ($p[3] -notmatch ('\$' + $next + '(\$|$)') -or $p[2] -notmatch ('\$' + $exitBranch + ',')) { return @{ Skip = 'the next quest record does not have the expected steps' } }
+  $zeroed = $p[2] -replace ',\d+', ',0'; $zeroed = [regex]::Replace($zeroed, ('\$' + $exitBranch + ',0(?=\$|$)'), ('$' + $exitBranch + ',1'))
+  $startRec = $p[0] + '*' + $next + '*' + $zeroed + '*States$' + $first + '$' + $next
   $body = ''; foreach ($n in $script:TwTutorialChain) { $body += $pick[$n] }; $body += $startRec
   $new = TW-ReplaceOnce $dq '@AllQuests@ActiveQuests' ('@AllQuests' + $body + '@ActiveQuests&' + $script:TwFirstRealId)
   # journal: the opening recording, all tutorial pop-ups seen, the village region, the hut reward
@@ -57,7 +79,7 @@ function TW-Tutorial($S, $D, [string]$srcText, [string]$dstText) {
   $reg = [regex]::Match($sq, '@UnlockedRegions((?:&[^&@#]*)*)@SkipAllTutorial'); if ($reg.Success -and $reg.Groups[1].Value) { $new = TW-ReplaceOnce $new '@UnlockedRegions@SkipAllTutorial' ('@UnlockedRegions' + $reg.Groups[1].Value + '@SkipAllTutorial') }
   if ($sq -match 'RewardPool_Village&[^>]*OnboardingHut=1') { $new = TW-ReplaceOnce $new '#QuestRewards#TimeEvents' '#QuestRewards$RewardPool_Village&OnboardingHut=1>#TimeEvents' }
   if ($new.Contains('?')) { return @{ Skip = 'the new quest data contains a field separator' } }
-  $res = @{ Value = $new; Lines = ("Tutorial: the opening quests $(($script:TwTutorialChain | ForEach-Object { $_ -replace '^(Main|Village_Main)_(\d+_)?', '' }) -join ', ') are marked done, '$($script:TwFirstReal)' is started, $($tut.Count) tutorial pop-ups count as seen."); Dog = $null }
+  $res = @{ Value = $new; Lines = ("Tutorial: the opening quests $(($script:TwTutorialChain | ForEach-Object { $_ -replace '^(Main|Village_Main)_(\d+_)?', '' }) -join ', ') are marked done, '$($script:TwFirstReal)' is started at its step 'establish a new home' (the cave exit counts as done), $($tut.Count) tutorial pop-ups count as seen."); Dog = $null }
   $sd = TW-DogRange $srcText; $dd = TW-DogRange $dstText
   if ($sd -and $dd) { $res.Dog = $sd.Text; $res.Lines += " Your dog comes along (it follows you, with its pack)." } else { $res.Warn = 'The dog could not be found in one of the saves, so it stays in its cave.' }
   return $res
@@ -85,6 +107,13 @@ function TW-Plan([string]$srcPath, [string]$dstPath, [string[]]$groups) {
   $plan.Dog = $null; $plan.TutorialLines = $null
   foreach ($g in $groups) {
     if (-not $script:TwGroups.Contains($g)) { continue }
+    if ($g -eq 'Map') {
+      $sm = [regex]::Match($S.Text, 'FogOfWarRevealer_Voxels>([0-9,;]*)'); $dm = [regex]::Match($D.Text, 'FogOfWarRevealer_Voxels>([0-9,;]*)')
+      if (-not $sm.Success -or -not $dm.Success) { $plan.Warnings.Add('The map was NOT copied: a save has no uncovered-map data.'); continue }
+      $cells = New-Object System.Collections.Generic.List[string]; $seen = @{}; foreach ($v in (($sm.Groups[1].Value + ';' + $dm.Groups[1].Value) -split ';')) { if ($v -match '^-?\d+,-?\d+$' -and -not $seen.ContainsKey($v)) { $seen[$v] = 1; $cells.Add($v) } }
+      $val = ($cells -join ';') + $(if ($sm.Groups[1].Value.EndsWith(';')) { ';' } else { '' }); $plan.MapCells = $cells.Count
+      if ($val -ceq $dm.Groups[1].Value) { [void]$plan.Keys.Add(@{ Key = 'FogOfWarRevealer_Voxels'; Mode = 'skip'; Why = 'already identical'; Group = $g }) } else { [void]$plan.Keys.Add(@{ Key = 'FogOfWarRevealer_Voxels'; Value = $val; Mode = 'replace'; Group = $g; PlainOnly = $true }) }
+      continue }
     if ($g -eq 'Tutorial') {
       $t = TW-Tutorial $S $D $S.Text $D.Text
       if ($t.Skip) { $plan.Warnings.Add("The tutorial was NOT skipped: $($t.Skip).") ; [void]$plan.Keys.Add(@{ Key = 'QuestSystem'; Mode = 'skip'; Why = $t.Skip; Group = $g }); continue }
@@ -114,6 +143,7 @@ function TW-Plan([string]$srcPath, [string]$dstPath, [string[]]$groups) {
     $plan.Lines.Add("Items on you: $hot hotbar stacks, $worn worn pieces, $bp stacks in the backpack, special items copied as they are.") }
   if ($groups -contains 'Skills') { $lv = @(foreach ($k in 0..15) { $j = $S.PV["CharacterSkillsComponent_Skill_$k"]; if ($j) { [regex]::Match($j, '"level":(\d+)').Groups[1].Value } }); $plan.Lines.Add(("Skills: 16 skills (levels {0}), {1} unspent skill points." -f ($lv -join ' '), $S.PV['PointsAmount'])) }
   if ($groups -contains 'Recipes') { $plan.Lines.Add(("Recipes: {0} learned recipes will replace the target's {1}." -f ([regex]::Matches($S.PV['PlayerKnowledge_Knowledge'], '/Game/')).Count, ([regex]::Matches($D.PV['PlayerKnowledge_Knowledge'], '/Game/')).Count)) }
+  if ($groups -contains 'Map' -and $plan.MapCells) { $plan.Lines.Add("Map: $($plan.MapCells) explored squares (50 m x 50 m) are uncovered in the target.") }
   if ($groups -contains 'Vitals') { $plan.Lines.Add(("Vitals: health {0}/{1}, warmth {2}/{3} as in the source world." -f $S.PV['health'], $S.PV['MaxHealth'], $S.PV['BodyWarmth'], $S.PV['MaxBodyWarmth'])) }
   if ($plan.TutorialLines) { $plan.Lines.Add($plan.TutorialLines) }
   $plan.Lines.Add($(if ($plan.TutorialLines) { 'Never touched: the rest of the story (every later quest starts from the beginning), character look, status effects and every other object of the world.' } else { 'Never touched: the story and quests, character look, status effects and every object of the world.' }))
@@ -209,7 +239,9 @@ function TW-Run([string]$srcPath, [string]$dstPath, [string[]]$groups, [switch]$
   # a new world starts you at the crash site, far from the copied base: put you at your bed (4 m above it, you drop onto it). Its own verified, backed-up and undoable teleport.
   $moved = $null
   if ($Teleport) {
-    try { $pd = Get-PlayerData $dstPath; if ($pd.Bed) { [void](Move-Player $dstPath $pd $pd.Bed.X $pd.Bed.Y $pd.Bed.Z 400 'your bed (after the transfer)' -SkipGameCheck:$SkipGameCheck); $moved = "you will load at your bed (X $([int]$pd.Bed.X), Y $([int]$pd.Bed.Y))" } else { $moved = 'NOT moved: the target has no bed' } }
+    try { $pd = Get-PlayerData $dstPath; $ds = $null; if ($pd.Bed -and $pd.Entries.ContainsKey('PlayerBuildParts')) { $ds = TW-DoorSpot $pd.Entries['PlayerBuildParts'] $pd.Bed }
+      if ($ds) { [void](Move-Player $dstPath $pd $ds.X $ds.Y $ds.Z 150 'just outside your front door (after the transfer)' -SkipGameCheck:$SkipGameCheck); $moved = "you will load just outside your front door (X $([int]$ds.X), Y $([int]$ds.Y))" }
+      elseif ($pd.Bed) { [void](Move-Player $dstPath $pd $pd.Bed.X $pd.Bed.Y $pd.Bed.Z 400 'your bed (after the transfer)' -SkipGameCheck:$SkipGameCheck); $moved = "no front door found: you will load above your bed (X $([int]$pd.Bed.X), Y $([int]$pd.Bed.Y))" } else { $moved = 'NOT moved: the target has no bed' } }
     catch { $moved = 'NOT moved (' + $_.Exception.Message + '); use Teleport > Your bed' }
   }
   return @{ Backup = $backup; Plan = $plan; Replaced = @($b.Rep.Keys); Added = @($b.Add.Keys); Moved = $moved }
@@ -235,7 +267,7 @@ function TW-Go {
   if (Test-GameRunning) { Msg 'The game is running. Save and close it first, then press the button again.' 'Game is running' 'OK' 'Warning' | Out-Null; return }
   if (@($plan.Keys | Where-Object { $_.Mode -ne 'skip' }).Count -eq 0) { Msg 'There is nothing to copy: everything you ticked is already identical in the target.' 'Transfer' 'OK' 'Information' | Out-Null; return }
   $t = $ui.TwTarget.Text.Trim(); $w = if ($plan.Warnings.Count) { "`n`n" + ($plan.Warnings -join "`n") } else { '' }
-  $ans = Msg ("Copy what is ticked from`n  " + [IO.Path]::GetFileName($script:SavePath) + "`ninto`n  " + [IO.Path]::GetFileName($t) + "`n`nThe source is not changed. The target gets a backup first and the result is checked afterwards." + $(if ($ui.TwTele.Checked) { "`n`nAFTER THE COPY YOU ARE MOVED TO YOUR BED: the next time you load the target world you appear at your base, not at the new-world start." } else { "" }) + $(if ((TW-Groups) -contains "Tutorial") { "`n`nTHE TUTORIAL IS SKIPPED: the opening quests count as done (tools, campfire, bow, the cave, the dog) and your dog comes along. Only do this in a brand-new world." } else { "" }) + $w + "`n`nContinue?") 'Transfer to a new world' 'OKCancel' 'Question' 'Button2'
+  $ans = Msg ("Copy what is ticked from`n  " + [IO.Path]::GetFileName($script:SavePath) + "`ninto`n  " + [IO.Path]::GetFileName($t) + "`n`nThe source is not changed. The target gets a backup first and the result is checked afterwards." + $(if ($ui.TwTele.Checked) { "`n`nAFTER THE COPY YOU ARE MOVED TO YOUR FRONT DOOR: the next time you load the target world you appear just outside your base, not at the new-world start." } else { "" }) + $(if ((TW-Groups) -contains "Tutorial") { "`n`nTHE TUTORIAL IS SKIPPED: the opening quests count as done (tools, campfire, bow, the cave, the dog) and your dog comes along. Only do this in a brand-new world." } else { "" }) + $w + "`n`nContinue?") 'Transfer to a new world' 'OKCancel' 'Question' 'Button2'
   if ($ans -ne 'OK') { return }
   try {
     $res = TW-Run $script:SavePath $t (TW-Groups) -Teleport:([bool]$ui.TwTele.Checked)
@@ -245,7 +277,7 @@ function TW-Go {
 }
 function TW-BuildTab($tab) {
   $ui = $script:PT
-  $tw_note = "WHAT THIS DOES:`r`n  Copies what is YOURS from the world open in the tool (the source) into another, NEW world (the target) so you can start the story again without rebuilding: your base with every container, bench, furnace and the bed, the items on you, your skills and your dog.`r`nIMPORTANT - READ BEFORE YOU PRESS THE BUTTON:`r`n  -  AFTER THE COPY YOU ARE MOVED TO YOUR BED.  The next time you load the target world you appear at your base, not at the new-world start.`r`n  -  THE TUTORIAL IS SKIPPED.  The opening quests (tools, campfire, bow, the cave, getting the dog) count as done and the first village quest is started; everything after that begins from the start. Only use this on a brand-new world: it refuses a world that already has quest progress.`r`nHOW TO USE IT:`r`n  1.  Create the new world in the game, let it load, save and QUIT.  2.  Close the game.  3.  Pick that world as the target, press Preview, read it, then press 'Copy into the target world'.`r`nGOOD TO KNOW:`r`n  -  The source world is only read. The target gets a backup first (Backups folder) and the result is checked. Recipes are OFF by default (some story steps hand them out).  -  This is new and only tried on a throwaway world so far: keep the source world's backup."
+  $tw_note = "WHAT THIS DOES:`r`n  Copies what is YOURS from the world open in the tool (the source) into another, NEW world (the target) so you can start the story again without rebuilding: your base with every container, bench, furnace and the bed, the items on you, your skills and your dog.`r`nIMPORTANT - READ BEFORE YOU PRESS THE BUTTON:`r`n  -  AFTER THE COPY YOU ARE MOVED TO YOUR FRONT DOOR.  The next time you load the target world you appear just outside your base, not at the new-world start.`r`n  -  THE TUTORIAL IS SKIPPED.  The opening quests (tools, campfire, bow, the cave, getting the dog) count as done and the first village quest is started; everything after that begins from the start. Only use this on a brand-new world: it refuses a world that already has quest progress.`r`nHOW TO USE IT:`r`n  1.  Create the new world in the game, let it load, save and QUIT.  2.  Close the game.  3.  Pick that world as the target, press Preview, read it, then press 'Copy into the target world'.`r`nGOOD TO KNOW:`r`n  -  The source world is only read. The target gets a backup first (Backups folder) and the result is checked. Recipes are OFF by default (some story steps hand them out).  -  This is new and only tried on a throwaway world so far: keep the source world's backup."
   [void](New-NoteBox $tab $tw_note 'PLEASE READ FIRST - HOW THE TRANSFER WORKS' -Dock Bottom)
   $top = New-Object System.Windows.Forms.Panel; $top.Dock = 'Top'; $top.Height = 316; $tab.Controls.Add($top)
   New-Lbl $top 'Source (copy FROM)' 0 8 150 | Out-Null; $ui.TwSrc = New-Lbl $top '' 160 8 880; 
@@ -254,7 +286,7 @@ function TW-BuildTab($tab) {
   $bBr = New-Btn $top 'Browse...' 810 32 100; $bRe = New-Btn $top 'Refresh list' 918 32 120
   $ui.TwChk = @{}; $y = 70
   foreach ($g in $script:TwGroups.Keys) { $c = New-Object System.Windows.Forms.CheckBox; $c.Text = $script:TwGroups[$g].Label; $c.AutoSize = $true; $c.Location = New-Object System.Drawing.Point(0, $y); $c.Checked = $script:TwGroups[$g].Default; $c.ForeColor = $script:Th.Text; $top.Controls.Add($c); $ui.TwChk[$g] = $c; $y += 26 }
-  $ui.TwTele = New-Object System.Windows.Forms.CheckBox; $ui.TwTele.Text = 'After the copy, move me to my bed in the target world (a new world starts you at the crash site, far from your base)'; $ui.TwTele.AutoSize = $true; $ui.TwTele.Location = New-Object System.Drawing.Point(0, $y); $ui.TwTele.Checked = $true; $ui.TwTele.ForeColor = $script:Th.Text; $top.Controls.Add($ui.TwTele); $y += 30
+  $ui.TwTele = New-Object System.Windows.Forms.CheckBox; $ui.TwTele.Text = 'After the copy, put me just outside my front door in the target world (a new world starts you at the crash site, far from your base)'; $ui.TwTele.AutoSize = $true; $ui.TwTele.Location = New-Object System.Drawing.Point(0, $y); $ui.TwTele.Checked = $true; $ui.TwTele.ForeColor = $script:Th.Text; $top.Controls.Add($ui.TwTele); $y += 30
   $bPre = New-Btn $top 'Preview' 0 ($y + 8) 150 34; $bGo = New-Btn $top 'Copy into the target world' 160 ($y + 8) 270 34; $bGo.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
   $ui.TwBox = New-Object System.Windows.Forms.TextBox; $ui.TwBox.Multiline = $true; $ui.TwBox.ReadOnly = $true; $ui.TwBox.ScrollBars = 'Vertical'; $ui.TwBox.Dock = 'Fill'; $ui.TwBox.Font = New-Object System.Drawing.Font('Consolas', 10); $tab.Controls.Add($ui.TwBox); $ui.TwBox.BringToFront()
   $fill = { $u = $script:PT; $u.TwSrc.Text = $script:SavePath; $u.TwTarget.Items.Clear(); $list = @(TW-Targets); foreach ($p in $list) { [void]$u.TwTarget.Items.Add($p) }; if (-not $u.TwTarget.Text -and $list.Count -gt 0) { $u.TwTarget.Text = $list[$list.Count - 1] } }
