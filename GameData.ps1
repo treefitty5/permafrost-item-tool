@@ -117,7 +117,7 @@ function GD-MakeTab($tabs, [string]$key, [string]$title, [string[]]$cols, [int[]
   $g = @{}; $script:GD[$key] = $g
   $top = New-Object System.Windows.Forms.Panel; $top.Dock = 'Top'; $top.Height = 40; $tab.Controls.Add($top)
   New-Lbl $top 'Search' 0 12 50 | Out-Null; $g.Filter = New-Object System.Windows.Forms.TextBox; $g.Filter.Location = '54,8'; $g.Filter.Size = '300,24'; $top.Controls.Add($g.Filter)
-  $g.Top = $top; $g.Count = New-Lbl $top '' 370 12 220; $g.Hint = New-Lbl $top $hint 600 12 520; $g.Hint.ForeColor = $script:Th.Muted
+  $g.Top = $top; $g.Count = New-Lbl $top '' 370 12 220; $g.Hint = New-Lbl $top $hint 600 3 470 36; $g.Hint.ForeColor = $script:Th.Muted   # two lines fit (the longer hints were cut off after the first line)
   $bot = New-Object System.Windows.Forms.Panel; $bot.Dock = 'Bottom'; $bot.Height = 230; $tab.Controls.Add($bot)
   $q = New-Object System.Windows.Forms.Panel; $q.Dock = 'Bottom'; $q.Height = 38; $bot.Controls.Add($q)
   $g.Detail = New-Object System.Windows.Forms.TextBox; $g.Detail.Multiline = $true; $g.Detail.ReadOnly = $true; $g.Detail.ScrollBars = 'Vertical'; $g.Detail.Dock = 'Fill'; $g.Detail.Font = New-Object System.Drawing.Font('Consolas', 9.5); $g.Detail.BackColor = [System.Drawing.Color]::White; $bot.Controls.Add($g.Detail); $g.Detail.BringToFront()
