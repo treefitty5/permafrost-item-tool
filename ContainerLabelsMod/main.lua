@@ -345,32 +345,48 @@ bind("F5", function() numbersOn = not numbersOn; removeAllLabels(); log("numbers
 -- ------------------------------------------------------------------ optional: the name in the game's own "Press F" prompt (experimental, switched on in the tool)
 function installPrompt()
   hookDone = true
-  local candidates = {
-    "/Game/SurvivalGameKitV2/Blueprints/BuildParts/BP_MasterBuildPart.BP_MasterBuildPart_C:GetInteractionName",
-    "/Game/SurvivalGameKitV2/Blueprints/BuildParts/BP_MasterStorageBuildPart.BP_MasterStorageBuildPart_C:GetInteractionName",
-  }
-  local n = 0
-  for _, path in ipairs(candidates) do
-    local fn = safe(function() return StaticFindObject(path) end)
-    log("prompt: " .. path .. " -> " .. (valid(fn) and "found" or "not found"))
-    if valid(fn) then
-      local ok, err = pcall(function()
-        RegisterHook(path, function() end, function(self, ...)
-          local args = { ... }; local rv = args[#args]
-          local a = safe(function() return self:get() end); if not valid(a) then return end
-          local l = safe(function() return a:K2_GetActorLocation() end); if not l then return end
-          for _, e in ipairs(entries()) do
-            if near(e, l.X, l.Y, l.Z) and (e.text or "") ~= "" then
-              local label = (e.text or ""):upper():gsub("%s+", " ")
-              local base = safe(function() return rv:get():ToString() end) or typeOf(a)
-              safe(function() rv:set(FText(base .. ": " .. label)) end)
-              return
-            end
-          end
-        end)
-      end)
-      log("prompt: hook " .. (ok and "registered" or ("failed: " .. tostring(err)))); if ok then n = n + 1 end
+  -- find where the game defines the name functions: walk up the class chain of a real container and look for <class>:GetInteractionName / :GetDisplayName
+  local sample
+  for _, list in pairs(actors) do if list[1] and valid(list[1].a) then sample = list[1].a; break end end
+  if not sample then hookDone = false; return end            -- no container loaded yet: try again at the next refresh
+  local paths, seen = {}, {}
+  local c = safe(function() return sample:GetClass() end); local guard = 0
+  while valid(c) and guard < 14 do
+    guard = guard + 1
+    local cp = safe(function() return c:GetPathName() end)
+    if cp then
+      for _, fname in ipairs({ "GetInteractionName", "GetDisplayName" }) do
+        local p = cp .. ":" .. fname
+        local fn = safe(function() return StaticFindObject(p) end)
+        if valid(fn) and not seen[p] then seen[p] = true; paths[#paths + 1] = p end
+      end
     end
+    c = safe(function() return c:GetSuperStruct() end)
+  end
+  log("prompt: class chain of " .. typeOf(sample) .. " defines " .. #paths .. " name function(s)")
+  local hits = 0
+  local n = 0
+  for _, path in ipairs(paths) do
+    log("prompt: found " .. path)
+    local ok, err = pcall(function()
+      RegisterHook(path, function() end, function(self, ...)
+        local args = { ... }; local rv = args[#args]
+        local a = safe(function() return self:get() end); if not valid(a) then return end
+        local l = safe(function() return a:K2_GetActorLocation() end); if not l then return end
+        for _, e in ipairs(entries()) do
+          if near(e, l.X, l.Y, l.Z) and (e.text or "") ~= "" then
+            local label = (e.text or ""):upper():gsub("%s+", " ")
+            local base = safe(function() return rv:get():ToString() end) or typeOf(a)
+            if not base:find(":", 1, true) then
+              local done = safe(function() rv:set(FText(base .. ": " .. label)); return true end)
+              hits = hits + 1; if hits <= 4 then log(string.format("prompt hook %s: '%s' -> '%s: %s' (%s)", path:match(":(%w+)$") or "?", base, base, label, done and "set" or "SET FAILED")) end
+            end
+            return
+          end
+        end
+      end)
+    end)
+    log("prompt: hook " .. (ok and "registered" or ("failed: " .. tostring(err)))); if ok then n = n + 1 end
   end
   log("prompt hooks registered: " .. n)
 end
