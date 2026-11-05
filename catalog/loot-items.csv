@@ -685,7 +685,7 @@
 "DA_RandomList_HostileNPC_IZG","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Moonshine","DA_Consumable_Moonshine","5","[0, 1)","",""
 "DA_RandomList_HostileNPC_IZG","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Beer","DA_Consumable_Beer","5","[0, 1)","",""
 "DA_RandomList_HostileNPC_IZG","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","VodkaSmall","DA_Consumable_VodkaSmall","5","[0, 1)","",""
-"DA_RandomList_HostileNPC_IZG","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Weapon_IZG","DA_Weapon_Firearms_IZG","2","[0, 1)","random [10, 50)",""
+"DA_RandomList_HostileNPC_IZG","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Weapon_IZG","DA_Weapon_Firearms_IZG","4","[1, 1)","random [10, 50)",""
 "DA_RandomList_HostileNPC_Mrozny","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Bucks","DA_Resource_Bucks","6","[1, 20)","",""
 "DA_RandomList_HostileNPC_Mrozny","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","Bandage","DA_Consumable_Medication_Bandage","3","[0, 1)","",""
 "DA_RandomList_HostileNPC_Mrozny","RandomLists\Hostile","LootConfig_RandomList","RandomItemsList","MakeshiftBandage","DA_Consumable_Medication_MakeshiftBandage","4","[1, 1)","",""

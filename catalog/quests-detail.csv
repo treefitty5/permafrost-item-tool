@@ -29,7 +29,6 @@
 "BP_Quest_EA_Main_04_TechnocratsColony","suitup","","True","Reach ""The Estate""","","Quests\EA_Release\Questchain_Technocrats","State_0_Start","3","2"
 "BP_Quest_EA_Main_05_Woods","thweayhome_newvers","The Outpost","True","Reach Hunter's Glade","","Quests\EA_Release\Questchain_Woods","State_0_Start","2","1"
 "BP_Quest_EA_Main_06_HighFrequency","highfrequency","High Frequency","True","Hunter's Glade’s tower can be a good spot to pick the signal from Icarus","","Quests\EA_Release\Questchain_Woods","State_0_Start","5","4"
-"BP_Quest_EA_Main_07_HouseIntoAHome","houseintoahome_oldv","","True","Time to set eyes for House Camp","","Quests\EA_Release\Questchain_Woods","State_0_Start","7","6"
 "BP_Quest_EA_Main_07_HouseIntoAHome_DELETE","houseintoahome_oldv","","True","Time to set eyes for House Camp","","Quests\EA_Release\Questchain_Woods","State_0_Start","7","6"
 "BP_Quest_EA_Main_07_Woods","houseintoahome","The Way Home","True","Reach House Camp","","Quests\EA_Release\Questchain_Woods","State_0_Start","7","6"
 "BP_Quest_Act_01_Side_01_GettingWarmer","GettingWarmer","Getting warmer","False","Light the Brazier","I should gather some Wood from the area and Light Brazier to raise my Cold Resistance","Quests\Archive\Quests_Act1_Side\CampStart","State_1_Start","6","4"

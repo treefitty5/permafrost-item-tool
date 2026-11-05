@@ -15,7 +15,7 @@
 "RandomEncounters_Muskox","Data","RandomEncounters/Data","0.7","","BP_Muskox"
 "RandomEncounters_Wolf_Day","Data","RandomEncounters/Data","0.7","","BP_Wolf_M"
 "RandomEncounters_Wolf_Night","Data","RandomEncounters/Data","0.7","","BP_Wolf_M"
-"BP_MeteorShowcase","MoonrockEvent","RandomEncounters/MoonrockEvent","14","",""
+"BP_MeteorShowcase","MoonrockEvent","RandomEncounters/MoonrockEvent","14.3","",""
 "BP_MoonrockEvent_Onboarding","MoonrockEvent","RandomEncounters/MoonrockEvent","64","","BP_RandomEncounter_Parent"
 "BP_RandomEncounter_MoonrockEvent","MoonrockEvent","RandomEncounters/MoonrockEvent","68.2","","BP_RandomEncounter_Parent"
 "BP_Encounter_BigCamp","StaticEncounters","RandomEncounters/StaticEncounters","16.5","",""
