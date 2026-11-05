@@ -32,3 +32,11 @@ Second flight (2026-10-24): route-v8-75m.lua
   player's own clothing attachments and other flight artefacts are filtered out). Flown in a NEW throwaway world; the game gave that world the slot name of
   an existing world and overwrote it, so BACK UP the played world's save and its DifficultySettings\<world>.diff before creating a new world.
   The vitals keeper now refills every second. Result: pristine-world.bin 2675 -> 2761 records (487 -> 491 cells), loot-pool.json 1148 -> 1568 rolls.
+
+Third flight (2026-11-05, after Content Update #1, Steam build 26381546): route-v9-75m.lua
+  424 stops, 75 m apart, over the 621 revealed squares of the played world (+ one square border) and 6 extra stops; ground heights come from every flight log in Archive\atlas-flight.
+  main.lua now has CHUNK = 1000, so ONE Ctrl+F2 flies the whole route (progress is still written after every stop). All other mods are switched off during a flight
+  (UE4SS Lua timers are not thread-safe). 424 stops in 2 h 16 min, 5,389 ids logged, no failures. The new world was a clean World#2; World#1 was backed up first.
+  Result: pristine-world.bin 2761 -> 2825 records (same 1,531 ores and 233 breakables; 64 more world items), terrain-levels.csv 932 -> 1048 levels (427 squares),
+  map-points.csv 2814 -> 3267 dots, places.csv and worldmap.png unchanged. The loot pool is rebuilt from the new flight plus every older save (the container loot tables
+  did not change in this update, and every item id in the rolls still exists).

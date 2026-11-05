@@ -8,7 +8,7 @@
 -- Use it in a THROWAWAY world only. It does not change the save by itself, but moving the player loads areas, and the game saves what is loaded.
 local UEHelpers = require("UEHelpers")
 local TAG = "[AtlasDump] "
-local CHUNK = 100                 -- stops per press of Ctrl+F2
+local CHUNK = 1000                -- stops per press of Ctrl+F2 (1000 = the whole route in one go; the progress is written after every stop, so a crash only loses the current stop)
 local HIGH_Z = 40000.0           -- cm: arrival height (above every structure)
 local HOVER = 2500.0             -- cm: hover height above the first surface below
 local MIN_CLEARANCE = 2000.0     -- cm: never closer than this to the first surface below

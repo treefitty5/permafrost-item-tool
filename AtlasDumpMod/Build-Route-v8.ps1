@@ -17,9 +17,10 @@ $w = Parse-WorldFromText $text 2>$null
 if (-not $w) { $plan = Build-ResetPlan $sp @{ Trees = $true; Ores = $true; Breakables = $true; Items = $true; Containers = $true; RadiusM = 0 }; $w = $plan.World }
 foreach ($c in $w.Cells) { foreach ($r in $c.Recs) { if ($r.Pos -and $r.Pos.Count -ge 3) { $pts.Add([double[]]@($r.Pos[0], $r.Pos[1], $r.Pos[2])) } } }
 "records: $($pts.Count)"
-$log = Join-Path $TR 'Archive\atlas-flight\AtlasDump-after-route106.log'
 $n0 = $pts.Count
-foreach ($ln in [IO.File]::ReadLines($log)) { if ($ln.StartsWith('STOP')) { $q = $ln.Split('|'); if ($q.Count -ge 8 -and $q[2] -notmatch 'MasterClothing|Spawner|PCGReActor|QuestItemDispenser|RespawnPoint|WeatherManager|WorldMapManager|Companion|PhaseWeather' -and [double]::Parse($q[6], $script:ResetInv) -lt 15000) { $pts.Add([double[]]@([double]::Parse($q[4], $script:ResetInv), [double]::Parse($q[5], $script:ResetInv), [double]::Parse($q[6], $script:ResetInv))) } } }
+# every flight log in Archive\atlas-flight gives ground references (the first flight and the later ones)
+foreach ($log in @(Get-ChildItem (Join-Path $TR 'Archive\atlas-flight') -Filter 'AtlasDump*.log' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })) { "ground references from $(Split-Path $log -Leaf)"
+foreach ($ln in [IO.File]::ReadLines($log)) { if ($ln.StartsWith('STOP')) { $q = $ln.Split('|'); if ($q.Count -ge 8 -and $q[2] -notmatch 'MasterClothing|Spawner|PCGReActor|QuestItemDispenser|RespawnPoint|WeatherManager|WorldMapManager|Companion|PhaseWeather' -and [double]::Parse($q[6], $script:ResetInv) -lt 15000) { $pts.Add([double[]]@([double]::Parse($q[4], $script:ResetInv), [double]::Parse($q[5], $script:ResetInv), [double]::Parse($q[6], $script:ResetInv))) } } } }
 "log positions added: $($pts.Count - $n0)"
 # z lookup grid (1 km cells are too coarse; use 100 m buckets of max z)
 $bk = @{}
