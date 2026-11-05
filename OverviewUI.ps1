@@ -100,6 +100,7 @@ function Get-SaveOverview([string]$savePath) {
       '  Recipe tweaks:    ' + $(if ($ms.Ok) { 'mod on.  ' } else { 'mod not on.  ' }) + ($ms.Text -replace '\s+(start-up|spawned in the world):.*$', '')
       $bm = $null; try { $bm = BM-Status } catch { }; if ($bm) { '  Build move:       ' + $bm.Text }
       $sp = $null; try { $sp = SP-Status } catch { }; if ($sp) { '  Solar panel fix:  ' + $sp.Text }
+      $cl = $null; try { $cl = CL-Status } catch { }; if ($cl) { $cn = 0; try { $cn = @(CL-ReadLabels).Count } catch { }; '  Container labels: ' + $cl.Text + $(if ($cn) { "  $cn containers have a label (Player tools > Container labels)." } else { '  No labels yet (Player tools > Container labels).' }) }
       $bt = $null; try { $bt = BT-ModStatus } catch { }
       if ($bt) { $set = @(); try { $h = Get-BackpackTweaks; foreach ($k in ($h.Keys | Sort-Object)) { $set += "$k = $($h[$k]) slots" } } catch { }
         '  Backpack size:    ' + $bt.Text + $(if ($set.Count) { '  Your sizes: ' + ($set -join ', ') + '.' } else { '  No size set (the game''s own sizes are used).' }) }

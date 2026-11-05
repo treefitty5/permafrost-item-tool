@@ -489,7 +489,7 @@ The window opens maximized and resizes with you; if it is ever smaller than its 
 
 The window refreshes by itself when the save changes (for example after you play), so it always shows your current backpack.
 
-- Overview (banner, top): a read-only report of your save - world and play time, character, skills, inventory (with the backpack size in use), recipes known, quests, buildings, explored area (including the map squares you have discovered), companion, the state of the in-game mods (Recipe tweaks, Build move, Backpack size, Stack sizes, Weapon damage, Teleport ground fix) and your settings for them, your last teleport, backups - with a Copy report button. Nothing in it changes the save.
+- Overview (banner, top): a read-only report of your save - world and play time, character, skills, inventory (with the backpack size in use), recipes known, quests, buildings, explored area (including the map squares you have discovered), companion, the state of the in-game mods (Recipe tweaks, Build move, Solar panel fix, Container labels, Backpack size, Stack sizes, Weapon damage, Teleport ground fix) and your settings for them, your last teleport, backups - with a Copy report button. Nothing in it changes the save.
 - Hover pictures: hold the mouse over an item in the catalog, the inventory list or the queue to see its picture and details. Pictures come from the 'icons' folder next to the tool. Press 'Pictures' (in the row of buttons) or 'Build pictures now' (the bar under the status lines) to build them from your own installed game - it reads the game's files, read-only, takes about 20 seconds, and needs the small free Oodle decompressor library once (the tool asks before downloading it). An item without a picture shows text only.
 
 Item catalog (left)
