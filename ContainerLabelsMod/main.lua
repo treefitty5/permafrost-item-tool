@@ -375,6 +375,21 @@ function installPrompt()
   log("prompt hooks registered: " .. n)
 end
 
+-- key repeat for Backspace: a key press reaches the mod once, so while Backspace is held a fast timer deletes a letter every 80 ms after the first 0.4 s
+local heldTicks = 0
+local repeatOk = pcall(function() return IsKeyBindDown(Key.BACKSPACE) end)
+LoopAsync(80, function()
+  if typing and repeatOk then
+    ExecuteInGameThread(function()
+      local down = safe(function() return IsKeyBindDown(Key.BACKSPACE) end)
+      if down then heldTicks = heldTicks + 1; if heldTicks > 5 then pcall(backspace) end else heldTicks = 0 end
+    end)
+  else
+    heldTicks = 0
+  end
+  return false
+end)
+
 loadLabels(); loadIngame()
 LoopAsync(TICK_MS, function()
   ExecuteInGameThread(function()
@@ -383,4 +398,4 @@ LoopAsync(TICK_MS, function()
   end)
   return false
 end)
-log(string.format("loaded; %d containers in labels.lua, %d labelled in the game. Ctrl+right-click on a container = label it (%s), Ctrl+F5 = numbers.", #data.items, #edits, startOk and "key ok" or "RIGHT MOUSE KEY NOT AVAILABLE"))
+log(string.format("loaded; %d containers in labels.lua, %d labelled in the game. Ctrl+right-click on a container = label it (%s), Ctrl+F5 = numbers. Backspace repeat: %s.", #data.items, #edits, startOk and "key ok" or "RIGHT MOUSE KEY NOT AVAILABLE", repeatOk and "on" or "not available (press Backspace once per letter)"))
