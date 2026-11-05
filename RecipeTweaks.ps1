@@ -177,10 +177,9 @@ function New-RecipeTweaksForm {
   New-Lbl $gl 'Ingredient costs  x' 14 70 150 | Out-Null; $ui.MulCost = New-Num $gl 170 67 90 0.1 100 2; $ui.MulCost.Value = 1; $ui.MulCost.Increment = 0.25
   New-Lbl $gl 'Crafting time  x' 14 104 150 | Out-Null; $ui.MulTime = New-Num $gl 170 101 90 0 100 2; $ui.MulTime.Value = 1; $ui.MulTime.Increment = 0.25
   $ui.ApplyG = New-Btn $gl 'Multiply the recipes shown' 14 138 220 28; $ui.ResetG = New-Btn $gl 'Reset the recipes shown' 14 170 220 28
-  $hint = New-Lbl $gl 'Use Search / Station to pick which. A value of 1 = no change.' 14 208 372 20; $hint.ForeColor = $script:Th.Muted
   $ui.Summary = New-Lbl $bot '' 10 244 740 20; $ui.Msg = New-Lbl $bot '' 10 268 1160 20; $ui.Msg.ForeColor = $script:Th.Accent
   $ui.Save = New-Btn $bot 'Save to game' 10 292 160 30; $ui.Save.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $ui.ResetAll = New-Btn $bot 'Reset ALL recipes' 180 292 160 30
-  $hk = New-Lbl $bot 'After saving, the game applies it by itself in a few seconds - reopen the bench. Your save file is never changed.' 360 299 800 20; $hk.ForeColor = $script:Th.Muted
+  [void](New-NoteBox $f "1.  Change the numbers, then press 'Save to game'.  The game applies it by itself within a few seconds - reopen the crafting bench to see it.  Your save file is never changed; this only changes the game's recipe data while it runs.`r`n2.  The 'Change every recipe shown' buttons act on the recipes currently listed: use Search / Station to pick which.  A value of 1 means no change." "PLEASE READ FIRST - HOW RECIPE TWEAKS WORK" -Dock Bottom)
   $ui.LV = New-LV $f @('Recipe', 'Station', 'Ingredients', 'Makes', 'Time', '') @(260, 150, 380, 220, 70, 80); $ui.LV.Dock = 'Fill'; $ui.LV.BringToFront(); $ui.LV.MultiSelect = $false
   $ui.LV.Add_SelectedIndexChanged({ RT-LoadEditor }); $ui.Filter.Add_TextChanged({ RT-RefreshList }); $ui.Station.Add_SelectedIndexChanged({ RT-RefreshList })
   foreach ($n in $ui.IngNum + $ui.ResNum + @($ui.TimeNum)) { $n.Add_ValueChanged({ RT-EditorChanged }) }

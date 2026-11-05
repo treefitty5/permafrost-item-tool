@@ -213,10 +213,12 @@ function New-StackSizesForm([string]$savePath) {
   $script:STW = @{ Save = $savePath; Rows = @{} }; $u = $script:STW; $cfg = Get-StackConfig
   $f = New-Object System.Windows.Forms.Form; $f.Text = 'Stack sizes  -  how many of each item fit in one slot'; $f.Size = New-Object System.Drawing.Size(800, [math]::Min(860, [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height - 30)); $f.MinimumSize = New-Object System.Drawing.Size(740, 640)
   $f.StartPosition = 'CenterParent'; $f.Font = New-Object System.Drawing.Font('Segoe UI', 9); $u.Form = $f
-  $by = $f.ClientSize.Height - 304     # top of the block of buttons and notes at the bottom; the list of items gets the rest
-  $intro = New-Lbl $f "Tick an item and pick how many fit in one slot. It works everywhere (backpack, hotbar, containers) through a small in-game mod and never touches your save. First aid kits normally take one slot each because they carry a durability: a stack would share ONE condition and waste kits, so stacked kits are made single use (every use consumes one whole kit; a small wound costs a whole kit)." 14 10 760 62; $intro.Anchor = 'Top,Left,Right'
+  $introBox = New-NoteBox $f "Tick an item and pick how many fit in one slot.`r`nIt works everywhere (backpack, hotbar, containers) through a small in-game mod and never touches your save.`r`nFirst aid kits normally take one slot each because they carry a durability: a stack would share ONE condition and waste kits, so stacked kits are made single use (every use consumes one whole kit; a small wound costs a whole kit)." 'PLEASE READ FIRST - HOW STACK SIZES WORK' -Dock None -X 10 -Y 8 -W 772 -Anchor 'Top,Left,Right'
+  $noteBox = New-NoteBox $f "If the mod is not running, the game trims every stack above the item's own limit the next time it saves, and the extra items are gone for good (tested).`r`nSo the tool refuses to switch an item off (or lower it) while such stacks exist, makes a backup each time you apply, and shows a red warning in the main window if they exist and the mod is not on.`r`nIf you remove the mod, UE4SS stops loading, or the game updates, check this window before you play." 'IMPORTANT - READ BEFORE YOU USE THIS' -Warn -Dock None -X 10 -Y 0 -W 772 -Anchor 'Left,Right,Bottom'
+  $by = $f.ClientSize.Height - (236 + $noteBox.Height + 12)     # top of the block of buttons at the bottom (the warning box sits under it); the list of items gets the rest
+  $noteBox.Top = $f.ClientSize.Height - $noteBox.Height - 10
   # the list of items sits in a scrolling panel, so a small screen never cuts it off
-  $pn = New-Object System.Windows.Forms.Panel; $pn.Location = '10,78'; $pn.Size = New-Object System.Drawing.Size(772, ($by - 86)); $pn.AutoScroll = $true; $pn.Anchor = 'Top,Left,Right,Bottom'; $f.Controls.Add($pn); $u.Panel = $pn
+  $pn = New-Object System.Windows.Forms.Panel; $pn.Location = New-Object System.Drawing.Point(10, ($introBox.Bottom + 8)); $pn.Size = New-Object System.Drawing.Size(772, ($by - $introBox.Bottom - 16)); $pn.AutoScroll = $true; $pn.Anchor = 'Top,Left,Right,Bottom'; $f.Controls.Add($pn); $u.Panel = $pn
   $y = 4
   foreach ($gn in $script:StGroupNames) {
     $items = @($script:StItems | Where-Object { $_.Group -eq $gn })
@@ -247,7 +249,6 @@ function New-StackSizesForm([string]$savePath) {
   $u.Apply = New-Btn $f 'Apply' 14 ($by + 126) 150 34; $u.Apply.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold); $u.Apply.Anchor = 'Left,Bottom'
   $close = New-Btn $f 'Close' 174 ($by + 126) 100 34; $close.Anchor = 'Left,Bottom'
   $u.Msg = New-Lbl $f '' 14 ($by + 166) 760 60; $u.Msg.ForeColor = $script:Th.Accent; $u.Msg.Anchor = 'Left,Right,Bottom'
-  $note = New-Lbl $f "IMPORTANT (tested): if the mod is not running, the game trims every stack above the item's own limit the next time it saves and the extra items are gone for good. So the tool refuses to switch an item off (or lower it) while such stacks exist, makes a backup each time you apply, and shows a red warning in the main window if they exist and the mod is not on. If you remove the mod, UE4SS stops loading, or the game updates, check this window before you play." 14 ($by + 230) 760 70; $note.ForeColor = $script:Th.Muted; $note.Anchor = 'Left,Right,Bottom'
   $u.Apply.Add_Click({ ST-WinApply }); $close.Add_Click({ $script:STW.Form.Close() })
   ST-WinRefresh
   Apply-Theme $f; Set-AppIcon $f

@@ -998,9 +998,11 @@ WHERE THINGS ARE
         $pw = New-PlayerForm; $pw.Opacity = 0; $pw.ShowInTaskbar = $false; $pw.StartPosition = 'Manual'; $pw.Location = New-Object System.Drawing.Point(-4000, -4000); $pw.Size = New-Object System.Drawing.Size(1500, 820); $pw.Show(); [System.Windows.Forms.Application]::DoEvents()
         Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_$tn.png")
         $ptTabs = $pw.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] } | Select-Object -First 1; if ($ptTabs) { foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Teleport') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_teleport_$tn.png")
-          foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Container labels') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_labels_$tn.png") }
+          foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Container labels') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_labels_$tn.png")
+          foreach ($pg in $ptTabs.TabPages) { if ($pg.Text -eq 'Quest progress') { $ptTabs.SelectedTab = $pg } }; [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $pw (Join-Path $env:PF_SHOTS "player_quest_$tn.png") }
         $pw.Close()
-        foreach ($sw in @(@{ F = { New-OverviewForm $script:SavePath }; N = 'overview' }, @{ F = { New-PicturesForm $script:SavePath }; N = 'pictures' })) {
+         try { $ww = New-WorldResetForm; $ww.Opacity = 0; $ww.ShowInTaskbar = $false; $ww.StartPosition = 'Manual'; $ww.Location = New-Object System.Drawing.Point(-4000, -4000); $ww.Show(); [System.Windows.Forms.Application]::DoEvents(); Save-WindowShot $ww (Join-Path $env:PF_SHOTS "world_$tn.png"); $ww.Close() } catch { $errs.Add("world reset window shot: $($_.Exception.Message)") }
+       foreach ($sw in @(@{ F = { New-OverviewForm $script:SavePath }; N = 'overview' }, @{ F = { New-PicturesForm $script:SavePath }; N = 'pictures' })) {
           $sf = & $sw.F; $sf.Opacity = 0; $sf.ShowInTaskbar = $false; $sf.StartPosition = 'Manual'; $sf.Location = New-Object System.Drawing.Point(-4000, -4000); $sf.Show(); [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 300; [System.Windows.Forms.Application]::DoEvents()
           Save-WindowShot $sf (Join-Path $env:PF_SHOTS "$($sw.N)_$tn.png"); $sf.Close() }
         $script:TestMode = $false

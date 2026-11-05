@@ -387,7 +387,7 @@ function New-PlayerForm {
   $ui.PendLbl = New-Lbl $t1 '' 14 360 460 40; $ui.PendLbl.ForeColor = $script:Th.Accent
   $bApply = New-Btn $t1 'Apply changes to save' 14 410 230 40; $bApply.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold); $bApply.Add_Click({ PT-Apply })
   $bDisc = New-Btn $t1 'Discard / reload from save' 252 410 200 40; $bDisc.Add_Click({ PT-Load })
-  $nt = New-Lbl $t1 "Nothing is written until you press 'Apply changes to save'. The game must be closed. A backup is made first.`r`nOnly values you changed are written." 14 462 460 50; $nt.ForeColor = $script:Th.Muted
+  [void](New-NoteBox $t1 "Nothing is written until you press 'Apply changes to save'.`r`nThe game must be closed. A backup is made first, and only the values you changed are written." -Dock None -X 14 -Y 456 -W 470)
   $gs = New-Object ThemedGroup; $gs.Text = 'Skills'; $gs.Location = '496,10'; $gs.Size = '560,500'; $gs.Anchor = 'Top,Left,Right,Bottom'; $t1.Controls.Add($gs)
   $pe = New-Object System.Windows.Forms.Panel; $pe.Dock = 'Bottom'; $pe.Height = 150; $gs.Controls.Add($pe)
   $ui.LvSkills = New-LV $gs @('Skill', 'Level', 'XP', 'XP needed for next', 'Max level', 'Benefit (from the game data)') @(170, 60, 80, 120, 80, 330); $ui.LvSkills.Dock = 'Fill'; $ui.LvSkills.BringToFront()
@@ -422,6 +422,7 @@ function New-PlayerForm {
   $mkGroup = { param([string]$title) $g = New-Object ThemedGroup; $g.Text = $title; $g.Dock = 'Fill'; $g.Padding = New-Object System.Windows.Forms.Padding(12, 8, 12, 10); return $g }
   $head = New-Object System.Windows.Forms.Panel; $head.Dock = 'Top'; $head.Height = 34; $t3.Controls.Add($head)
   $ui.TeleNow = New-Object System.Windows.Forms.Label; $ui.TeleNow.Dock = 'Fill'; $ui.TeleNow.TextAlign = 'MiddleLeft'; $ui.TeleNow.Font = $bold; $head.Controls.Add($ui.TeleNow)
+  [void](New-NoteBox $t3 "1.  Pick a place in the list (or type X / Y / Z) and press 'Teleport to selected place'.  The game must be closed; a backup is made first and 'Undo last teleport' puts it back.`r`n2.  You load above the spot and drop onto it.  With 'Let the game fix my height' ticked, a small in-game mod then measures the real ground and puts you on it.`r`n3.  Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings.  The suggested height is in bold; click another to use it.  Open the map to click any point." "PLEASE READ FIRST - HOW TELEPORT WORKS" -Dock Bottom)
   $tl = New-Object System.Windows.Forms.TableLayoutPanel; $tl.Dock = 'Fill'; $tl.ColumnCount = 2; $tl.RowCount = 1
   [void]$tl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 54))); [void]$tl.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 46))); [void]$tl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
   $t3.Controls.Add($tl); $tl.BringToFront()
@@ -455,7 +456,7 @@ function New-PlayerForm {
   [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 56))); [void]$hl.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 44))); $gH.Controls.Add($hl)
   $ui.LvLevels = New-LV $hl @('Height (Z)', 'Objects', 'On ground', 'Nearest (m)') @(110, 100, 120, 120); $ui.LvLevels.Dock = 'Fill'; $ui.LvLevels.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
   $ui.TeleInfo = New-Object System.Windows.Forms.Label; $ui.TeleInfo.Dock = 'Fill'; $ui.TeleInfo.AutoSize = $false; $ui.TeleInfo.ForeColor = $script:Th.Muted
-  $ui.TeleInfo.Text = "Pick a place in the list: its heights appear here, the suggested one in bold.`r`n`r`nHow it works: a new position is written into the save (game closed, backup first; Undo last teleport puts it back). You load above the spot and drop onto it; with 'Let the game fix my height' ticked, a small in-game mod then measures the real ground and puts you on it. Places: the game's named locations and fast-travel points, your bed, the crash site, your builds and your own spots. Open the map to click any point. Heights come from objects the atlas flights found: good, not perfect, on hills and in buildings."
+  $ui.TeleInfo.Text = "Pick a place in the list: its heights appear here, the suggested one in bold."
   $hl.Controls.Add($ui.TeleInfo)
   $fitCols = { Fit-LastColumn $this; $lc = $this.Columns[$this.Columns.Count - 1]; $lc.Width = [math]::Max(40, $lc.Width - 24) }; $ui.LvTele.Add_Resize($fitCols); $ui.LvLevels.Add_Resize($fitCols)   # leave room for the scroll bar so no horizontal bar shows
   $ui.TeleLevelZ = $null; $ui.TeleBusy = $false
@@ -470,7 +471,7 @@ function New-PlayerForm {
   New-Lbl $tq 'View' 0 11 40 | Out-Null; $ui.QView = New-Object System.Windows.Forms.ComboBox; $ui.QView.DropDownStyle = 'DropDownList'; $ui.QView.Location = '44,7'; $ui.QView.Size = '260,24'; [void]$ui.QView.Items.AddRange(@('Quests (state of each)', 'Task counters', 'Rewards already claimed', 'Journal (letters, recordings, places)')); $ui.QView.SelectedIndex = 0; $tq.Controls.Add($ui.QView)
   New-Lbl $tq 'Search' 322 11 50 | Out-Null; $ui.QFilter = New-Object System.Windows.Forms.TextBox; $ui.QFilter.Location = '374,7'; $ui.QFilter.Size = '260,24'; $tq.Controls.Add($ui.QFilter)
   $ui.QCount = New-Lbl $tq '' 650 11 200; $ui.QSpoil = New-Object System.Windows.Forms.CheckBox; $ui.QSpoil.Text = 'Hide story text'; $ui.QSpoil.AutoSize = $true; $ui.QSpoil.Location = '860,9'; $ui.QSpoil.Checked = (Get-HideSpoilers); $ui.QSpoil.ForeColor = $script:Th.Text; $tq.Controls.Add($ui.QSpoil)
-  $qn = New-Object System.Windows.Forms.Label; $qn.Dock = 'Bottom'; $qn.Height = 44; $qn.ForeColor = $script:Th.Muted; $qn.Text = "Read-only. Green = state name says finished (End / Success / Final). Blue = in the active list. Numbered states such as QuestState_6 are internal; the game files do not say what each one means, so this tool does not edit quests."; $t4.Controls.Add($qn)
+  [void](New-NoteBox $t4 "This tab only READS your save - quests are deliberately not editable.`r`nGreen = the state name says finished (End / Success / Final).  Blue = in the active list.  Numbered states such as QuestState_6 are internal: the game files do not say what each one means." "PLEASE READ FIRST - THIS TAB IS READ ONLY" -Dock Bottom)
   $ui.LvQuest = New-LV $t4 @('x') @(100); $ui.LvQuest.Dock = 'Fill'; $ui.LvQuest.BringToFront()
   $ui.QSpoil.Add_CheckedChanged({ Set-HideSpoilers $script:PT.QSpoil.Checked; PT-FillQuest }); $ui.QView.Add_SelectedIndexChanged({ PT-FillQuest }); $ui.QFilter.Add_TextChanged({ PT-FillQuest })
 

@@ -31,10 +31,47 @@ public class ThemedGroup : GroupBox {
       TextRenderer.DrawText(g, Text, Font, new Point(10, 0), TitleC, TextFormatFlags.NoPadding); }
   }
 }
+// The "please read" box: an explanation people must not skip. A coloured bar, a round badge, a bold heading and the text at a readable size; it works out its own height from the text and the width.
+public class ThemedNote : Panel {
+  public string Heading = "PLEASE READ FIRST - HOW THIS WORKS", Body = ""; public bool Warn = false, AutoFit = true;
+  public Color BackC = Color.FromArgb(27,34,44), BarC = Color.SteelBlue, HeadC = Color.White, TextC = Color.White, BorderC = Color.SteelBlue;
+  public Font HeadFont = new Font("Segoe UI", 10f, FontStyle.Bold), BodyFont = new Font("Segoe UI", 10f), BadgeFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+  const int Bar = 7, PadX = 16, PadY = 10, Badge = 22;
+  public ThemedNote() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+  public int NeededHeight(int width) {
+    int w = Math.Max(60, width - Bar - PadX * 2);
+    var bs = TextRenderer.MeasureText(Body ?? "", BodyFont, new Size(w, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+    return PadY + Badge + 8 + bs.Height + PadY + 2;
+  }
+  public void Fit() { if (!AutoFit || Dock == DockStyle.Fill || Dock == DockStyle.Left || Dock == DockStyle.Right || Width < 80) return; int h = NeededHeight(Width); if (Height != h) Height = h; }
+  protected override void OnResize(EventArgs e) { base.OnResize(e); Fit(); }
+  public void SetBody(string s) { Body = s; Fit(); Invalidate(); }
+  protected override void OnPaint(PaintEventArgs e) {
+    var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+    using (var b = new SolidBrush(BackC)) g.FillRectangle(b, ClientRectangle);
+    using (var p = new Pen(BorderC)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
+    using (var b = new SolidBrush(BarC)) g.FillRectangle(b, 0, 0, Bar, Height);
+    var br = new Rectangle(Bar + PadX - 2, PadY, Badge, Badge);
+    using (var b = new SolidBrush(BarC)) g.FillEllipse(b, br);
+    TextRenderer.DrawText(g, Warn ? "!" : "i", BadgeFont, br, BackC, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+    TextRenderer.DrawText(g, Heading, HeadFont, new Rectangle(br.Right + 10, PadY, Math.Max(20, Width - br.Right - 20), Badge), HeadC, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+    TextRenderer.DrawText(g, Body ?? "", BodyFont, new Rectangle(Bar + PadX, PadY + Badge + 8, Math.Max(20, Width - Bar - PadX * 2), Math.Max(10, Height - (PadY + Badge + 8) - PadY)), TextC, TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+  }
+}
 '@
 }
 
 function C([string]$hex) { [System.Drawing.ColorTranslator]::FromHtml($hex) }
+# a colour part of the way from $a to $b ($f = 0 gives $a, 1 gives $b)
+function Mix-Color($a, $b, [double]$f) { [System.Drawing.Color]::FromArgb([int]($a.R + ($b.R - $a.R) * $f), [int]($a.G + ($b.G - $a.G) * $f), [int]($a.B + ($b.B - $a.B) * $f)) }
+# The "please read" box used for every explanation in the tool (see ThemedNote): -Dock Top/Bottom (it sizes its own height from the text) or -Dock None with X, Y and W (it
+# keeps the width you give and sizes its height); -Warn makes it amber with a "!" for something that can cost you data.
+function New-NoteBox($parent, [string]$body, [string]$heading = '', [switch]$Warn, [string]$Dock = 'Bottom', [int]$X = 0, [int]$Y = 0, [int]$W = 0, [string]$Anchor = '') {
+  $n = New-Object ThemedNote; if ($heading) { $n.Heading = $heading }; $n.Body = $body; $n.Warn = [bool]$Warn
+  if ($Dock -eq 'None') { $n.Dock = 'None'; $n.Location = New-Object System.Drawing.Point($X, $Y); $n.Width = $W; if ($Anchor) { $n.Anchor = $Anchor }; $n.Height = $n.NeededHeight($W) }
+  else { $n.Dock = $Dock; $n.Height = 90 }
+  $parent.Controls.Add($n); return $n
+}
 # Palettes: charcoal panels #12171F/#222832/#2E333F, steel #3D485E, frost #5A99D5/#85BEE3, sunset amber #F8AD41, off-white #DAE1E8
 $script:PaletteDefs = [ordered]@{
   'Frostbite' = @{ Dark = $true; Art = 'art_frost.jpg'; Back = '#12171F'; Panel = '#1B222C'; Field = '#161B23'; Button = '#2E333F'; ButtonHot = '#3D485E'; Border = '#3D485E'; Text = '#DAE1E8'; Muted = '#8E9AAD'; Accent = '#5A99D5'; Accent2 = '#85BEE3'; AccentText = '#0B1118'; Good = '#6FD3A0'; Bad = '#FF7B7B'; Warn = '#F8AD41'; Select = '#2F4A66'; Header = '#2A3342' }
@@ -79,6 +116,10 @@ function Apply-Theme($ctl) {
   elseif ($ctl -is [ThemedTabs]) { $ctl.BackC = $t.Back; $ctl.PageC = $t.Panel; $ctl.TextC = $t.Text; $ctl.AccentC = $t.Accent; $ctl.MutedC = $t.Muted; $ctl.BackColor = $t.Back; $ctl.Invalidate() }
   elseif ($ctl -is [System.Windows.Forms.TabPage]) { $ctl.BackColor = $t.Panel; $ctl.ForeColor = $t.Text }
   elseif ($ctl -is [ThemedGroup]) { $ctl.BackColor = $t.Panel; $ctl.OuterC = $t.Back; $ctl.BorderC = $t.Border; $ctl.TitleC = $t.Accent2; $ctl.ForeColor = $t.Text; $ctl.Invalidate() }
+  elseif ($ctl -is [ThemedNote]) {
+    $bar = $(if ($ctl.Warn) { $t.Warn } else { $t.Accent }); $head = $(if ($ctl.Warn) { $t.Warn } else { $t.Accent2 })
+    $ctl.BackC = (Mix-Color $t.Panel $bar 0.14); $ctl.BarC = $bar; $ctl.HeadC = $head; $ctl.TextC = $t.Text; $ctl.BorderC = (Mix-Color $t.Panel $bar 0.6); $ctl.BackColor = $ctl.BackC; $ctl.Fit(); $ctl.Invalidate()
+  }
   elseif ($ctl -is [System.Windows.Forms.Button]) {
     $ctl.FlatStyle = 'Flat'; $ctl.FlatAppearance.BorderSize = 1; $ctl.UseVisualStyleBackColor = $false
     $primary = ($ctl.Font.Bold)
